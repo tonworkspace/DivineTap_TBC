@@ -23,27 +23,27 @@ export const OnboardingScreen: FC = () => {
   const steps: OnboardingStep[] = [
     {
       icon: <HiOutlineSparkles className="w-8 h-8 text-blue-400" />,
-      title: "Welcome to Divine Coin Resurrection",
-      description: "The Billion Coin is no more. The Divine Coin has risen. This is not just a rebrand. This is a spiritual rebirth. A reset. A higher calling.",
-      emoji: "✨"
+      title: "Welcome to TBC Mining Revolution",
+      description: "The Billion Coin returns stronger than ever. This is the next generation of TBC mining - powered by advanced blockchain technology and decentralized mining networks.",
+      emoji: "⛏️"
     },
     {
       icon: <HiOutlineLightBulb className="w-8 h-8 text-blue-400" />,
-      title: "Our Resurrection Story",
-      description: "Many of us believed in The Billion Coin because it stood for hope, freedom, and abundance. But it lost its way. Now, a new team of spiritually-awakened builders is here to redeem the original vision.",
-      emoji: "💡"
+      title: "Mining the Future",
+      description: "Join the global TBC mining network. Use cutting-edge mining rigs, optimize your hash rate, and earn TBC coins through our innovative tap-to-mine mechanics.",
+      emoji: "🚀"
     },
     {
       icon: <HiOutlineCube className="w-8 h-8 text-blue-400" />,
-      title: "What You Can Expect",
-      description: "Tap-to-Earn Light, Redemption Portal for past TBC holders, Daily Rituals & Quests, Soul DAO, and Real Value built on TON with NFTs, tokens, staking, and purpose.",
-      emoji: "🔮"
+      title: "Advanced Mining Features",
+      description: "Tap-to-Mine TBC, Hardware Upgrades, Daily Mining Challenges, Mining Pool Rewards, and Real Value built on TON with NFTs, tokens, staking, and mining rewards.",
+      emoji: "🔧"
     },
     {
       icon: <HiOutlineCheckCircle className="w-8 h-8 text-blue-400" />,
-      title: "Ready to Begin?",
-      description: "You are not here by accident. You were chosen to rebuild wealth — the divine way. Welcome home to Divine Coin.",
-      emoji: "🌟"
+      title: "Start Mining Now!",
+      description: "Your mining rig is ready. Join thousands of miners earning TBC coins every day. Start your mining operation and build your crypto wealth.",
+      emoji: "💎"
     }
   ];
 

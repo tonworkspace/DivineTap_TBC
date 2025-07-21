@@ -205,7 +205,7 @@ export const useAuth = () => {
               first_name: telegramUser.firstName || null,
               last_name: telegramUser.lastName || null,
               language_code: telegramUser.languageCode || null,
-              wallet_address: null,
+              wallet_address: null, // Will be set when user connects their wallet
               balance: 0,
               total_deposit: 0,
               total_withdrawn: 0,

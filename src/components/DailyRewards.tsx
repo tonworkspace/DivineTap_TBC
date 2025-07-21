@@ -1,2162 +1,3719 @@
-import React, { useState, useEffect, useCallback } from 'react';
-import { useGameContext } from '@/contexts/GameContext';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
+import { useAuth } from '../hooks/useAuth';
+// import { useGameContext } from '../contexts/GameContext';
+import { toNano } from '@ton/core';
+import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
+import { supabase } from '../lib/supabaseClient';
 import { useNotificationSystem } from './NotificationSystem';
-import { useAuth } from '@/hooks/useAuth';
-import './DailyRewards.css';
+import {
+  SECURITY_CONFIG,
+  rateLimiter,
+  generateDataHash,
+  validateDataIntegrity,
+  generateOperationSignature,
+  validateOperationSignature,
+  logSecurityEvent,
+  validateBalanceChange,
+  validateStakeData,
+  reconcileUserData,
+  detectSuspiciousActivity
+} from '../lib/security';
+// import * as TonWeb from 'tonweb';
+// import { calculateDailyRewards, STAKING_CONFIG } from '../lib/supabaseClient';
 
-interface SpiritualTask {
+interface StakingTier {
   id: string;
   name: string;
-  description: string;
+  minAmount: number;
+  maxAmount: number;
+  dailyRate: number;
+  cycleDuration: number;
+  maxReturn: number;
+  color: string;
   icon: string;
-  category: 'meditation' | 'chakra' | 'elemental' | 'cosmic' | 'mastery';
-  difficulty: 'beginner' | 'intermediate' | 'advanced' | 'master';
-  gemReward: number;
-  experienceReward: number;
-  requirements: {
-    minLevel?: number;
-    previousTask?: string;
-    chakraLevel?: number;
-  };
-  progress: number;
-  maxProgress: number;
-  completed: boolean;
-  completedAt?: number;
-  // Enhanced educational fields
-  instructions: string[];
-  duration: number; // in minutes
-  benefits: string[];
-  tips: string[];
-  scientificBackground?: string;
-  relatedChakras?: string[];
-  materials?: string[];
-  environment?: string;
-  timeOfDay?: 'morning' | 'afternoon' | 'evening' | 'anytime';
-  weather?: 'indoor' | 'outdoor' | 'any';
+  features: string[];
 }
 
-interface DailyStreak {
-  current: number;
-  max: number;
-  lastClaim: number;
-  totalClaimed: number;
-  consecutiveDays: number;
-  totalDays: number;
-  streakProtection: number;
-  vipLevel: number;
-  achievements: string[];
-  lastMissedDay: number;
-  bonusMultiplier: number;
-  specialRewards: string[];
-  spiritualLevel: number;
-  chakraProgress: {
-    root: number;
-    sacral: number;
-    solar: number;
-    heart: number;
-    throat: number;
-    thirdEye: number;
-    crown: number;
-  };
-  completedTasks: string[];
-  dailyTaskProgress: number;
-  weeklyGoal: number;
-  monthlyGoal: number;
-  lastDailyReset: string; // Add this field for daily reset tracking
-  lastTaskReset: number; // Add this field for task reset tracking
+interface UserStake {
+  id: number;
+  amount: number;
+  daily_rate: number;
+  total_earned: number;
+  start_date: string;
+  last_payout: string;
+  is_active: boolean;
+  speed_boost_active: boolean;
+  cycle_progress: number;
+  user_id?: string;
+  // New mining integration fields
+  mining_bonus_active?: boolean;
+  mining_level_bonus?: number;
+  divine_points_earned?: number;
+  last_mining_sync?: string;
 }
 
-interface Achievement {
+// New interface for mining-staking synergy
+interface MiningStakingSynergy {
+  totalMiningPoints: number;
+  stakingBonusMultiplier: number;
+  miningLevelBonus: number;
+  activeStakesCount: number;
+  totalStakedAmount: number;
+  synergyLevel: number;
+  nextSynergyMilestone: number;
+  synergyRewards: {
+    miningBoost: number;
+    stakingBoost: number;
+    divinePointsBonus: number;
+  };
+}
+
+// Stealth Saving System Configuration
+const STEALTH_SAVE_CONFIG = {
+  AUTO_SAVE_INTERVAL: 30000,
+  OFFLINE_QUEUE_KEY: 'divine_mining_offline_queue',
+  LAST_SYNC_KEY: 'divine_mining_last_sync',
+  SYNC_RETRY_DELAY: 5000,
+  MAX_RETRY_ATTEMPTS: SECURITY_CONFIG.MAX_RETRY_ATTEMPTS,
+  BATCH_SIZE: 10,
+  MIN_SYNC_INTERVAL: 10000,
+  // Security settings
+  MAX_OFFLINE_QUEUE_SIZE: SECURITY_CONFIG.MAX_OFFLINE_QUEUE_SIZE,
+  DATA_INTEGRITY_CHECK: SECURITY_CONFIG.DATA_INTEGRITY_ENABLED,
+  RATE_LIMIT_OPERATIONS: SECURITY_CONFIG.RATE_LIMITING_ENABLED,
+  MAX_OPERATIONS_PER_MINUTE: SECURITY_CONFIG.MAX_OPERATIONS_PER_MINUTE
+};
+
+// Offline operation types
+interface OfflineOperation {
   id: string;
-  name: string;
-  description: string;
-  icon: string;
-  reward: {
-    points: number;
-    gems: number;
-    bonus: string;
-  };
-  condition: (streak: DailyStreak) => boolean;
+  type: 'stake_create' | 'stake_update' | 'reward_claim' | 'user_data_update' | 'synergy_update';
+  data: any;
+  timestamp: number;
+  retryCount: number;
+  userId: string;
+  signature?: string;
 }
 
-// Spiritual Tasks System
-const SPIRITUAL_TASKS: SpiritualTask[] = [
-  // Meditation Tasks
-  {
-    id: 'morning-meditation',
-    name: 'Morning Meditation',
-    description: 'Begin your day with 10 minutes of mindful meditation to set positive intentions',
-    icon: '🧘‍♀️',
-    category: 'meditation',
-    difficulty: 'beginner',
-    gemReward: 5,
-    experienceReward: 50,
-    requirements: {},
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a quiet, comfortable space where you won\'t be disturbed',
-      'Sit cross-legged on a cushion or chair with your back straight',
-      'Close your eyes and take 3 deep breaths to center yourself',
-      'Focus on your natural breath - inhale and exhale slowly',
-      'When your mind wanders, gently bring it back to your breath',
-      'Continue for 10 minutes, maintaining gentle awareness'
-    ],
-    duration: 10,
-    benefits: [
-      'Reduces stress and anxiety',
-      'Improves focus and concentration',
-      'Enhances emotional regulation',
-      'Promotes better sleep quality',
-      'Increases self-awareness'
-    ],
-    tips: [
-      'Start with just 5 minutes if 10 feels too long',
-      'Use a meditation app timer with gentle bells',
-      'Don\'t judge yourself if your mind wanders - this is normal',
-      'Try to meditate at the same time each day'
-    ],
-    scientificBackground: 'Research shows morning meditation activates the prefrontal cortex, improving decision-making and emotional control throughout the day.',
-    relatedChakras: ['crown', 'third-eye'],
-    materials: ['Meditation cushion or comfortable chair', 'Timer or meditation app'],
-    environment: 'Quiet indoor space',
-    timeOfDay: 'morning',
-    weather: 'indoor'
-  },
-  {
-    id: 'breathing-exercise',
-    name: 'Breathing Exercise',
-    description: 'Practice deep breathing for 5 minutes to activate your parasympathetic nervous system',
-    icon: '🫁',
-    category: 'meditation',
-    difficulty: 'beginner',
-    gemReward: 3,
-    experienceReward: 30,
-    requirements: {},
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Sit comfortably with your back straight and shoulders relaxed',
-      'Place one hand on your chest and the other on your belly',
-      'Inhale deeply through your nose for 4 counts, feeling your belly expand',
-      'Hold your breath for 4 counts',
-      'Exhale slowly through your mouth for 6 counts',
-      'Repeat this 4-4-6 breathing pattern for 5 minutes'
-    ],
-    duration: 5,
-    benefits: [
-      'Activates the parasympathetic nervous system',
-      'Reduces cortisol levels',
-      'Improves oxygen flow to the brain',
-      'Calms the mind and body',
-      'Enhances focus and clarity'
-    ],
-    tips: [
-      'Start with just 2-3 minutes if 5 feels too long',
-      'Focus on the sensation of air entering and leaving your body',
-      'If you feel lightheaded, return to normal breathing',
-      'Practice this technique whenever you feel stressed'
-    ],
-    scientificBackground: 'Deep breathing activates the vagus nerve, which triggers the parasympathetic nervous system, reducing stress hormones and promoting relaxation.',
-    relatedChakras: ['root', 'heart'],
-    materials: ['Comfortable chair or cushion'],
-    environment: 'Any quiet space',
-    timeOfDay: 'anytime',
-    weather: 'indoor'
-  },
-  {
-    id: 'mindful-walking',
-    name: 'Mindful Walking',
-    description: 'Take a 15-minute mindful walk in nature to connect with the present moment',
-    icon: '🚶‍♀️',
-    category: 'meditation',
-    difficulty: 'intermediate',
-    gemReward: 8,
-    experienceReward: 80,
-    requirements: { minLevel: 5 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Choose a natural setting like a park, forest, or garden',
-      'Walk at a slower pace than usual, about half your normal speed',
-      'Focus on the sensation of your feet touching the ground',
-      'Notice the rhythm of your breath as you walk',
-      'Observe the sights, sounds, and smells around you without judgment',
-      'If your mind wanders, gently bring it back to your walking experience',
-      'Continue for 15 minutes, maintaining awareness of each step'
-    ],
-    duration: 15,
-    benefits: [
-      'Reduces stress and anxiety',
-      'Improves mood and emotional well-being',
-      'Enhances connection with nature',
-      'Increases mindfulness and present-moment awareness',
-      'Provides gentle exercise and fresh air'
-    ],
-    tips: [
-      'Choose a familiar route to avoid getting lost',
-      'Walk alone to minimize distractions',
-      'Turn off your phone or put it on silent',
-      'Dress appropriately for the weather',
-      'Focus on one sense at a time (sight, sound, touch)'
-    ],
-    scientificBackground: 'Mindful walking combines the benefits of exercise with meditation, reducing cortisol levels and increasing endorphins while improving cognitive function.',
-    relatedChakras: ['root', 'sacral'],
-    materials: ['Comfortable walking shoes', 'Weather-appropriate clothing'],
-    environment: 'Natural outdoor setting',
-    timeOfDay: 'anytime',
-    weather: 'outdoor'
-  },
-  {
-    id: 'zen-garden',
-    name: 'Zen Garden Creation',
-    description: 'Create or tend to a small zen garden space to cultivate mindfulness and inner peace',
-    icon: '🏮',
-    category: 'meditation',
-    difficulty: 'advanced',
-    gemReward: 15,
-    experienceReward: 150,
-    requirements: { minLevel: 10 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Choose a small space (desktop, windowsill, or corner of a room)',
-      'Gather natural materials: sand, small stones, moss, or miniature plants',
-      'Create a simple design with clean lines and minimal elements',
-      'Use a small rake or stick to create patterns in the sand',
-      'Place stones strategically to represent mountains or islands',
-      'Add a small plant or moss for life energy',
-      'Spend 20 minutes arranging and tending to your garden mindfully'
-    ],
-    duration: 20,
-    benefits: [
-      'Promotes mindfulness and concentration',
-      'Reduces stress and anxiety',
-      'Enhances creativity and artistic expression',
-      'Creates a peaceful sanctuary space',
-      'Teaches patience and attention to detail'
-    ],
-    tips: [
-      'Start with a simple design - less is more in zen gardens',
-      'Use natural materials whenever possible',
-      'Change the sand patterns regularly for variety',
-      'Keep your garden in a quiet, undisturbed location',
-      'Tend to it daily for maximum benefit'
-    ],
-    scientificBackground: 'Creating and tending to zen gardens activates the brain\'s default mode network, promoting creative thinking and reducing stress through focused attention.',
-    relatedChakras: ['third-eye', 'crown'],
-    materials: ['Shallow container or tray', 'Fine sand or gravel', 'Small stones', 'Miniature rake or stick', 'Optional: small plants or moss'],
-    environment: 'Indoor or outdoor quiet space',
-    timeOfDay: 'anytime',
-    weather: 'indoor'
-  },
+// Stealth saving state interface
+interface StealthSaveState {
+  isOnline: boolean;
+  lastSyncTime: number;
+  pendingOperations: OfflineOperation[];
+  isSyncing: boolean;
+  syncErrors: string[];
+  autoSaveEnabled: boolean;
+}
 
-  // Chakra Tasks
-  {
-    id: 'root-chakra-activation',
-    name: 'Root Chakra Activation',
-    description: 'Ground yourself and activate your root chakra for stability and security',
-    icon: '🔴',
-    category: 'chakra',
-    difficulty: 'beginner',
-    gemReward: 10,
-    experienceReward: 100,
-    requirements: {},
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a quiet space and sit comfortably with your feet flat on the ground',
-      'Close your eyes and take 3 deep breaths to center yourself',
-      'Visualize a red light at the base of your spine (tailbone area)',
-      'Feel the energy of this red light growing stronger with each breath',
-      'Imagine roots growing from your feet deep into the earth',
-      'Feel the earth\'s energy flowing up through these roots into your body',
-      'Focus on feelings of safety, security, and being grounded',
-      'Continue this visualization for 10 minutes'
-    ],
-    duration: 10,
-    benefits: [
-      'Increases feelings of safety and security',
-      'Reduces anxiety and fear',
-      'Improves physical energy and vitality',
-      'Enhances connection to the physical world',
-      'Promotes stability and grounding'
-    ],
-    tips: [
-      'Practice barefoot on grass or earth for enhanced grounding',
-      'Use red crystals like garnet or red jasper if available',
-      'Focus on the physical sensations in your lower body',
-      'If you feel ungrounded, this practice is especially beneficial',
-      'Combine with deep breathing for maximum effect'
-    ],
-    scientificBackground: 'The root chakra corresponds to the sacral plexus and is associated with the fight-or-flight response. Activating it can reduce cortisol levels and promote feelings of safety.',
-    relatedChakras: ['root'],
-    materials: ['Comfortable cushion or chair', 'Optional: red crystals or stones'],
-    environment: 'Quiet indoor or outdoor space',
-    timeOfDay: 'morning',
-    weather: 'any'
-  },
-  {
-    id: 'sacral-chakra-balance',
-    name: 'Sacral Chakra Balance',
-    description: 'Balance your sacral chakra through creative expression and emotional awareness',
-    icon: '🟠',
-    category: 'chakra',
-    difficulty: 'intermediate',
-    gemReward: 12,
-    experienceReward: 120,
-    requirements: { previousTask: 'root-chakra-activation' },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a comfortable space where you can be creative',
-      'Close your eyes and visualize an orange light in your lower abdomen',
-      'Focus on your emotions and creative energy',
-      'Express yourself through drawing, writing, or movement',
-      'Allow your emotions to flow freely without judgment',
-      'Feel the orange energy expanding and balancing',
-      'Continue for 15 minutes, focusing on creative expression'
-    ],
-    duration: 15,
-    benefits: [
-      'Enhances creativity and artistic expression',
-      'Improves emotional balance and awareness',
-      'Increases passion and joy in life',
-      'Strengthens relationships and intimacy',
-      'Promotes healthy sexuality and sensuality'
-    ],
-    tips: [
-      'Use orange crystals like carnelian or orange calcite',
-      'Listen to music that inspires creativity',
-      'Don\'t judge your creative output - focus on the process',
-      'Practice this when you feel emotionally blocked',
-      'Combine with gentle hip-opening yoga poses'
-    ],
-    scientificBackground: 'The sacral chakra corresponds to the reproductive organs and is associated with creativity, emotions, and pleasure. Balancing it can improve emotional regulation and creative thinking.',
-    relatedChakras: ['sacral'],
-    materials: ['Art supplies (optional)', 'Comfortable space', 'Optional: orange crystals'],
-    environment: 'Private, comfortable space',
-    timeOfDay: 'afternoon',
-    weather: 'indoor'
-  },
-  {
-    id: 'solar-plexus-power',
-    name: 'Solar Plexus Power',
-    description: 'Strengthen your solar plexus chakra for confidence and personal power',
-    icon: '🟡',
-    category: 'chakra',
-    difficulty: 'intermediate',
-    gemReward: 15,
-    experienceReward: 150,
-    requirements: { previousTask: 'sacral-chakra-balance' },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Sit in a comfortable position with your back straight',
-      'Place your hands on your solar plexus (upper abdomen)',
-      'Visualize a bright yellow light in this area',
-      'Take deep breaths, feeling the yellow energy expand',
-      'Repeat positive affirmations about your personal power',
-      'Feel confidence and strength building within you',
-      'Continue this practice for 12 minutes'
-    ],
-    duration: 12,
-    benefits: [
-      'Increases self-confidence and self-esteem',
-      'Improves decision-making abilities',
-      'Enhances personal power and willpower',
-      'Reduces anxiety and self-doubt',
-      'Strengthens digestive system'
-    ],
-    tips: [
-      'Use yellow crystals like citrine or yellow topaz',
-      'Practice power poses before starting',
-      'Repeat affirmations like "I am confident and powerful"',
-      'Focus on your core strength and stability',
-      'Practice this before important meetings or decisions'
-    ],
-    scientificBackground: 'The solar plexus chakra corresponds to the celiac plexus and is associated with confidence and personal power. Activating it can improve self-esteem and reduce anxiety.',
-    relatedChakras: ['solar'],
-    materials: ['Comfortable cushion or chair', 'Optional: yellow crystals'],
-    environment: 'Quiet, private space',
-    timeOfDay: 'morning',
-    weather: 'indoor'
-  },
-  {
-    id: 'heart-chakra-opening',
-    name: 'Heart Chakra Opening',
-    description: 'Open your heart chakra through compassion meditation and love awareness',
-    icon: '🟢',
-    category: 'chakra',
-    difficulty: 'advanced',
-    gemReward: 20,
-    experienceReward: 200,
-    requirements: { previousTask: 'solar-plexus-power' },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Sit comfortably and place your hands over your heart center',
-      'Visualize a bright green light in your chest area',
-      'Focus on feelings of love, compassion, and forgiveness',
-      'Send love to yourself, then to others in your life',
-      'Practice loving-kindness meditation',
-      'Feel your heart expanding with unconditional love',
-      'Continue this practice for 20 minutes'
-    ],
-    duration: 20,
-    benefits: [
-      'Increases compassion and empathy',
-      'Improves relationships and connection',
-      'Reduces anger and resentment',
-      'Enhances emotional healing',
-      'Promotes forgiveness and acceptance'
-    ],
-    tips: [
-      'Use green crystals like rose quartz or green aventurine',
-      'Practice this when you feel disconnected from others',
-      'Focus on breathing love in and out',
-      'Start with self-love before extending to others',
-      'Combine with gentle heart-opening yoga poses'
-    ],
-    scientificBackground: 'The heart chakra corresponds to the cardiac plexus and is associated with love and compassion. Opening it can improve emotional well-being and social connections.',
-    relatedChakras: ['heart'],
-    materials: ['Comfortable cushion or chair', 'Optional: green or pink crystals'],
-    environment: 'Peaceful, quiet space',
-    timeOfDay: 'evening',
-    weather: 'indoor'
-  },
+// TON Transaction Constants and Configuration
+const MAINNET_DEPOSIT_ADDRESS = 'UQDd4ENxNBVIFNoi1t1FQPrLhLM1rMbxIFoI1sWIS4vuhjs-';
+const TESTNET_DEPOSIT_ADDRESS = 'UQDd4ENxNBVIFNoi1t1FQPrLhLM1rMbxIFoI1sWIS4vuhjs-';
 
-  // Elemental Tasks
-  {
-    id: 'earth-connection',
-    name: 'Earth Connection',
-    description: 'Connect with earth element through grounding exercises and nature awareness',
-    icon: '🌍',
-    category: 'elemental',
-    difficulty: 'beginner',
-    gemReward: 8,
-    experienceReward: 80,
-    requirements: {},
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a natural outdoor setting (park, garden, or forest)',
-      'Remove your shoes and stand barefoot on the earth',
-      'Feel the texture and temperature of the ground beneath you',
-      'Take deep breaths and imagine roots growing from your feet',
-      'Feel the earth\'s energy flowing up through your body',
-      'Observe the natural elements around you',
-      'Continue this practice for 10 minutes'
-    ],
-    duration: 10,
-    benefits: [
-      'Reduces stress and anxiety',
-      'Improves balance and stability',
-      'Enhances connection to nature',
-      'Increases feelings of security',
-      'Promotes physical grounding'
-    ],
-    tips: [
-      'Choose a safe, clean area for barefoot practice',
-      'Practice in different weather conditions',
-      'Focus on the sensations in your feet',
-      'Combine with tree-hugging for enhanced connection',
-      'Practice this when you feel scattered or anxious'
-    ],
-    scientificBackground: 'Grounding (earthing) has been shown to reduce inflammation, improve sleep, and reduce stress by connecting with the earth\'s natural electrical charge.',
-    relatedChakras: ['root'],
-    materials: ['Access to natural outdoor space'],
-    environment: 'Natural outdoor setting',
-    timeOfDay: 'anytime',
-    weather: 'outdoor'
-  },
-  {
-    id: 'water-flow',
-    name: 'Water Flow',
-    description: 'Embrace water element through fluid movement and emotional flow',
-    icon: '💧',
-    category: 'elemental',
-    difficulty: 'intermediate',
-    gemReward: 12,
-    experienceReward: 120,
-    requirements: { minLevel: 8 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a quiet space where you can move freely',
-      'Stand with your feet shoulder-width apart',
-      'Begin gentle, flowing movements with your arms',
-      'Imagine you are moving through water',
-      'Let your body flow naturally without rigid movements',
-      'Focus on the fluidity and grace of water',
-      'Continue this practice for 15 minutes'
-    ],
-    duration: 15,
-    benefits: [
-      'Improves flexibility and fluid movement',
-      'Enhances emotional flow and expression',
-      'Reduces tension and rigidity',
-      'Promotes adaptability and change',
-      'Increases grace and elegance'
-    ],
-    tips: [
-      'Practice near water if possible (lake, river, ocean)',
-      'Use blue crystals like aquamarine or blue lace agate',
-      'Listen to flowing water sounds',
-      'Don\'t force movements - let them flow naturally',
-      'Practice this when you feel emotionally stuck'
-    ],
-    scientificBackground: 'Fluid movement practices activate the parasympathetic nervous system and improve proprioception, enhancing emotional regulation and physical coordination.',
-    relatedChakras: ['sacral', 'throat'],
-    materials: ['Comfortable clothing', 'Optional: blue crystals'],
-    environment: 'Quiet space with room to move',
-    timeOfDay: 'afternoon',
-    weather: 'indoor'
-  },
-  {
-    id: 'fire-transformation',
-    name: 'Fire Transformation',
-    description: 'Harness fire element for personal transformation and inner strength',
-    icon: '🔥',
-    category: 'elemental',
-    difficulty: 'advanced',
-    gemReward: 18,
-    experienceReward: 180,
-    requirements: { minLevel: 15 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a safe space where you can light a candle',
-      'Sit comfortably and focus on the flame',
-      'Visualize fire energy within your solar plexus',
-      'Feel the warmth and power of transformation',
-      'Imagine burning away old patterns and limitations',
-      'Embrace the energy of change and renewal',
-      'Continue this practice for 20 minutes'
-    ],
-    duration: 20,
-    benefits: [
-      'Increases personal power and confidence',
-      'Promotes transformation and change',
-      'Enhances willpower and determination',
-      'Burns away negative patterns',
-      'Ignites passion and motivation'
-    ],
-    tips: [
-      'Use red or orange crystals like ruby or carnelian',
-      'Practice during sunset for enhanced fire energy',
-      'Focus on the transformative power of fire',
-      'Be mindful of fire safety',
-      'Practice this when you need motivation or change'
-    ],
-    scientificBackground: 'Fire meditation activates the sympathetic nervous system and increases metabolic rate, promoting energy, focus, and the courage to make changes.',
-    relatedChakras: ['solar'],
-    materials: ['Candle and matches', 'Fire-safe container', 'Optional: red/orange crystals'],
-    environment: 'Safe indoor space',
-    timeOfDay: 'evening',
-    weather: 'indoor'
-  },
-  {
-    id: 'air-freedom',
-    name: 'Air Freedom',
-    description: 'Embrace air element for mental clarity and spiritual freedom',
-    icon: '💨',
-    category: 'elemental',
-    difficulty: 'master',
-    gemReward: 25,
-    experienceReward: 250,
-    requirements: { minLevel: 20 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find an open space with fresh air (outdoor preferred)',
-      'Stand with your arms open wide',
-      'Take deep breaths, feeling the air fill your lungs',
-      'Visualize your thoughts as clouds passing by',
-      'Feel the freedom and expansiveness of air',
-      'Let go of mental limitations and restrictions',
-      'Continue this practice for 25 minutes'
-    ],
-    duration: 25,
-    benefits: [
-      'Enhances mental clarity and focus',
-      'Promotes spiritual freedom and expansion',
-      'Improves communication and expression',
-      'Reduces mental fog and confusion',
-      'Increases inspiration and creativity'
-    ],
-    tips: [
-      'Practice on a windy day for enhanced air energy',
-      'Use clear crystals like clear quartz or selenite',
-      'Focus on the breath and mental clarity',
-      'Practice this when you feel mentally stuck',
-      'Combine with pranayama breathing techniques'
-    ],
-    scientificBackground: 'Air element practices improve oxygen flow to the brain, enhancing cognitive function, creativity, and mental clarity while reducing stress and anxiety.',
-    relatedChakras: ['throat', 'third-eye'],
-    materials: ['Access to fresh air', 'Optional: clear crystals'],
-    environment: 'Outdoor space with fresh air',
-    timeOfDay: 'morning',
-    weather: 'outdoor'
-  },
+const isMainnet = false; // You can toggle this for testing
+const DEPOSIT_ADDRESS = isMainnet ? MAINNET_DEPOSIT_ADDRESS : TESTNET_DEPOSIT_ADDRESS;
 
-  // Cosmic Tasks
-  {
-    id: 'moon-phase-alignment',
-    name: 'Moon Phase Alignment',
-    description: 'Align your energy with the current moon phase for enhanced spiritual connection',
-    icon: '🌙',
-    category: 'cosmic',
-    difficulty: 'intermediate',
-    gemReward: 15,
-    experienceReward: 150,
-    requirements: { minLevel: 12 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Check the current moon phase (new, waxing, full, or waning)',
-      'Find a quiet space where you can see the moon if possible',
-      'Sit comfortably and close your eyes',
-      'Visualize the moon\'s energy flowing into your body',
-      'Align your intentions with the moon\'s current phase',
-      'Feel the cosmic connection and lunar energy',
-      'Continue this practice for 15 minutes'
-    ],
-    duration: 15,
-    benefits: [
-      'Enhances spiritual intuition and awareness',
-      'Improves emotional balance and cycles',
-      'Strengthens connection to natural rhythms',
-      'Increases psychic sensitivity',
-      'Promotes inner reflection and wisdom'
-    ],
-    tips: [
-      'Practice during the actual moon phase for best results',
-      'Use moonstone or selenite crystals',
-      'Keep a moon phase journal to track your experiences',
-      'Practice this during full moon for maximum energy',
-      'Combine with lunar breathing techniques'
-    ],
-    scientificBackground: 'Moon phases affect human behavior and emotions through gravitational forces and light exposure, influencing circadian rhythms and hormonal cycles.',
-    relatedChakras: ['third-eye', 'crown'],
-    materials: ['Moon phase calendar', 'Optional: moonstone or selenite'],
-    environment: 'Quiet space, preferably with moon visibility',
-    timeOfDay: 'evening',
-    weather: 'any'
-  },
-  {
-    id: 'star-gazing',
-    name: 'Star Gazing',
-    description: 'Spend time under the stars for cosmic connection and universal awareness',
-    icon: '⭐',
-    category: 'cosmic',
-    difficulty: 'intermediate',
-    gemReward: 12,
-    experienceReward: 120,
-    requirements: { minLevel: 10 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a clear, dark location away from city lights',
-      'Lie down comfortably on a blanket or reclining chair',
-      'Allow your eyes to adjust to the darkness (10-15 minutes)',
-      'Gaze at the stars without focusing on any particular one',
-      'Feel the vastness and infinite nature of the universe',
-      'Contemplate your place in the cosmic order',
-      'Continue this practice for 20 minutes'
-    ],
-    duration: 20,
-    benefits: [
-      'Enhances cosmic awareness and perspective',
-      'Reduces stress and promotes relaxation',
-      'Improves night vision and visual perception',
-      'Increases sense of wonder and awe',
-      'Promotes deep philosophical contemplation'
-    ],
-    tips: [
-      'Check weather conditions for clear skies',
-      'Use a star map app to identify constellations',
-      'Bring warm clothing for comfort',
-      'Practice during new moon for best star visibility',
-      'Allow time for your eyes to fully adjust to darkness'
-    ],
-    scientificBackground: 'Star gazing activates the default mode network in the brain, promoting creative thinking, problem-solving, and a sense of awe that reduces stress and improves well-being.',
-    relatedChakras: ['third-eye', 'crown'],
-    materials: ['Blanket or reclining chair', 'Warm clothing', 'Optional: star map'],
-    environment: 'Dark outdoor location',
-    timeOfDay: 'evening',
-    weather: 'outdoor'
-  },
-  {
-    id: 'cosmic-meditation',
-    name: 'Cosmic Meditation',
-    description: 'Meditate on the vastness of the universe and your cosmic connection',
-    icon: '🌌',
-    category: 'cosmic',
-    difficulty: 'advanced',
-    gemReward: 20,
-    experienceReward: 200,
-    requirements: { minLevel: 18 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a quiet, dark space where you won\'t be disturbed',
-      'Sit in a comfortable meditation position',
-      'Close your eyes and take several deep breaths',
-      'Visualize yourself floating in the vastness of space',
-      'Feel the infinite expanse of the universe around you',
-      'Contemplate the interconnectedness of all things',
-      'Continue this meditation for 30 minutes'
-    ],
-    duration: 30,
-    benefits: [
-      'Expands consciousness and awareness',
-      'Promotes deep spiritual insight',
-      'Enhances cosmic perspective and understanding',
-      'Reduces ego and personal limitations',
-      'Increases sense of universal connection'
-    ],
-    tips: [
-      'Practice after star gazing for enhanced effect',
-      'Use cosmic imagery or space sounds',
-      'Allow thoughts to come and go like stars',
-      'Focus on the feeling of infinite space',
-      'Practice this when you need perspective on life'
-    ],
-    scientificBackground: 'Cosmic meditation activates the default mode network and promotes transcendent experiences, leading to increased creativity, problem-solving abilities, and reduced stress.',
-    relatedChakras: ['crown'],
-    materials: ['Comfortable meditation cushion', 'Optional: space sounds or imagery'],
-    environment: 'Dark, quiet space',
-    timeOfDay: 'evening',
-    weather: 'indoor'
-  },
+// Note: TonWeb initialization removed due to import issues
+// Will be handled in the deposit function using TonConnect
 
-  // Mastery Tasks
-  {
-    id: 'energy-healing',
-    name: 'Energy Healing',
-    description: 'Practice energy healing on yourself or others to restore balance and promote healing',
-    icon: '✨',
-    category: 'mastery',
-    difficulty: 'advanced',
-    gemReward: 25,
-    experienceReward: 250,
-    requirements: { minLevel: 25 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a quiet, comfortable space where you won\'t be disturbed',
-      'Sit or lie down in a relaxed position',
-      'Close your eyes and take several deep breaths to center yourself',
-      'Place your hands over the area that needs healing (or use visualization)',
-      'Visualize healing light flowing from your hands into the area',
-      'Feel the energy moving and transforming negative energy into positive',
-      'Continue this practice for 30 minutes, maintaining focused intention',
-      'When finished, ground yourself and express gratitude for the healing'
-    ],
-    duration: 30,
-    benefits: [
-      'Promotes physical and emotional healing',
-      'Reduces pain and inflammation',
-      'Improves energy flow and vitality',
-      'Enhances spiritual connection and intuition',
-      'Strengthens the body\'s natural healing abilities'
-    ],
-    tips: [
-      'Start with self-healing before working on others',
-      'Use crystals like clear quartz or amethyst to amplify energy',
-      'Trust your intuition about where healing is needed',
-      'Practice regularly to strengthen your healing abilities',
-      'Always ask permission before healing others'
-    ],
-    scientificBackground: 'Energy healing practices may work through the placebo effect, relaxation response, and the body\'s natural healing mechanisms, reducing stress hormones and promoting parasympathetic nervous system activation.',
-    relatedChakras: ['heart', 'crown'],
-    materials: ['Comfortable space', 'Optional: healing crystals'],
-    environment: 'Quiet, peaceful space',
-    timeOfDay: 'anytime',
-    weather: 'indoor'
-  },
-  {
-    id: 'spiritual-teaching',
-    name: 'Spiritual Teaching',
-    description: 'Share spiritual wisdom with someone in need to help them on their journey',
-    icon: '📚',
-    category: 'mastery',
-    difficulty: 'master',
-    gemReward: 30,
-    experienceReward: 300,
-    requirements: { minLevel: 30 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Identify someone who is seeking spiritual guidance or support',
-      'Create a safe, non-judgmental space for the conversation',
-      'Listen deeply to their questions or concerns without interrupting',
-      'Share relevant spiritual wisdom from your own experience',
-      'Offer practical advice and techniques they can use',
-      'Encourage them to trust their own intuition and inner wisdom',
-      'Provide resources or recommendations for further learning',
-      'End with gratitude and offer ongoing support if needed'
-    ],
-    duration: 45,
-    benefits: [
-      'Deepens your own spiritual understanding',
-      'Strengthens your connection to universal wisdom',
-      'Helps others on their spiritual path',
-      'Improves communication and empathy skills',
-      'Creates meaningful connections and community'
-    ],
-    tips: [
-      'Teach from experience rather than just theory',
-      'Adapt your teaching style to the person\'s level',
-      'Be humble and acknowledge you\'re also learning',
-      'Encourage questions and open dialogue',
-      'Respect their beliefs and don\'t force your perspective'
-    ],
-    scientificBackground: 'Teaching others activates the brain\'s reward system and strengthens neural pathways, while also improving social connection and empathy through mirror neuron activation.',
-    relatedChakras: ['throat', 'heart', 'crown'],
-    materials: ['Quiet space for conversation', 'Optional: spiritual books or resources'],
-    environment: 'Comfortable, private space',
-    timeOfDay: 'anytime',
-    weather: 'indoor'
-  },
-  {
-    id: 'enlightenment-moment',
-    name: 'Enlightenment Moment',
-    description: 'Experience a moment of deep spiritual insight and universal understanding',
-    icon: '💡',
-    category: 'mastery',
-    difficulty: 'master',
-    gemReward: 50,
-    experienceReward: 500,
-    requirements: { minLevel: 40 },
-    progress: 0,
-    maxProgress: 1,
-    completed: false,
-    instructions: [
-      'Find a sacred space where you feel completely safe and undisturbed',
-      'Sit in a comfortable meditation position with your back straight',
-      'Close your eyes and take several deep, slow breaths',
-      'Let go of all thoughts, expectations, and attachments',
-      'Surrender to the present moment completely',
-      'Allow your consciousness to expand beyond your individual self',
-      'Open yourself to receiving divine wisdom and insight',
-      'Remain in this state of expanded awareness for as long as possible',
-      'When you return, journal your insights and experiences'
-    ],
-    duration: 60,
-    benefits: [
-      'Provides profound spiritual insights and understanding',
-      'Dissolves ego and personal limitations',
-      'Creates lasting positive transformation',
-      'Enhances connection to universal consciousness',
-      'Brings clarity and purpose to life direction'
-    ],
-    tips: [
-      'Don\'t force or chase enlightenment - let it come naturally',
-      'Practice regular meditation to prepare your mind',
-      'Be patient - these moments often come unexpectedly',
-      'Trust the process and don\'t judge your experiences',
-      'Integrate insights into daily life for lasting transformation'
-    ],
-    scientificBackground: 'Enlightenment experiences activate the default mode network and can create lasting changes in brain structure, particularly in areas associated with self-awareness, empathy, and consciousness.',
-    relatedChakras: ['crown', 'third-eye'],
-    materials: ['Sacred space', 'Meditation cushion', 'Journal for insights'],
-    environment: 'Sacred, undisturbed space',
-    timeOfDay: 'evening',
-    weather: 'indoor'
-  }
-];
+// Add this near the top with other constants
+const NETWORK_NAME = isMainnet ? 'Mainnet' : 'Testnet';
 
-// Achievement system
-const ACHIEVEMENTS: Achievement[] = [
-  {
-    id: 'first-week',
-    name: 'Week Warrior',
-    description: 'Complete spiritual tasks for 7 consecutive days',
-    icon: '📅',
-    reward: { points: 100, gems: 50, bonus: '+5% permanent mining' },
-    condition: (streak) => streak.current >= 7
-  },
-  {
-    id: 'month-master',
-    name: 'Month Master',
-    description: 'Complete spiritual tasks for 30 consecutive days',
-    icon: '🗓️',
-    reward: { points: 500, gems: 200, bonus: '+10% permanent mining' },
-    condition: (streak) => streak.current >= 30
-  },
-  {
-    id: 'chakra-master',
-    name: 'Chakra Master',
-    description: 'Complete all chakra-related tasks',
-    icon: '🌈',
-    reward: { points: 300, gems: 150, bonus: 'Chakra resonance bonus' },
-    condition: (streak) => streak.chakraProgress.crown >= 100
-  },
-  {
-    id: 'elemental-harmony',
-    name: 'Elemental Harmony',
-    description: 'Complete all elemental tasks',
-    icon: '⚡',
-    reward: { points: 400, gems: 200, bonus: 'Elemental balance bonus' },
-    condition: (streak) => streak.completedTasks.filter(id => SPIRITUAL_TASKS.find(t => t.id === id)?.category === 'elemental').length >= 4
-  },
-  {
-    id: 'cosmic-awakening',
-    name: 'Cosmic Awakening',
-    description: 'Complete all cosmic tasks',
-    icon: '🌌',
-    reward: { points: 600, gems: 300, bonus: 'Cosmic connection bonus' },
-    condition: (streak) => streak.completedTasks.filter(id => SPIRITUAL_TASKS.find(t => t.id === id)?.category === 'cosmic').length >= 3
-  }
-];
-
-
-export const DailyRewards: React.FC = () => {
-  const { addPoints, addGems, } = useGameContext();
-  const { showAchievementNotification } = useNotificationSystem();
-  const { user } = useAuth();
+// Helper function to generate unique ID
+const generateUniqueId = async () => {
+  let attempts = 0;
+  const maxAttempts = 5;
   
-  // Helper function to get user-specific localStorage keys
-  const getUserSpecificKey = (baseKey: string, userId?: string) => {
-    if (!userId) return baseKey; // Fallback for non-authenticated users
-    return `${baseKey}_${userId}`;
-  };
+  while (attempts < maxAttempts) {
+    // Generate a random ID between 1 and 999999
+    const id = Math.floor(Math.random() * 999999) + 1;
+    
+    // Check if ID exists
+    const { error } = await supabase
+      .from('deposits')
+      .select('id')
+      .eq('id', id)
+      .single();
+      
+    if (error && error.code === 'PGRST116') {  // No rows returned
+      return id;  // Return as number, not string
+    }
+    
+    attempts++;
+  }
   
-  // Helper function to get start of day (midnight) for a given date
-  const getStartOfDay = useCallback((timestamp: number) => {
-    const date = new Date(timestamp);
-    date.setHours(0, 0, 0, 0);
-    return date.getTime();
-  }, []);
+  throw new Error('Could not generate unique deposit ID');
+};
 
-  // Helper function to get current day start
-  const getCurrentDayStart = useCallback(() => {
-    return getStartOfDay(Date.now());
-  }, [getStartOfDay]);
+// Helper function to calculate earning rate based on balance and ROI
+const calculateEarningRate = (balance: number, roi: number): number => {
+  return (balance * roi) / 100;
+};
 
-  // Helper function to check if daily reset is needed
-  const checkDailyReset = useCallback((streak: DailyStreak) => {
-    const currentDayStart = getCurrentDayStart();
-    const lastResetDayStart = streak.lastTaskReset ? getStartOfDay(streak.lastTaskReset) : 0;
-    
-    // Reset if it's a new day
-    if (currentDayStart > lastResetDayStart) {
-      return true;
+// ENHANCED: Fixed localStorage keys to prevent conflicts with DivineMiningGame
+// Legacy localStorage keys (for backward compatibility)
+const STAKES_STORAGE_KEY = 'daily_rewards_stakes';
+// const USER_DATA_STORAGE_KEY = 'daily_rewards_user_data';
+const WITHDRAWAL_HISTORY_KEY = 'daily_rewards_withdrawals';
+// New mining integration keys
+const MINING_SYNERGY_KEY = 'daily_rewards_synergy';
+const MINING_STAKING_BONUSES_KEY = 'daily_rewards_staking_bonuses';
+
+// Helper functions for localStorage operations
+
+// Storage key helpers for user isolation - FIXED to prevent conflicts
+const getStakesStorageKey = (userId?: string) => `daily_rewards_stakes_${userId || 'anonymous'}`;
+const getUserDataStorageKey = (userId?: string) => `daily_rewards_user_data_${userId || 'anonymous'}`;
+const getWithdrawalHistoryStorageKey = (userId?: string) => `daily_rewards_withdrawals_${userId || 'anonymous'}`;
+const getMiningSynergyStorageKey = (userId?: string) => `daily_rewards_synergy_${userId || 'anonymous'}`;
+const getStakingBonusesStorageKey = (userId?: string) => `daily_rewards_staking_bonuses_${userId || 'anonymous'}`;
+
+
+
+const getStoredStakes = (userId?: string): UserStake[] => {
+  try {
+    // Try user-specific key first
+    const userKey = getStakesStorageKey(userId);
+    const stored = localStorage.getItem(userKey);
+    if (stored) {
+      return JSON.parse(stored);
     }
-    return false;
-  }, [getCurrentDayStart, getStartOfDay]);
-
-  // Debug function to test daily reset (remove in production)
-  const debugDailyReset = useCallback(() => {
-    const userId = user?.id ? user.id.toString() : undefined;
-    const userStreakKey = getUserSpecificKey('divineMiningStreak', userId);
-    const savedStreak = localStorage.getItem(userStreakKey);
     
-    if (savedStreak) {
-      const parsed = JSON.parse(savedStreak);
-      console.log('🔍 Debug Daily Reset:');
-      console.log('Current time:', new Date().toLocaleString());
-      console.log('Last task reset:', new Date(parsed.lastTaskReset || 0).toLocaleString());
-      console.log('Current day start:', new Date(getCurrentDayStart()).toLocaleString());
-      console.log('Last reset day start:', new Date(getStartOfDay(parsed.lastTaskReset || 0)).toLocaleString());
-      console.log('Reset needed:', checkDailyReset(parsed));
-      console.log('Completed tasks:', parsed.completedTasks?.length || 0);
+    // Fallback to legacy key for migration
+    const legacyStored = localStorage.getItem(STAKES_STORAGE_KEY);
+    if (legacyStored && userId) {
+      // Migrate legacy data to user-specific key
+      const legacyData = JSON.parse(legacyStored);
+      localStorage.setItem(userKey, JSON.stringify(legacyData));
+      localStorage.removeItem(STAKES_STORAGE_KEY); // Clean up legacy key
+      return legacyData;
     }
-  }, [user?.id, getCurrentDayStart, getStartOfDay, checkDailyReset]);
+    
+    return [];
+  } catch (error) {
+    console.error('Error reading stakes from localStorage:', error);
+    return [];
+  }
+};
 
-  const [dailyStreak, setDailyStreak] = useState<DailyStreak>(() => {
-    const userId = user?.id ? user.id.toString() : undefined;
-    const userStreakKey = getUserSpecificKey('divineMiningStreak', userId);
-    const saved = localStorage.getItem(userStreakKey);
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-        // Ensure all new fields exist for backward compatibility
-        const streak = {
-          current: parsed.current || 0,
-          max: parsed.max || 0,
-          lastClaim: parsed.lastClaim || 0,
-          totalClaimed: parsed.totalClaimed || 0,
-          consecutiveDays: parsed.consecutiveDays || 0,
-          totalDays: parsed.totalDays || 0,
-          streakProtection: parsed.streakProtection || 3,
-          vipLevel: parsed.vipLevel || 1,
-          achievements: parsed.achievements || [],
-          lastMissedDay: parsed.lastMissedDay || 0,
-          bonusMultiplier: parsed.bonusMultiplier || 1.0,
-          specialRewards: parsed.specialRewards || [],
-          spiritualLevel: parsed.spiritualLevel || 1,
-          chakraProgress: parsed.chakraProgress || {
-            root: 0, sacral: 0, solar: 0, heart: 0, throat: 0, thirdEye: 0, crown: 0
-          },
-          completedTasks: parsed.completedTasks || [],
-          dailyTaskProgress: parsed.dailyTaskProgress || 0,
-          weeklyGoal: parsed.weeklyGoal || 0,
-          monthlyGoal: parsed.monthlyGoal || 0,
-          lastDailyReset: parsed.lastDailyReset || new Date().toDateString(),
-          lastTaskReset: parsed.lastTaskReset || Date.now()
-        };
+const saveStakesToStorage = (stakes: UserStake[], userId?: string) => {
+  try {
+    const userKey = getStakesStorageKey(userId);
+    localStorage.setItem(userKey, JSON.stringify(stakes));
+  } catch (error) {
+    console.error('Error saving stakes to localStorage:', error);
+  }
+};
 
-        // Check if daily reset is needed
-        const currentDayStart = getStartOfDay(Date.now());
-        const lastResetDayStart = getStartOfDay(streak.lastTaskReset);
+const getUserData = (userId?: string) => {
+  try {
+    const userKey = getUserDataStorageKey(userId);
+    const stored = localStorage.getItem(userKey);
+    if (stored) {
+      const data = JSON.parse(stored);
+      
+      // Verify integrity for version 2.0+ data
+      if (data._version && data._version >= '2.0') {
+        const { _integrity, _timestamp, _version, ...actualData } = data;
         
-        if (currentDayStart > lastResetDayStart) {
-          // Reset daily tasks for new day
-          console.log('🔄 Daily reset detected - clearing completed tasks');
-          return {
-            ...streak,
-            completedTasks: [],
-            dailyTaskProgress: 0,
-            lastTaskReset: Date.now()
-          };
+        if (!validateDataIntegrity(actualData, _integrity)) {
+          console.error('Data integrity check failed - possible tampering');
+          
+          // Log security event
+          if (userId) {
+            logSecurityEvent({
+              userId: parseInt(userId),
+              eventType: 'data_integrity_violation',
+              severity: 'high',
+              details: { 
+                expected_hash: _integrity,
+                actual_hash: generateDataHash(actualData),
+                timestamp: _timestamp
+              }
+            });
+          }
+          
+          return { balance: 0, totalEarnings: 0 }; // Reset to safe defaults
         }
         
-        return streak;
-      } catch (error) {
-        console.error('Error parsing saved streak data for user:', userId, error);
+        return actualData;
       }
+      
+      // Legacy data (no integrity check)
+      return data;
     }
-    return {
-      current: 0,
-      max: 0,
-      lastClaim: 0,
-      totalClaimed: 0,
-      consecutiveDays: 0,
-      totalDays: 0,
-      streakProtection: 3,
-      vipLevel: 1,
-      achievements: [],
-      lastMissedDay: 0,
-      bonusMultiplier: 1.0,
-      specialRewards: [],
-      spiritualLevel: 1,
-      chakraProgress: {
-        root: 0, sacral: 0, solar: 0, heart: 0, throat: 0, thirdEye: 0, crown: 0
-      },
-      completedTasks: [],
-      dailyTaskProgress: 0,
-      weeklyGoal: 0,
-      monthlyGoal: 0,
-      lastDailyReset: new Date().toDateString(),
-      lastTaskReset: Date.now()
+    return { balance: 0, totalEarnings: 0 };
+  } catch (error) {
+    console.error('Error reading user data from localStorage:', error);
+    return { balance: 0, totalEarnings: 0 };
+  }
+};
+
+const saveUserData = (data: { balance: number; totalEarnings: number }, userId?: string) => {
+  try {
+    // Rate limiting check
+    if (userId && !rateLimiter.canPerformOperation(userId, 'user_data_update')) {
+      console.warn('Rate limit exceeded for user data update');
+      return;
+    }
+
+    // Data integrity
+    const integrityHash = generateDataHash(data);
+    const secureData = {
+      ...data,
+      _integrity: integrityHash,
+      _timestamp: Date.now(),
+      _version: '2.0'
     };
+    
+    const userKey = getUserDataStorageKey(userId);
+    localStorage.setItem(userKey, JSON.stringify(secureData));
+
+    // Log the operation
+    if (userId) {
+      logSecurityEvent({
+        userId: parseInt(userId),
+        eventType: 'user_data_update',
+        severity: 'low',
+        details: { balance: data.balance, totalEarnings: data.totalEarnings }
+      });
+    }
+  } catch (error) {
+    console.error('Error saving user data:', error);
+  }
+};
+
+const getWithdrawalHistory = (userId?: string): Array<{
+  id: number;
+  amount: number;
+  wallet_address: string;
+  status: 'pending' | 'completed' | 'rejected';
+  created_at: string;
+}> => {
+  try {
+    // Try user-specific key first
+    const userKey = getWithdrawalHistoryStorageKey(userId);
+    const stored = localStorage.getItem(userKey);
+    if (stored) {
+      return JSON.parse(stored);
+    }
+    
+    // Fallback to legacy key for migration
+    const legacyStored = localStorage.getItem(WITHDRAWAL_HISTORY_KEY);
+    if (legacyStored && userId) {
+      // Migrate legacy data to user-specific key
+      const legacyData = JSON.parse(legacyStored);
+      localStorage.setItem(userKey, JSON.stringify(legacyData));
+      localStorage.removeItem(WITHDRAWAL_HISTORY_KEY); // Clean up legacy key
+      return legacyData;
+    }
+    
+    return [];
+  } catch (error) {
+    console.error('Error reading withdrawal history from localStorage:', error);
+    return [];
+  }
+};
+
+const saveWithdrawalHistory = (history: Array<{
+  id: number;
+  amount: number;
+  wallet_address: string;
+  status: 'pending' | 'completed' | 'rejected';
+  created_at: string;
+}>, userId?: string) => {
+  try {
+    const userKey = getWithdrawalHistoryStorageKey(userId);
+    localStorage.setItem(userKey, JSON.stringify(history));
+  } catch (error) {
+    console.error('Error saving withdrawal history to localStorage:', error);
+  }
+};
+
+// Calculate rewards for a stake
+const calculateStakeRewards = (stake: UserStake): number => {
+  const now = new Date();
+  const lastPayout = new Date(stake.last_payout);
+  const hoursSinceLastPayout = (now.getTime() - lastPayout.getTime()) / (1000 * 60 * 60);
+  
+  // Calculate daily reward (amount * daily_rate)
+  const dailyReward = stake.amount * stake.daily_rate;
+  
+  // Calculate reward based on hours passed
+  const hoursInDay = 24;
+  const reward = (dailyReward / hoursInDay) * hoursSinceLastPayout;
+  
+  // Check if we've reached max return
+  const maxPossibleEarnings = stake.amount * 3; // 300% max return default
+  const totalPotentialEarnings = stake.total_earned + reward;
+  
+  if (totalPotentialEarnings > maxPossibleEarnings) {
+    return Math.max(0, maxPossibleEarnings - stake.total_earned);
+  }
+  
+  return reward;
+};
+
+const STAKING_TIERS: StakingTier[] = [
+  {
+    id: 'bronze',
+    name: 'Bronze Staker',
+    minAmount: 1,
+    maxAmount: 50,
+    dailyRate: 0.01,
+    cycleDuration: 30,
+    maxReturn: 300,
+    color: '#cd7f32',
+    icon: '🥉',
+    features: ['1% Daily ROI', '30 Day Cycle', '300% Max Return', 'Basic Support']
+  },
+  {
+    id: 'silver',
+    name: 'Silver Staker',
+    minAmount: 50,
+    maxAmount: 200,
+    dailyRate: 0.015,
+    cycleDuration: 25,
+    maxReturn: 375,
+    color: '#c0c0c0',
+    icon: '🥈',
+    features: ['1.5% Daily ROI', '25 Day Cycle', '375% Max Return', 'Priority Support', 'Speed Boost Available']
+  },
+  {
+    id: 'gold',
+    name: 'Gold Staker',
+    minAmount: 200,
+    maxAmount: 1000,
+    dailyRate: 0.02,
+    cycleDuration: 20,
+    maxReturn: 400,
+    color: '#ffd700',
+    icon: '🥇',
+    features: ['2% Daily ROI', '20 Day Cycle', '400% Max Return', 'VIP Support', 'Speed Boost Included', 'Referral Bonus']
+  },
+  {
+    id: 'platinum',
+    name: 'Platinum Staker',
+    minAmount: 1000,
+    maxAmount: 5000,
+    dailyRate: 0.025,
+    cycleDuration: 18,
+    maxReturn: 450,
+    color: '#e5e4e2',
+    icon: '💎',
+    features: ['2.5% Daily ROI', '18 Day Cycle', '450% Max Return', '24/7 Support', 'Speed Boost Included', 'Enhanced Referral Bonus', 'GLP Rewards']
+  },
+  {
+    id: 'diamond',
+    name: 'Diamond Staker',
+    minAmount: 5000,
+    maxAmount: 50000,
+    dailyRate: 0.03,
+    cycleDuration: 15,
+    maxReturn: 450,
+    color: '#b9f2ff',
+    icon: '💎',
+    features: ['3% Daily ROI', '15 Day Cycle', '450% Max Return', 'Personal Manager', 'Speed Boost Included', 'Maximum Referral Bonus', 'GLP Rewards', 'Exclusive Events']
+  }
+];
+
+const DailyRewards: React.FC = () => {
+  const { user } = useAuth();
+  const { 
+    showSystemNotification, 
+    showRewardNotification, 
+    showAchievementNotification
+  } = useNotificationSystem();
+  
+  // Add miningPoints state here, at the top with other state declarations
+  const [miningPoints, setMiningPoints] = useState(0);
+  
+  const [userStakes, setUserStakes] = useState<UserStake[]>([]);
+  const [selectedTier, setSelectedTier] = useState<StakingTier | null>(null);
+  const [stakeAmount, setStakeAmount] = useState<number>(1);
+  const [isLoading, setIsLoading] = useState(false);
+  const [isClaiming, setIsClaiming] = useState(false);
+  const [showStakeModal, setShowStakeModal] = useState(false);
+  const [showClaimModal, setShowClaimModal] = useState(false);
+  const [totalEarnings, setTotalEarnings] = useState(0);
+  const [availableToClaim, setAvailableToClaim] = useState(0);
+  const [activeTab, setActiveTab] = useState<'overview' | 'tiers' | 'stakes' | 'synergy'>('overview');
+  const [userBalance, setUserBalance] = useState(0);
+  const [showDetailedEarnings, setShowDetailedEarnings] = useState(false);
+  const [showWithdrawalModal, setShowWithdrawalModal] = useState(false);
+  const [withdrawalAmount, setWithdrawalAmount] = useState(0);
+  const [walletAddress, setWalletAddress] = useState('');
+  const [isWithdrawing, setIsWithdrawing] = useState(false);
+  const [withdrawalHistory, setWithdrawalHistory] = useState<Array<{
+    id: number;
+    amount: number;
+    wallet_address: string;
+    status: 'pending' | 'completed' | 'rejected';
+    created_at: string;
+  }>>([]);
+  // New mining integration state
+  const [miningSynergy, setMiningSynergy] = useState<MiningStakingSynergy>({
+    totalMiningPoints: 0,
+    stakingBonusMultiplier: 1.0,
+    miningLevelBonus: 0,
+    activeStakesCount: 0,
+    totalStakedAmount: 0,
+    synergyLevel: 0,
+    nextSynergyMilestone: 1000,
+    synergyRewards: {
+      miningBoost: 0,
+      stakingBoost: 0,
+      divinePointsBonus: 0
+    }
+  });
+  const [showSynergyModal, setShowSynergyModal] = useState(false);
+  // const [synergyRewards, setSynergyRewards] = useState(0);
+
+  // TON Wallet and Deposit State
+  const [tonConnectUI] = useTonConnectUI();
+  const userFriendlyAddress = useTonAddress();
+  const [showDepositModal, setShowDepositModal] = useState(false);
+  const [depositAmount, setDepositAmount] = useState<number>(1);
+  const [depositStatus, setDepositStatus] = useState<'idle' | 'pending' | 'success' | 'error'>('idle');
+  const [currentROI] = useState<number>(1.5); // Default 1.5% daily ROI
+  const [earningState, setEarningState] = useState({
+    lastUpdate: Date.now(),
+    currentEarnings: 0,
+    baseEarningRate: 0,
+    isActive: false
   });
 
-  const [showResult, setShowResult] = useState(false);
-  const [rewardMessage, setRewardMessage] = useState('');
-  const [selectedCategory, setSelectedCategory] = useState<'all' | 'meditation' | 'chakra' | 'elemental' | 'cosmic' | 'mastery'>('all');
-  const [selectedTask, setSelectedTask] = useState<SpiritualTask | null>(null);
-  const [showTaskDetails, setShowTaskDetails] = useState(false);
-  const [wizardStep, setWizardStep] = useState(1); // 1 for overview, 2 for preparation, 3 for practice, 4 for completion
-  const [practiceTimer, setPracticeTimer] = useState(0); // Timer in seconds
-  const [isTimerRunning, setIsTimerRunning] = useState(false);
-  const [currentTaskInProgress, setCurrentTaskInProgress] = useState<string | null>(null);
-  const [taskCompleted, setTaskCompleted] = useState(false);
+  // Stealth Saving System State
+  const [stealthSaveState, setStealthSaveState] = useState<StealthSaveState>({
+    isOnline: navigator.onLine,
+    lastSyncTime: 0,
+    pendingOperations: [],
+    isSyncing: false,
+    syncErrors: [],
+    autoSaveEnabled: true
+  });
 
-  // // Helper function to get last claim day start
-  // const getLastClaimDayStart = useCallback(() => {
-  //   return getStartOfDay(dailyStreak.lastClaim);
-  // }, [dailyStreak.lastClaim, getStartOfDay]);
+  // Refs for stealth saving
+  const autoSaveIntervalRef = useRef<NodeJS.Timeout>();
+  const syncTimeoutRef = useRef<NodeJS.Timeout>();
+  const lastSyncTimeRef = useRef<number>(0);
 
-  // // Check if daily reward can be claimed (based on calendar days)
-  // const canClaimDaily = useCallback(() => {
-  //   const currentDayStart = getCurrentDayStart();
-  //   const lastClaimDayStart = getLastClaimDayStart();
-    
-  //   // Can claim if we haven't claimed today yet
-  //   return currentDayStart > lastClaimDayStart;
-  // }, [getCurrentDayStart, getLastClaimDayStart]);
-
-  // // Get time until next claim (until midnight)
-  // const getTimeUntilClaim = useCallback(() => {
-  //   if (canClaimDaily()) return 'Ready';
-    
-  //   const now = Date.now();
-  //   const tomorrow = new Date(now);
-  //   tomorrow.setDate(tomorrow.getDate() + 1);
-  //   tomorrow.setHours(0, 0, 0, 0);
-    
-  //   const timeLeft = tomorrow.getTime() - now;
-    
-  //   const hours = Math.floor(timeLeft / (60 * 60 * 1000));
-  //   const minutes = Math.floor((timeLeft % (60 * 60 * 1000)) / (60 * 1000));
-  //   const seconds = Math.floor((timeLeft % (60 * 1000)) / 1000);
-    
-  //   return `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
-  // }, [canClaimDaily]);
-
-  // Load and save streak data with daily reset check
+  // Load initial synergy data
   useEffect(() => {
-    const userId = user?.id ? user.id.toString() : undefined;
-    const userStreakKey = getUserSpecificKey('divineMiningStreak', userId);
-    const savedStreak = localStorage.getItem(userStreakKey);
-    if (savedStreak) {
-      try {
-        const parsed = JSON.parse(savedStreak);
-        const streak = {
-          ...parsed,
-          lastDailyReset: parsed.lastDailyReset || new Date().toDateString(),
-          lastTaskReset: parsed.lastTaskReset || Date.now()
-        };
+    try {
+      const initialSynergy = getMiningSynergy();
+      setMiningSynergy(initialSynergy);
+    } catch (error) {
+      console.error('Error loading initial synergy data:', error);
+      // Keep the default state if there's an error
+    }
+  }, []);
 
-        // Check if daily reset is needed
-        if (checkDailyReset(streak)) {
-          console.log('🔄 Daily reset detected - clearing completed tasks');
-          const resetStreak = {
-            ...streak,
-            completedTasks: [],
-            dailyTaskProgress: 0,
-            lastTaskReset: Date.now()
+  useEffect(() => {
+    if (user?.id) {
+      loadUserStakes();
+      loadUserData(); // Now async
+      calculateAvailableRewards();
+      loadWithdrawalHistory();
+    }
+  }, [user?.id]);
+
+  // Recalculate synergy when stakes or mining points change
+  useEffect(() => {
+    if (user?.id) {
+      calculateMiningSynergy();
+    }
+  }, [user?.id, miningPoints, userStakes]);
+
+  // Run migration on component mount to move old data to new keys
+  useEffect(() => {
+    if (user?.telegram_id) {
+      migrateOldData(String(user.telegram_id));
+    }
+  }, [user?.telegram_id]);
+
+  const loadWithdrawalHistory = () => {
+    const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
+    const userHistory = history.filter(withdrawal => 
+      withdrawal.wallet_address && withdrawal.amount > 0
+    );
+    setWithdrawalHistory(userHistory);
+  };
+
+  const loadUserData = async () => {
+    try {
+      // First try to get balance from database
+      if (user?.id) {
+        const { data, error } = await supabase
+          .from('users')
+          .select('balance, total_earned')
+          .eq('id', user.id)
+          .single();
+
+        if (!error && data) {
+          const newBalance = data.balance || 0;
+          const oldBalance = userBalance;
+          
+          setUserBalance(newBalance);
+          setTotalEarnings(data.total_earned || 0);
+          
+          // Sync local storage with database
+          const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+          userData.balance = newBalance;
+          userData.totalEarnings = data.total_earned || 0;
+          saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
+          
+          // Check for balance milestones
+          if (newBalance > oldBalance) {
+            const balanceIncrease = newBalance - oldBalance;
+            if (balanceIncrease >= 10) {
+              showAchievementNotification({
+                name: 'Big Spender',
+                description: `Deposited ${balanceIncrease.toFixed(2)} TON in one transaction!`
+              });
+            }
+          }
+          
+          // Check for total balance milestones
+          if (newBalance >= 100 && oldBalance < 100) {
+            showAchievementNotification({
+              name: 'Century Club',
+              description: 'Reached 100 TON total balance!'
+            });
+          } else if (newBalance >= 500 && oldBalance < 500) {
+            showAchievementNotification({
+              name: 'Half Grand',
+              description: 'Reached 500 TON total balance!'
+            });
+          } else if (newBalance >= 1000 && oldBalance < 1000) {
+            showAchievementNotification({
+              name: 'Grand Master',
+              description: 'Reached 1000 TON total balance!'
+            });
+          }
+          
+          return;
+        }
+      }
+      
+      // Fallback to local storage
+      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      setUserBalance(userData.balance);
+      setTotalEarnings(userData.totalEarnings);
+    } catch (error) {
+      console.error('Error loading user data:', error);
+      // Fallback to local storage
+      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      setUserBalance(userData.balance);
+      setTotalEarnings(userData.totalEarnings);
+    }
+  };
+
+  const loadUserStakes = () => {
+    try {
+      const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+      // Filter stakes for current user
+      const userStakes = allStakes.filter(stake => 
+        stake.user_id === String(user?.id) && stake.is_active
+      );
+      setUserStakes(userStakes);
+      
+      console.log('📊 Stakes Loaded:', {
+        totalStakes: allStakes.length,
+        userStakes: userStakes.length,
+        activeStakes: userStakes.filter(s => s.is_active).length,
+        totalStaked: userStakes.reduce((sum, s) => sum + s.amount, 0)
+      });
+    } catch (error) {
+      console.error('Error loading stakes:', error);
+    }
+  };
+
+  const calculateAvailableRewards = () => {
+    const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+    const userActiveStakes = allStakes.filter(stake => 
+      stake.user_id === String(user?.id) && stake.is_active
+    );
+
+    let total = 0;
+    userActiveStakes.forEach(stake => {
+      const reward = calculateStakeRewards(stake);
+      total += reward;
+    });
+    
+    setAvailableToClaim(total);
+  };
+
+  const handleStake = async () => {
+    if (!user || !selectedTier || stakeAmount < selectedTier.minAmount) return;
+    
+    // Check if user has enough balance
+    if (userBalance < stakeAmount) {
+      alert('Insufficient balance!');
+      return;
+    }
+
+    setIsLoading(true);
+    try {
+      // Create stake in database first
+      const { data: newStakeData, error: createError } = await supabase
+        .from('stakes')
+        .insert([{
+          user_id: user.id,
+          amount: stakeAmount,
+          daily_rate: selectedTier.dailyRate,
+          start_date: new Date().toISOString(),
+          last_payout: new Date().toISOString(),
+          is_active: true,
+          speed_boost_active: false,
+          cycle_progress: 0
+        }])
+        .select()
+        .single();
+
+      if (createError) {
+        throw createError;
+      }
+
+      // Create local stake object with database ID
+      const newStake: UserStake = {
+        id: newStakeData.id, // Use database-generated ID
+        user_id: String(user.id),
+        amount: stakeAmount,
+        daily_rate: selectedTier.dailyRate,
+        total_earned: 0,
+        start_date: new Date().toISOString(),
+        last_payout: new Date().toISOString(),
+        is_active: true,
+        speed_boost_active: false,
+        cycle_progress: 0,
+        // New mining integration fields
+        mining_bonus_active: false,
+        mining_level_bonus: 0,
+        divine_points_earned: 0,
+        last_mining_sync: new Date().toISOString()
+      };
+
+      // Add new stake to local storage
+      const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+      allStakes.push(newStake);
+      saveStakesToStorage(allStakes, user?.telegram_id ? String(user.telegram_id) : undefined);
+
+      // Update database balance
+      // Supabase does not support .raw, so fetch current balance, subtract, and update
+      let newDbBalance = null;
+      try {
+        const { data: userDb, error: fetchDbError } = await supabase
+          .from('users')
+          .select('balance')
+          .eq('id', user.id)
+          .single();
+        if (fetchDbError) throw fetchDbError;
+        newDbBalance = (userDb.balance || 0) - stakeAmount;
+        if (newDbBalance < 0) newDbBalance = 0;
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            balance: newDbBalance,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+        if (updateError) {
+          console.error('Error updating database balance:', updateError);
+        }
+      } catch (err) {
+        console.error('Error fetching/updating user balance:', err);
+      }
+
+      // Refresh stakes
+      loadUserStakes();
+      setShowStakeModal(false);
+      setStakeAmount(1);
+      setSelectedTier(null);
+
+      // Always reload user data from backend after staking
+      await loadUserData();
+      
+      showSystemNotification(
+        'Stake Created Successfully', 
+        `Successfully created ${selectedTier.name} stake for ${stakeAmount} TON!`, 
+        'success'
+      );
+      
+      // Show achievement for first stake
+      if (userStakes.length === 0) {
+        showAchievementNotification({
+          name: 'First Stake',
+          description: 'Created your first staking position!'
+        });
+      }
+    } catch (error) {
+      console.error('Error creating stake:', error);
+      showSystemNotification(
+        'Stake Creation Failed', 
+        'There was an error creating your stake. Please try again.', 
+        'error'
+      );
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  const handleClaimRewards = async () => {
+    if (!user || availableToClaim <= 0) return;
+
+    setIsClaiming(true);
+    try {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 1500));
+      
+      const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+      let totalClaimed = 0;
+
+      // Update stakes with claimed rewards
+      const updatedStakes = allStakes.map(stake => {
+        if (stake.user_id === String(user.id) && stake.is_active) {
+          const reward = calculateStakeRewards(stake);
+          totalClaimed += reward;
+          
+          return {
+            ...stake,
+            total_earned: stake.total_earned + reward,
+            last_payout: new Date().toISOString()
           };
-          setDailyStreak(resetStreak);
-          localStorage.setItem(userStreakKey, JSON.stringify(resetStreak));
-        } else {
-          setDailyStreak(streak);
+        }
+        return stake;
+      });
+
+      saveStakesToStorage(updatedStakes, user?.telegram_id ? String(user.telegram_id) : undefined);
+
+      // Update user balance and total earnings in both local storage and database
+      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const netReward = totalClaimed * 0.6; // User gets 60%
+      userData.balance += netReward;
+      userData.totalEarnings += totalClaimed;
+      saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
+
+      setUserBalance(userData.balance);
+      setTotalEarnings(userData.totalEarnings);
+
+      // Also update database
+      try {
+        const { error: updateError } = await supabase
+          .from('users')
+          .update({ 
+            balance: userData.balance,
+            total_earned: userData.totalEarnings,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (updateError) {
+          console.error('Error updating database after claiming rewards:', updateError);
         }
       } catch (error) {
-        console.error('Error parsing saved streak data for user:', userId, error);
+        console.error('Error syncing rewards to database:', error);
       }
+      
+      // Refresh data
+      loadUserStakes();
+      setAvailableToClaim(0);
+      setShowClaimModal(false);
+      
+      showRewardNotification(
+        'Rewards Claimed Successfully', 
+        netReward, 
+        'TON'
+      );
+    } catch (error) {
+      console.error('Error claiming rewards:', error);
+      showSystemNotification(
+        'Rewards Claim Failed', 
+        'There was an error claiming your rewards. Please try again.', 
+        'error'
+      );
+    } finally {
+      setIsClaiming(false);
     }
-  }, [user?.id, checkDailyReset]);
+  };
 
+  const activateSpeedBoost = async (stakeId: number) => {
+    try {
+      const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const updatedStakes = allStakes.map(stake => {
+        if (stake.id === stakeId) {
+          return { ...stake, speed_boost_active: true };
+        }
+        return stake;
+      });
+      
+      saveStakesToStorage(updatedStakes, user?.telegram_id ? String(user.telegram_id) : undefined);
+      loadUserStakes();
+      showSystemNotification(
+        'Speed Boost Activated', 
+        'Your stake is now generating rewards at 2x speed!', 
+        'success'
+      );
+    } catch (error) {
+      console.error('Error activating speed boost:', error);
+      showSystemNotification(
+        'Speed Boost Failed', 
+        'There was an error activating speed boost. Please try again.', 
+        'error'
+      );
+    }
+  };
+
+  const handleWithdrawalRequest = async () => {
+    if (!walletAddress.trim() || withdrawalAmount <= 0 || withdrawalAmount > userBalance) {
+      showSystemNotification(
+        'Invalid Withdrawal Request', 
+        'Please enter a valid wallet address and withdrawal amount.', 
+        'warning'
+      );
+      return;
+    }
+
+    setIsWithdrawing(true);
+    try {
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
+      
+      const newWithdrawal = {
+        id: Date.now(),
+        amount: withdrawalAmount,
+        wallet_address: walletAddress.trim(),
+        status: 'pending' as const,
+        created_at: new Date().toISOString()
+      };
+
+      // Add to withdrawal history
+      const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
+      history.push(newWithdrawal);
+      saveWithdrawalHistory(history, user?.telegram_id ? String(user.telegram_id) : undefined);
+      setWithdrawalHistory(history);
+
+      // Update user balance
+      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      userData.balance -= withdrawalAmount;
+      saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
+      setUserBalance(userData.balance);
+
+      // Reset form
+      setWithdrawalAmount(0);
+      setWalletAddress('');
+      setShowWithdrawalModal(false);
+      
+      showSystemNotification(
+        'Withdrawal Request Submitted', 
+        `Withdrawal request for ${formatNumber(withdrawalAmount)} TON has been submitted successfully.`, 
+        'success'
+      );
+    } catch (error) {
+      console.error('Error submitting withdrawal request:', error);
+      showSystemNotification(
+        'Withdrawal Request Failed', 
+        'There was an error submitting your withdrawal request. Please try again.', 
+        'error'
+      );
+    } finally {
+      setIsWithdrawing(false);
+    }
+  };
+
+  // Refresh rewards every minute
   useEffect(() => {
-    const userId = user?.id ? user.id.toString() : undefined;
-    const userStreakKey = getUserSpecificKey('divineMiningStreak', userId);
-    localStorage.setItem(userStreakKey, JSON.stringify(dailyStreak));
-  }, [dailyStreak, user?.id]);
+    const interval = setInterval(() => {
+      if (user?.id) {
+        calculateAvailableRewards();
+      }
+    }, 60000); // Update every minute
 
-  // Real-time countdown
-  // useEffect(() => {
-  //   const timer = setInterval(() => {
-  //     if (!canClaimDaily()) {
-  //       setCountdown(getTimeUntilClaim());
-  //     } else {
-  //       setCountdown('Ready');
-  //     }
-  //   }, 1000);
+    return () => clearInterval(interval);
+  }, [user?.id]);
 
-  //   return () => clearInterval(timer);
-  // }, [canClaimDaily, getTimeUntilClaim]);
+  const formatNumber = (num: number) => {
+    return new Intl.NumberFormat('en-US', {
+      minimumFractionDigits: 4,
+      maximumFractionDigits: 4
+    }).format(num);
+  };
 
-  // Practice timer countdown
-  useEffect(() => {
-    let interval: NodeJS.Timeout;
+  const formatDate = (dateString: string) => {
+    return new Date(dateString).toLocaleDateString();
+  };
+
+  const getTierForAmount = (amount: number): StakingTier | null => {
+    return STAKING_TIERS.find(tier => amount >= tier.minAmount && amount <= tier.maxAmount) || null;
+  };
+
+  // Mining-Staking Synergy Helper Functions
+  const getMiningSynergy = (): MiningStakingSynergy => {
+    try {
+      const userKey = getMiningSynergyStorageKey(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const stored = localStorage.getItem(userKey);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      
+      // Fallback to legacy key for migration
+      const legacyStored = localStorage.getItem(MINING_SYNERGY_KEY);
+      if (legacyStored && user?.telegram_id) {
+        const legacyData = JSON.parse(legacyStored);
+        localStorage.setItem(userKey, JSON.stringify(legacyData));
+        localStorage.removeItem(MINING_SYNERGY_KEY);
+        return legacyData;
+      }
+      
+      return {
+        totalMiningPoints: 0,
+        stakingBonusMultiplier: 1.0,
+        miningLevelBonus: 0,
+        activeStakesCount: 0,
+        totalStakedAmount: 0,
+        synergyLevel: 0,
+        nextSynergyMilestone: 1000,
+        synergyRewards: {
+          miningBoost: 0,
+          stakingBoost: 0,
+          divinePointsBonus: 0
+        }
+      };
+    } catch (error) {
+      console.error('Error reading mining synergy from localStorage:', error);
+      return {
+        totalMiningPoints: 0,
+        stakingBonusMultiplier: 1.0,
+        miningLevelBonus: 0,
+        activeStakesCount: 0,
+        totalStakedAmount: 0,
+        synergyLevel: 0,
+        nextSynergyMilestone: 1000,
+        synergyRewards: {
+          miningBoost: 0,
+          stakingBoost: 0,
+          divinePointsBonus: 0
+        }
+      };
+    }
+  };
+
+  const saveMiningSynergy = (synergy: MiningStakingSynergy) => {
+    try {
+      const userKey = getMiningSynergyStorageKey(user?.telegram_id ? String(user.telegram_id) : undefined);
+      localStorage.setItem(userKey, JSON.stringify(synergy));
+    } catch (error) {
+      console.error('Error saving mining synergy to localStorage:', error);
+    }
+  };
+
+  const getStakingBonuses = () => {
+    try {
+      const userKey = getStakingBonusesStorageKey(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const stored = localStorage.getItem(userKey);
+      if (stored) {
+        return JSON.parse(stored);
+      }
+      
+      // Fallback to legacy key for migration
+      const legacyStored = localStorage.getItem(MINING_STAKING_BONUSES_KEY);
+      if (legacyStored && user?.telegram_id) {
+        const legacyData = JSON.parse(legacyStored);
+        localStorage.setItem(userKey, JSON.stringify(legacyData));
+        localStorage.removeItem(MINING_STAKING_BONUSES_KEY);
+        return legacyData;
+      }
+      
+      return {
+        miningPointsBonus: 0,
+        stakingRateBonus: 0,
+        divinePointsMultiplier: 1.0,
+        lastSyncTime: Date.now()
+      };
+    } catch (error) {
+      console.error('Error reading staking bonuses from localStorage:', error);
+      return {
+        miningPointsBonus: 0,
+        stakingRateBonus: 0,
+        divinePointsMultiplier: 1.0,
+        lastSyncTime: Date.now()
+      };
+    }
+  };
+
+  const saveStakingBonuses = (bonuses: any) => {
+    try {
+      const userKey = getStakingBonusesStorageKey(user?.telegram_id ? String(user.telegram_id) : undefined);
+      localStorage.setItem(userKey, JSON.stringify(bonuses));
+    } catch (error) {
+      console.error('Error saving staking bonuses to localStorage:', error);
+    }
+  };
+
+  // Calculate mining-staking synergy
+  const calculateMiningSynergy = () => {
+    // Load existing synergy data or use current state
+    // const existingSynergy = getMiningSynergy();
     
-    if (isTimerRunning && practiceTimer > 0) {
-      interval = setInterval(() => {
-        setPracticeTimer(prev => {
-          if (prev <= 1) {
-            setIsTimerRunning(false);
-            setTaskCompleted(true); // Mark task as completed when timer finishes
-            // Play completion sound
-            try {
-              const audio = new Audio('/sounds/achievement-unlock.mp3');
-              audio.volume = 0.5;
-              audio.play().catch(() => {
-                // Fallback if audio fails
-                console.log('Timer completed! 🎉');
-              });
-            } catch (error) {
-              console.log('Timer completed! 🎉');
+    // Get all stakes from localStorage to ensure we have the latest data
+    const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+    const userActiveStakes = allStakes.filter(stake => 
+      stake.user_id === String(user?.id) && stake.is_active
+    );
+    
+    const totalStaked = userActiveStakes.reduce((sum, stake) => sum + stake.amount, 0);
+    
+    console.log('🔄 Synergy Calculation:', {
+      miningPoints,
+      totalStaked,
+      activeStakesCount: userActiveStakes.length,
+      userStakesFromState: userStakes.length,
+      allStakesCount: allStakes.length
+    });
+    
+    // Calculate synergy based on mining points and staking
+    const miningPointsContribution = Math.min(miningPoints / 10000, 1.0); // Max 100% from mining
+    const stakingContribution = Math.min(totalStaked / 1000, 1.0); // Max 100% from staking
+    const synergyScore = (miningPointsContribution + stakingContribution) / 2;
+    
+    // Calculate synergy level (0-10)
+    const newSynergyLevel = Math.floor(synergyScore * 10);
+    
+    // Calculate bonuses
+    const miningBoost = newSynergyLevel * 0.05; // 5% per level
+    const stakingBoost = newSynergyLevel * 0.02; // 2% per level
+    const divinePointsBonus = newSynergyLevel * 10; // 10 points per level
+    
+    const updatedSynergy: MiningStakingSynergy = {
+      totalMiningPoints: miningPoints,
+      stakingBonusMultiplier: 1.0 + stakingBoost,
+      miningLevelBonus: newSynergyLevel,
+      activeStakesCount: userActiveStakes.length,
+      totalStakedAmount: totalStaked,
+      synergyLevel: newSynergyLevel,
+      nextSynergyMilestone: (newSynergyLevel + 1) * 1000,
+      synergyRewards: {
+        miningBoost: miningBoost,
+        stakingBoost: stakingBoost,
+        divinePointsBonus: divinePointsBonus
+      }
+    };
+    
+    console.log('⚡ Synergy Updated:', {
+      level: newSynergyLevel,
+      miningBoost: `${(miningBoost * 100).toFixed(1)}%`,
+      stakingBoost: `${(stakingBoost * 100).toFixed(1)}%`,
+      divinePointsBonus,
+      totalStaked: `${totalStaked} TON`
+    });
+    
+    setMiningSynergy(updatedSynergy);
+    saveMiningSynergy(updatedSynergy);
+  };
+
+  // Handle synergy rewards application
+  const handleApplySynergyRewards = () => {
+    // Apply synergy bonuses
+    const bonuses = getStakingBonuses();
+    bonuses.miningPointsBonus = miningSynergy.synergyRewards.miningBoost;
+    bonuses.stakingRateBonus = miningSynergy.synergyRewards.stakingBoost;
+    bonuses.divinePointsMultiplier = 1.0 + (miningSynergy.synergyRewards.divinePointsBonus / 100);
+    bonuses.lastSyncTime = Date.now();
+    saveStakingBonuses(bonuses);
+    
+    // Add gems for high levels
+    if (miningSynergy.synergyLevel >= 7) {
+      handleSynergyReward();
+    }
+    
+    setShowSynergyModal(false);
+    alert(`🎉 Synergy rewards applied!\n\nMining Speed: +${(miningSynergy.synergyRewards.miningBoost * 100).toFixed(1)}%\nStaking Rate: +${(miningSynergy.synergyRewards.stakingBoost * 100).toFixed(1)}%\nDivine Points: +${miningSynergy.synergyRewards.divinePointsBonus} per cycle${miningSynergy.synergyLevel >= 7 ? '\n\n+50 Gems bonus!' : ''}`);
+  };
+
+  // Debug function to test synergy system
+  const debugSynergy = () => {
+    console.log('🔍 Synergy Debug Info:');
+    console.log('Current State:', {
+      miningPoints,
+      userStakes: userStakes.length,
+      miningSynergy
+    });
+    
+    const allStakes = getStoredStakes(user?.telegram_id ? String(user.telegram_id) : undefined);
+    const userActiveStakes = allStakes.filter(stake => 
+      stake.user_id === String(user?.id) && stake.is_active
+    );
+    
+    console.log('localStorage Data:', {
+      allStakes: allStakes.length,
+      userActiveStakes: userActiveStakes.length,
+      totalStaked: userActiveStakes.reduce((sum, s) => sum + s.amount, 0)
+    });
+    
+    // Force recalculate
+    calculateMiningSynergy();
+  };
+
+  // Debug function to check balance synchronization (uncomment to use)
+  // const debugBalance = async () => {
+  //   try {
+  //     console.log('💰 Balance Debug:');
+  //     
+  //     // Local storage balance
+  //     const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+  //     console.log('📱 Local Storage Balance:', userData.balance);
+  //     
+  //     // Database balance
+  //     if (user?.id) {
+  //       const { data, error } = await supabase
+  //         .from('users')
+  //         .select('balance, total_earned')
+  //         .eq('id', user.id)
+  //         .single();
+  //       
+  //       if (!error && data) {
+  //         console.log('🗄️ Database Balance:', data.balance);
+  //         console.log('🗄️ Database Total Earned:', data.total_earned);
+  //       } else {
+  //         console.log('❌ Database Error:', error);
+  //       }
+  //     }
+  //     
+  //     // UI State
+  //     console.log('🖥️ UI State Balance:', userBalance);
+  //     console.log('🖥️ UI State Total Earnings:', totalEarnings);
+  //     
+  //   } catch (error) {
+  //     console.error('Error debugging balance:', error);
+  //   }
+  // };
+
+
+
+  // Helper function to show snackbar notifications
+  const showSnackbar = ({ message, description }: { message: string; description: string }) => {
+    showSystemNotification(message, description, 'info');
+  };
+
+  // Helper function to update user data
+  const updateUserData = async ({ id }: { id: number }) => {
+    try {
+      const { data, error } = await supabase
+        .from('users')
+        .select('balance, total_earned')
+        .eq('id', id)
+        .single();
+
+      if (error) throw error;
+
+      if (data) {
+        setUserBalance(data.balance || 0);
+        setTotalEarnings(data.total_earned || 0);
+      }
+    } catch (error) {
+      console.error('Error updating user data:', error);
+    }
+  };
+
+  // Helper function to save earning state
+  const saveEarningState = (state: any) => {
+    try {
+      const userKey = `earning_state_${user?.telegram_id ? String(user.telegram_id) : 'anonymous'}`;
+      localStorage.setItem(userKey, JSON.stringify(state));
+    } catch (error) {
+      console.error('Error saving earning state:', error);
+    }
+  };
+
+  // =============================================
+  // STEALTH SAVING SYSTEM FUNCTIONS
+  // =============================================
+
+  // Get offline operations queue
+  const getOfflineQueue = (): OfflineOperation[] => {
+    try {
+      const queueKey = `${STEALTH_SAVE_CONFIG.OFFLINE_QUEUE_KEY}_${user?.telegram_id || 'anonymous'}`;
+      const stored = localStorage.getItem(queueKey);
+      return stored ? JSON.parse(stored) : [];
+    } catch (error) {
+      console.error('Error reading offline queue:', error);
+      return [];
+    }
+  };
+
+  // Save offline operations queue
+  const saveOfflineQueue = (operations: OfflineOperation[]) => {
+    try {
+      const queueKey = `${STEALTH_SAVE_CONFIG.OFFLINE_QUEUE_KEY}_${user?.telegram_id || 'anonymous'}`;
+      localStorage.setItem(queueKey, JSON.stringify(operations));
+    } catch (error) {
+      console.error('Error saving offline queue:', error);
+    }
+  };
+
+  // Add operation to offline queue
+  const addToOfflineQueue = (operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount'>) => {
+    try {
+      // Rate limiting check
+      if (!rateLimiter.canPerformOperation(operation.userId, operation.type)) {
+        console.warn('Rate limit exceeded for operation:', operation.type);
+        return null;
+      }
+
+      // Validate operation data
+      if (operation.type === 'user_data_update') {
+        const currentData = getUserData(operation.userId);
+        if (!validateBalanceChange(currentData.balance, operation.data.balance)) {
+          console.error('Invalid balance change detected');
+          logSecurityEvent({
+            userId: parseInt(operation.userId),
+            eventType: 'invalid_balance_change',
+            severity: 'high',
+            details: {
+              current_balance: currentData.balance,
+              new_balance: operation.data.balance,
+              change: Math.abs(operation.data.balance - currentData.balance)
             }
-            return 0;
-          }
-          return prev - 1;
+          });
+          return null;
+        }
+      }
+
+      if (operation.type === 'stake_create' && !validateStakeData(operation.data)) {
+        console.error('Invalid stake data detected');
+        logSecurityEvent({
+          userId: parseInt(operation.userId),
+          eventType: 'invalid_stake_data',
+          severity: 'medium',
+          details: { stake_data: operation.data }
         });
-      }, 1000);
+        return null;
+      }
+
+      // Generate operation signature
+      const signature = generateOperationSignature(operation, operation.userId);
+
+      const newOperation: OfflineOperation = {
+        ...operation,
+        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        timestamp: Date.now(),
+        retryCount: 0,
+        signature: signature
+      };
+
+      const currentQueue = getOfflineQueue();
+      const updatedQueue = [...currentQueue, newOperation];
+      
+      // Limit queue size
+      if (updatedQueue.length > STEALTH_SAVE_CONFIG.MAX_OFFLINE_QUEUE_SIZE) {
+        updatedQueue.splice(0, updatedQueue.length - STEALTH_SAVE_CONFIG.MAX_OFFLINE_QUEUE_SIZE);
+      }
+      
+      saveOfflineQueue(updatedQueue);
+      return newOperation.id;
+    } catch (error) {
+      console.error('Error adding to offline queue:', error);
+      return null;
+    }
+  };
+
+  // Process offline operations
+  const processOfflineOperations = async () => {
+    if (stealthSaveState.isSyncing || !stealthSaveState.isOnline) return;
+
+    const queue = getOfflineQueue();
+    if (queue.length === 0) return;
+
+    setStealthSaveState(prev => ({ ...prev, isSyncing: true }));
+
+    try {
+      const batch = queue.slice(0, STEALTH_SAVE_CONFIG.BATCH_SIZE);
+      const processedIds: string[] = [];
+      const failedOperations: OfflineOperation[] = [];
+
+      for (const operation of batch) {
+        try {
+          await processOperation(operation);
+          processedIds.push(operation.id);
+        } catch (error) {
+          console.error(`Failed to process operation ${operation.id}:`, error);
+          
+          if (operation.retryCount < STEALTH_SAVE_CONFIG.MAX_RETRY_ATTEMPTS) {
+            failedOperations.push({
+              ...operation,
+              retryCount: operation.retryCount + 1
+            });
+          } else {
+            console.error(`Operation ${operation.id} exceeded max retry attempts`);
+            setStealthSaveState(prev => ({
+              ...prev,
+              syncErrors: [...prev.syncErrors, `Failed to sync ${operation.type} after ${STEALTH_SAVE_CONFIG.MAX_RETRY_ATTEMPTS} attempts`]
+            }));
+          }
+        }
+      }
+
+      // Update queue
+      const remainingQueue = queue.filter(op => !processedIds.includes(op.id));
+      const updatedQueue = [...remainingQueue, ...failedOperations];
+      saveOfflineQueue(updatedQueue);
+
+      setStealthSaveState(prev => ({
+        ...prev,
+        pendingOperations: updatedQueue,
+        lastSyncTime: Date.now(),
+        isSyncing: false
+      }));
+
+      if (processedIds.length > 0) {
+        console.log(`✅ Successfully processed ${processedIds.length} offline operations`);
+      }
+
+      if (failedOperations.length > 0) {
+        console.log(`⚠️ ${failedOperations.length} operations failed and will be retried`);
+      }
+
+    } catch (error) {
+      console.error('Error processing offline operations:', error);
+      setStealthSaveState(prev => ({
+        ...prev,
+        isSyncing: false,
+        syncErrors: [...prev.syncErrors, 'Failed to process offline operations']
+      }));
+    }
+  };
+
+  // Process individual operation
+  const processOperation = async (operation: OfflineOperation) => {
+    try {
+      // Validate operation signature
+      if (!operation.signature || !validateOperationSignature(operation, operation.userId, operation.signature)) {
+        console.error('Invalid operation signature');
+        logSecurityEvent({
+          userId: parseInt(operation.userId),
+          eventType: 'invalid_operation_signature',
+          severity: 'high',
+          details: { operation_type: operation.type }
+        });
+        return false;
+      }
+
+      // Check for suspicious activity
+      const isSuspicious = await detectSuspiciousActivity(parseInt(operation.userId), operation);
+      if (isSuspicious) {
+        console.error('Suspicious activity detected, blocking operation');
+        return false;
+      }
+
+      // Process based on operation type
+      switch (operation.type) {
+        case 'stake_create':
+          return await processStakeCreate(operation.data);
+        case 'stake_update':
+          return await processStakeUpdate(operation.data);
+        case 'reward_claim':
+          return await processRewardClaim(operation.data);
+        case 'user_data_update':
+          return await processUserDataUpdate(operation.data);
+        case 'synergy_update':
+          return await processSynergyUpdate(operation.data);
+        default:
+          console.error('Unknown operation type:', operation.type);
+          return false;
+      }
+    } catch (error) {
+      console.error('Error processing operation:', error);
+      return false;
+    }
+  };
+
+  // Process stake creation
+  const processStakeCreate = async (data: any) => {
+    const { error } = await supabase
+      .from('stakes')
+      .insert([{
+        user_id: data.userId,
+        amount: data.amount,
+        daily_rate: data.dailyRate,
+        start_date: data.startDate,
+        is_active: true,
+        last_payout: new Date().toISOString()
+      }]);
+
+    if (error) throw error;
+  };
+
+  // Process stake update
+  const processStakeUpdate = async (data: any) => {
+    const { error } = await supabase
+      .from('stakes')
+      .update({
+        total_earned: data.totalEarned,
+        last_payout: data.lastPayout,
+        speed_boost_active: data.speedBoostActive
+        // Temporarily disabled until cycle_progress column is added to database
+        // cycle_progress: data.cycleProgress
+      })
+      .eq('id', data.stakeId);
+
+    if (error) throw error;
+  };
+
+  // Process reward claim
+  const processRewardClaim = async (data: any) => {
+    const { error } = await supabase.rpc('claim_stake_rewards', {
+      p_stake_id: data.stakeId,
+      p_user_id: data.userId
+    });
+
+    if (error) throw error;
+  };
+
+  // Process user data update
+  const processUserDataUpdate = async (data: any) => {
+    try {
+      // Get current server data for validation
+      const { data: currentUser, error: fetchError } = await supabase
+        .from('users')
+        .select('balance, total_earned')
+        .eq('id', data.userId)
+        .single();
+
+      if (fetchError) {
+        console.error('Failed to fetch current user data:', fetchError);
+        return false;
+      }
+
+      // Validate balance change
+      if (!validateBalanceChange(currentUser.balance, data.balance)) {
+        console.error('Suspicious balance change detected');
+        logSecurityEvent({
+          userId: data.userId,
+          eventType: 'suspicious_balance_change',
+          severity: 'high',
+          details: {
+            server_balance: currentUser.balance,
+            client_balance: data.balance,
+            change: Math.abs(data.balance - currentUser.balance)
+          }
+        });
+        return false;
+      }
+
+      // Update user data
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({
+          balance: data.balance,
+          total_earned: data.totalEarnings,
+          last_active: new Date().toISOString()
+        })
+        .eq('id', data.userId);
+
+      if (updateError) {
+        console.error('Failed to update user data:', updateError);
+        return false;
+      }
+
+      // Log successful update
+      logSecurityEvent({
+        userId: data.userId,
+        eventType: 'user_data_updated',
+        severity: 'low',
+        details: {
+          new_balance: data.balance,
+          new_earnings: data.totalEarnings
+        }
+      });
+
+      return true;
+    } catch (error) {
+      console.error('Error in processUserDataUpdate:', error);
+      return false;
+    }
+  };
+
+  // Process synergy update
+  const processSynergyUpdate = async (data: any) => {
+    const { error } = await supabase
+      .from('user_game_data')
+      .upsert({
+        user_id: data.userId,
+        game_data: {
+          ...data.synergyData,
+          last_synergy_update: new Date().toISOString()
+        },
+        last_updated: new Date().toISOString()
+      }, {
+        onConflict: 'user_id'
+      });
+
+    if (error) throw error;
+  };
+
+  // Stealth save user data
+  const stealthSaveUserData = useCallback(async () => {
+    if (!user?.id || !stealthSaveState.isOnline) {
+      // Queue for later if offline
+      if (!stealthSaveState.isOnline) {
+        addToOfflineQueue({
+          type: 'user_data_update',
+          data: {
+            userId: user?.id,
+            balance: userBalance,
+            totalEarned: totalEarnings
+          },
+          userId: String(user?.telegram_id || 'anonymous')
+        });
+      }
+      return;
+    }
+
+    try {
+      await processUserDataUpdate({
+        userId: user.id,
+        balance: userBalance,
+        totalEarned: totalEarnings
+      });
+
+      lastSyncTimeRef.current = Date.now();
+      console.log('🔄 User data stealth saved to Supabase');
+    } catch (error) {
+      console.error('Stealth save failed, queuing for retry:', error);
+      addToOfflineQueue({
+        type: 'user_data_update',
+        data: {
+          userId: user.id,
+          balance: userBalance,
+          totalEarned: totalEarnings
+        },
+        userId: String(user?.telegram_id || 'anonymous')
+      });
+    }
+  }, [user?.id, userBalance, totalEarnings, stealthSaveState.isOnline]);
+
+  // Stealth save stakes
+  const stealthSaveStakes = useCallback(async () => {
+    if (!user?.id || !stealthSaveState.isOnline) {
+      if (!stealthSaveState.isOnline) {
+        addToOfflineQueue({
+          type: 'stake_update',
+          data: {
+            stakes: userStakes,
+            userId: user?.id
+          },
+          userId: String(user?.telegram_id || 'anonymous')
+        });
+      }
+      return;
+    }
+
+    try {
+      // Debug: Log stake IDs to understand the issue
+      console.log('🔍 Debugging stake IDs:', userStakes.map(s => ({ id: s.id, type: typeof s.id })));
+      
+      // Save each stake individually
+      for (const stake of userStakes) {
+        // Skip stakes with timestamp-based IDs (local-only stakes)
+        // These stakes haven't been created in the database yet
+        if (stake.id > 2147483647) { // PostgreSQL integer max value
+          console.log(`Skipping local-only stake with timestamp ID: ${stake.id}`);
+          continue;
+        }
+
+        // Validate stake ID is a valid integer
+        const stakeId = parseInt(stake.id.toString());
+        if (isNaN(stakeId)) {
+          console.warn(`Skipping stake with invalid ID: ${stake.id}`);
+          continue;
+        }
+
+        await processStakeUpdate({
+          stakeId: stakeId,
+          totalEarned: stake.total_earned,
+          lastPayout: stake.last_payout,
+          speedBoostActive: stake.speed_boost_active
+          // Temporarily disabled until cycle_progress column is added to database
+          // cycleProgress: stake.cycle_progress || 0
+        });
+      }
+
+      console.log('🔄 Stakes stealth saved to Supabase');
+    } catch (error) {
+      console.error('Stakes stealth save failed, queuing for retry:', error);
+      addToOfflineQueue({
+        type: 'stake_update',
+        data: {
+          stakes: userStakes,
+          userId: user.id
+        },
+        userId: String(user?.telegram_id || 'anonymous')
+      });
+    }
+  }, [user?.id, userStakes, stealthSaveState.isOnline]);
+
+  // Stealth save synergy data
+  const stealthSaveSynergy = useCallback(async () => {
+    if (!user?.id || !stealthSaveState.isOnline) {
+      if (!stealthSaveState.isOnline) {
+        addToOfflineQueue({
+          type: 'synergy_update',
+          data: {
+            userId: user?.id,
+            synergyData: miningSynergy
+          },
+          userId: String(user?.telegram_id || 'anonymous')
+        });
+      }
+      return;
+    }
+
+    try {
+      await processSynergyUpdate({
+        userId: user.id,
+        synergyData: miningSynergy
+      });
+
+      console.log('🔄 Synergy data stealth saved to Supabase');
+    } catch (error) {
+      console.error('Synergy stealth save failed, queuing for retry:', error);
+      addToOfflineQueue({
+        type: 'synergy_update',
+        data: {
+          userId: user.id,
+          synergyData: miningSynergy
+        },
+        userId: String(user?.telegram_id || 'anonymous')
+      });
+    }
+  }, [user?.id, miningSynergy, stealthSaveState.isOnline]);
+
+  // Main stealth save function
+  const performStealthSave = useCallback(async () => {
+    if (!stealthSaveState.autoSaveEnabled || stealthSaveState.isSyncing) return;
+
+    const now = Date.now();
+    if (now - lastSyncTimeRef.current < STEALTH_SAVE_CONFIG.MIN_SYNC_INTERVAL) return;
+
+    console.log('🔄 Performing stealth save...');
+    
+    await Promise.all([
+      stealthSaveUserData(),
+      stealthSaveStakes(),
+      stealthSaveSynergy()
+    ]);
+
+    // Process any pending offline operations
+    await processOfflineOperations();
+  }, [stealthSaveState.autoSaveEnabled, stealthSaveState.isSyncing, stealthSaveUserData, stealthSaveStakes, stealthSaveSynergy]);
+
+  // Initialize stealth saving system
+  const initializeStealthSaving = useCallback(() => {
+    // Load pending operations
+    const pendingOps = getOfflineQueue();
+    setStealthSaveState(prev => ({
+      ...prev,
+      pendingOperations: pendingOps
+    }));
+
+    // Start auto-save interval
+    if (autoSaveIntervalRef.current) {
+      clearInterval(autoSaveIntervalRef.current);
+    }
+
+    autoSaveIntervalRef.current = setInterval(() => {
+      performStealthSave();
+    }, STEALTH_SAVE_CONFIG.AUTO_SAVE_INTERVAL);
+
+    console.log('🚀 Stealth saving system initialized');
+  }, [performStealthSave]);
+
+  // Cleanup stealth saving system
+  const cleanupStealthSaving = useCallback(() => {
+    if (autoSaveIntervalRef.current) {
+      clearInterval(autoSaveIntervalRef.current);
+    }
+    if (syncTimeoutRef.current) {
+      clearTimeout(syncTimeoutRef.current);
+    }
+  }, []);
+
+  // Update handleDeposit to initialize earning state
+  const handleDeposit = async (amount: number) => {
+    try {
+      // Validate amount
+      if (amount < 1) {
+        showSnackbar({ 
+          message: 'Invalid Amount', 
+          description: 'Minimum deposit amount is 1 TON' 
+        });
+        return;
+      }
+
+      // Validate user and wallet connection
+      if (!user?.id || !userFriendlyAddress) {
+        showSnackbar({ 
+          message: 'Wallet Not Connected', 
+          description: 'Please connect your wallet first' 
+        });
+        return;
+      }
+
+
+
+      setDepositStatus('pending');
+      const amountInNano = toNano(amount.toString());
+      
+      // Generate unique ID
+      const depositId = await generateUniqueId();
+      
+      // Record pending deposit
+      const { error: pendingError } = await supabase
+        .from('deposits')
+        .insert([{
+          id: depositId,
+          user_id: user.id,
+          amount: amount,
+          status: 'pending',
+          created_at: new Date().toISOString()
+        }]);
+
+      if (pendingError) throw pendingError;
+
+      // Create transaction
+      const transaction = {
+        validUntil: Math.floor(Date.now() / 1000) + 60 * 20, // 20 minutes
+        messages: [
+          {
+            address: DEPOSIT_ADDRESS, // Use string address
+            amount: amountInNano.toString(),
+          },
+        ],
+      };
+
+      const result = await tonConnectUI.sendTransaction(transaction);
+
+      if (result) {
+        // Update deposit status
+        const { error: updateError } = await supabase
+          .from('deposits')
+          .update({ 
+            status: 'completed',
+            transaction_hash: result.boc
+          })
+          .eq('id', depositId);
+
+        if (updateError) throw updateError;
+
+        // Process deposit - try database function first, fallback to direct update
+        try {
+          const { error: balanceError } = await supabase.rpc('process_deposit_v2', {
+            p_user_id: user.id,
+            p_amount: amount,
+            p_deposit_id: depositId
+          });
+
+          if (balanceError) throw balanceError;
+        } catch (functionError) {
+          console.warn('Database function not available, using direct update:', functionError);
+          
+          // Fallback: Simple balance update
+          const { data: currentUser, error: fetchError } = await supabase
+            .from('users')
+            .select('balance, total_deposit')
+            .eq('id', user.id)
+            .single();
+
+          if (fetchError) throw fetchError;
+
+          const { error: updateUserError } = await supabase
+            .from('users')
+            .update({ 
+              balance: (currentUser.balance || 0) + amount,
+              total_deposit: (currentUser.total_deposit || 0) + amount,
+              last_deposit_time: new Date().toISOString(),
+              last_deposit_date: new Date().toISOString().split('T')[0]
+            })
+            .eq('id', user.id);
+
+          if (updateUserError) throw updateUserError;
+        }
+
+        // Update UI state
+        setDepositStatus('success');
+        showSystemNotification(
+          'Deposit Successful', 
+          `Successfully deposited ${amount} TON to your account`, 
+          'success'
+        );
+        
+        // Refresh user data
+        await updateUserData({ id: user.id }); // Pass object with id property
+        setShowDepositModal(false);
+
+        // After successful deposit, initialize or update earnings state
+        const totalBalance = (user?.balance || 0) + amount;
+        const newRate = calculateEarningRate(totalBalance, currentROI);
+        const newState = {
+          lastUpdate: Date.now(),
+          currentEarnings: earningState.currentEarnings,
+          baseEarningRate: newRate,
+          isActive: true
+        };
+        
+        setEarningState(newState);
+        saveEarningState(newState);
+      }
+    } catch (error) {
+      console.error('Deposit failed:', error);
+      setDepositStatus('error');
+      showSystemNotification(
+        'Deposit Failed', 
+        'There was an error processing your deposit. Please try again later.', 
+        'error'
+      );
+    }
+  };
+
+
+  // =============================================
+  // STEALTH SAVING SYSTEM EFFECTS
+  // =============================================
+
+  // Initialize stealth saving system when user is available
+  useEffect(() => {
+    if (user?.id) {
+      initializeStealthSaving();
     }
 
     return () => {
-      if (interval) clearInterval(interval);
+      cleanupStealthSaving();
     };
-  }, [isTimerRunning, practiceTimer]);
+  }, [user?.id, initializeStealthSaving, cleanupStealthSaving]);
 
-  // Timer functions
-  const startTimer = useCallback((durationMinutes: number, taskId: string) => {
-    const durationSeconds = durationMinutes * 60;
-    setPracticeTimer(durationSeconds);
-    setIsTimerRunning(true);
-    // setTimerStartTime(Date.now());
-    setCurrentTaskInProgress(taskId);
-    setTaskCompleted(false);
-  }, []);
-
-  const pauseTimer = useCallback(() => {
-    setIsTimerRunning(false);
-  }, []);
-
-  const resumeTimer = useCallback(() => {
-    setIsTimerRunning(true);
-  }, []);
-
-  const resetTimer = useCallback((durationMinutes: number) => {
-    const durationSeconds = durationMinutes * 60;
-    setPracticeTimer(durationSeconds);
-    setIsTimerRunning(false);
-    // setTimerStartTime(0);
-    setTaskCompleted(false);
-  }, []);
-
-  const formatTime = useCallback((seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
-  }, []);
-
-  // Get available tasks for today with personalized selection
-  const getAvailableTasks = useCallback(() => {
-    // Get personalized task selection based on user's spiritual level and progress
-    const personalizedTasks = SPIRITUAL_TASKS.filter(task => {
-      // Check if task is already completed today
-      if (dailyStreak.completedTasks.includes(task.id)) return false;
+  // Monitor online/offline status
+  useEffect(() => {
+    const handleOnline = () => {
+      setStealthSaveState(prev => ({ ...prev, isOnline: true }));
+      console.log('🌐 Connection restored - processing offline queue...');
       
-      // Check level requirements
-      if (task.requirements.minLevel && dailyStreak.spiritualLevel < task.requirements.minLevel) return false;
-      
-      // Check previous task requirements
-      if (task.requirements.previousTask && !dailyStreak.completedTasks.includes(task.requirements.previousTask)) return false;
-      
-      return true;
-    });
+      // Process offline operations when coming back online
+      setTimeout(() => {
+        processOfflineOperations();
+      }, 2000); // Small delay to ensure connection is stable
+    };
 
-    // Limit to 5-8 tasks per day for better user experience
-    const maxTasksPerDay = Math.min(8, Math.max(5, Math.floor(dailyStreak.spiritualLevel / 2) + 3));
-    
-    // Prioritize tasks based on user's progress and preferences
-    const prioritizedTasks = personalizedTasks.sort((a, b) => {
-      // Prioritize tasks that match user's current chakra progress
-      if (a.category === 'chakra' && b.category !== 'chakra') {
-        const chakraMap: { [key: string]: keyof typeof dailyStreak.chakraProgress } = {
-          'root-chakra-activation': 'root',
-          'sacral-chakra-balance': 'sacral',
-          'solar-plexus-power': 'solar',
-          'heart-chakra-opening': 'heart'
-        };
-        const chakraKey = chakraMap[a.id];
-        if (chakraKey && dailyStreak.chakraProgress[chakraKey] < 100) {
-          return -1;
+    const handleOffline = () => {
+      setStealthSaveState(prev => ({ ...prev, isOnline: false }));
+      console.log('📴 Connection lost - operations will be queued');
+    };
+
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+
+  // Auto-save when user data changes
+  useEffect(() => {
+    if (user?.id && stealthSaveState.autoSaveEnabled) {
+      const timeoutId = setTimeout(() => {
+        stealthSaveUserData();
+      }, 2000); // Debounce for 2 seconds
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [userBalance, totalEarnings, user?.id, stealthSaveState.autoSaveEnabled, stealthSaveUserData]);
+
+  // Auto-save when stakes change
+  useEffect(() => {
+    if (user?.id && stealthSaveState.autoSaveEnabled && userStakes.length > 0) {
+      const timeoutId = setTimeout(() => {
+        stealthSaveStakes();
+      }, 3000); // Debounce for 3 seconds
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [userStakes, user?.id, stealthSaveState.autoSaveEnabled, stealthSaveStakes]);
+
+  // Auto-save when synergy changes
+  useEffect(() => {
+    if (user?.id && stealthSaveState.autoSaveEnabled) {
+      const timeoutId = setTimeout(() => {
+        stealthSaveSynergy();
+      }, 5000); // Debounce for 5 seconds
+
+      return () => clearTimeout(timeoutId);
+    }
+  }, [miningSynergy, user?.id, stealthSaveState.autoSaveEnabled, stealthSaveSynergy]);
+
+  // Add periodic reconciliation
+  useEffect(() => {
+    if (!user?.id) return;
+
+    const reconciliationInterval = setInterval(async () => {
+      try {
+        const reconciledData = await reconcileUserData(user.id);
+        if (reconciledData) {
+          setUserBalance(reconciledData.balance);
+          setTotalEarnings(reconciledData.total_earned);
         }
+      } catch (error) {
+        console.error('Reconciliation failed:', error);
       }
+    }, SECURITY_CONFIG.RECONCILIATION_INTERVAL);
+
+    return () => clearInterval(reconciliationInterval);
+  }, [user?.id]);
+
+  // Migration function to move old data to new keys
+  const migrateOldData = (userId?: string) => {
+    try {
+      const oldKeys = [
+        `divine_mining_stakes_${userId || 'anonymous'}`,
+        `divine_mining_user_data_${userId || 'anonymous'}`,
+        `divine_mining_withdrawals_${userId || 'anonymous'}`,
+        `divine_mining_synergy_${userId || 'anonymous'}`,
+        `divine_mining_staking_bonuses_${userId || 'anonymous'}`
+      ];
       
-      // Prioritize beginner tasks for new users
-      if (dailyStreak.spiritualLevel < 5) {
-        if (a.difficulty === 'beginner' && b.difficulty !== 'beginner') return -1;
-        if (b.difficulty === 'beginner' && a.difficulty !== 'beginner') return 1;
-      }
+      const newKeys = [
+        getStakesStorageKey(userId),
+        getUserDataStorageKey(userId),
+        getWithdrawalHistoryStorageKey(userId),
+        getMiningSynergyStorageKey(userId),
+        getStakingBonusesStorageKey(userId)
+      ];
       
-      // Sort by difficulty for balanced progression
-      const difficultyOrder = { beginner: 0, intermediate: 1, advanced: 2, master: 3 };
-      return difficultyOrder[a.difficulty] - difficultyOrder[b.difficulty];
-    });
-
-    return prioritizedTasks.slice(0, maxTasksPerDay);
-  }, [dailyStreak.completedTasks, dailyStreak.spiritualLevel, dailyStreak.chakraProgress]);
-
-  // Get filtered tasks based on selected category
-  const getFilteredTasks = useCallback(() => {
-    const availableTasks = getAvailableTasks();
-    if (selectedCategory === 'all') return availableTasks;
-    return availableTasks.filter(task => task.category === selectedCategory);
-  }, [getAvailableTasks, selectedCategory]);
-
-  // Complete a spiritual task
-  const completeTask = useCallback((taskId: string) => {
-    const task = SPIRITUAL_TASKS.find(t => t.id === taskId);
-    if (!task) return;
-
-    // Add rewards
-    addGems(task.gemReward);
-    addPoints(task.experienceReward);
-
-    // Update streak data
-    setDailyStreak(prev => {
-      const newCompletedTasks = [...prev.completedTasks, taskId];
-      const newDailyTaskProgress = prev.dailyTaskProgress + 1;
-      
-      // Update chakra progress if it's a chakra task
-      let newChakraProgress = { ...prev.chakraProgress };
-      if (task.category === 'chakra') {
-        const chakraMap: { [key: string]: keyof typeof newChakraProgress } = {
-          'root-chakra-activation': 'root',
-          'sacral-chakra-balance': 'sacral',
-          'solar-plexus-power': 'solar',
-          'heart-chakra-opening': 'heart'
-        };
-        const chakraKey = chakraMap[taskId];
-        if (chakraKey) {
-          newChakraProgress[chakraKey] = Math.min(100, newChakraProgress[chakraKey] + 25);
+      oldKeys.forEach((oldKey, index) => {
+        const oldData = localStorage.getItem(oldKey);
+        if (oldData) {
+          localStorage.setItem(newKeys[index], oldData);
+          // localStorage.removeItem(oldKey); // Do NOT delete the old key!
+          console.log(`✅ Migrated data from ${oldKey} to ${newKeys[index]}`);
         }
-      }
-
-      // Check for level up with better calculation
-      const totalExperience = newCompletedTasks.length * 100 + (prev.spiritualLevel - 1) * 1000;
-      const newSpiritualLevel = Math.floor(totalExperience / 1000) + 1;
-
-      return {
-        ...prev,
-        completedTasks: newCompletedTasks,
-        dailyTaskProgress: newDailyTaskProgress,
-        chakraProgress: newChakraProgress,
-        spiritualLevel: newSpiritualLevel
-      };
-    });
-
-    // Show completion message
-    setRewardMessage(`✅ ${task.name} completed! +${task.gemReward} gems, +${task.experienceReward} experience`);
-    setShowResult(true);
-
-    // Check for achievements
-    setTimeout(() => {
-      checkAchievements();
-    }, 100);
-  }, [addGems, addPoints]);
-
-  // Check for new achievements
-  const checkAchievements = useCallback(() => {
-    const achievements = dailyStreak.achievements || [];
-    const newAchievements = ACHIEVEMENTS.filter(achievement => 
-      !achievements.includes(achievement.id) && 
-      achievement.condition(dailyStreak)
-    );
-    
-    if (newAchievements.length > 0) {
-      newAchievements.forEach(achievement => {
-        showAchievementNotification(achievement);
-        addPoints(achievement.reward.points);
-        addGems(achievement.reward.gems);
       });
+    } catch (error) {
+      console.error('Error during data migration:', error);
+    }
+  };
+
+  // REPLACE with local state:
+
+  // Add useEffect to sync mining points from DivineMiningGame localStorage:
+  useEffect(() => {
+    const syncMiningPoints = () => {
+      if (user?.telegram_id) {
+        const userPointsKey = `spiritualEssencePoints_${user.telegram_id}`;
+        const savedPoints = localStorage.getItem(userPointsKey);
+        if (savedPoints) {
+          setMiningPoints(parseInt(savedPoints, 10));
+        }
+      }
+    };
+    
+    syncMiningPoints();
+    
+    // Listen for changes from DivineMiningGame
+    const handleStorageChange = (e: StorageEvent) => {
+      if (e.key === `spiritualEssencePoints_${user?.telegram_id}`) {
+        syncMiningPoints();
+      }
+    };
+    
+    window.addEventListener('storage', handleStorageChange);
+    return () => window.removeEventListener('storage', handleStorageChange);
+  }, [user?.telegram_id]);
+
+  // REPLACE with direct localStorage update:
+  const handleSynergyReward = () => {
+    if (user?.telegram_id) {
+      const userGemsKey = `divineMiningGems_${user.telegram_id}`;
+      const currentGems = parseInt(localStorage.getItem(userGemsKey) || '0', 10);
+      const newGems = currentGems + 50;
+      localStorage.setItem(userGemsKey, newGems.toString());
       
-      setDailyStreak(prev => ({
-        ...prev,
-        achievements: [...(prev.achievements || []), ...newAchievements.map(a => a.id)]
+      // Dispatch event for GameContext to pick up
+      window.dispatchEvent(new CustomEvent('gemsUpdated', { 
+        detail: { gems: newGems, amount: 50, source: 'synergy_reward' } 
       }));
     }
-  }, [dailyStreak, showAchievementNotification, addPoints, addGems]);
-
-  // // Get unlocked achievements
-  // const unlockedAchievements = useMemo(() => {
-  //   const achievements = dailyStreak.achievements || [];
-  //   return ACHIEVEMENTS.filter(achievement => 
-  //     achievements.includes(achievement.id)
-  //   );
-  // }, [dailyStreak.achievements]);
-
-  // Get category icon
-  const getCategoryIcon = (category: string) => {
-    const icons = {
-      meditation: '🧘‍♀️',
-      chakra: '🌈',
-      elemental: '⚡',
-      cosmic: '🌌',
-      mastery: '✨'
-    };
-    return icons[category as keyof typeof icons] || '📋';
   };
-
-  // Get difficulty color
-  const getDifficultyColor = (difficulty: string) => {
-    const colors = {
-      beginner: 'text-green-400',
-      intermediate: 'text-yellow-400',
-      advanced: 'text-orange-400',
-      master: 'text-red-400'
-    };
-    return colors[difficulty as keyof typeof colors] || 'text-gray-400';
-  };
-
-  const availableTasks = getFilteredTasks();
 
   return (
-    <div className="flex-1 p-custom space-y-2 overflow-y-auto game-scrollbar">
-      {/* User Progress Header */}
-      <div className="bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="flex items-center gap-3">
-            <div className="text-2xl">🌟</div>
-            <div>
-              <div className="text-white font-mono font-bold text-sm tracking-wider">
-                Spiritual Level {dailyStreak.spiritualLevel}
-              </div>
-              <div className="text-gray-400 font-mono text-xs">
-                {dailyStreak.dailyTaskProgress} tasks completed today
-              </div>
-            </div>
+    <div className="min-h-screen text-white p-1 sm:p-2">
+      <div className="max-w-4xl mx-auto">
+        {/* User-Friendly Header */}
+        <div className="text-center mb-3 sm:mb-4">
+          <div className="mb-2 sm:mb-3">
+            <h1 className="text-lg sm:text-xl md:text-2xl font-mono font-bold bg-gradient-to-r from-cyan-400 to-blue-400 bg-clip-text text-transparent mb-1">
+              🚀 Divine Mining Staking
+            </h1>
+            <p className="text-xs sm:text-sm text-gray-300 font-mono">
+              Start earning up to 3% daily TON rewards instantly
+            </p>
           </div>
-          <div className="text-right">
-            <div className="text-purple-400 font-mono font-bold text-sm">
-              {dailyStreak.completedTasks.length} total completed
-            </div>
-            <div className="text-yellow-400 font-mono text-xs">
-              {dailyStreak.consecutiveDays} day streak
-            </div>
-            {/* Debug button - remove in production */}
-            <button
-              onClick={debugDailyReset}
-              className="ml-2 px-2 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700"
-              title="Debug Daily Reset"
-            >
-              🐛
-            </button>
-          </div>
-        </div>
-        
-        {/* Chakra Progress Bar */}
-        <div className="space-y-2">
-          <div className="text-gray-400 font-mono text-xs">Chakra Progress</div>
-          <div className="grid grid-cols-7 gap-1">
-            {Object.entries(dailyStreak.chakraProgress).map(([chakra, progress]) => (
-              <div key={chakra} className="text-center">
-                <div className="text-xs font-mono text-gray-400 capitalize">{chakra}</div>
-                <div className="w-full bg-gray-700 rounded-full h-2">
-                  <div 
-                    className="bg-gradient-to-r from-purple-500 to-pink-500 h-2 rounded-full transition-all duration-300"
-                    style={{ width: `${progress}%` }}
-                  ></div>
+          
+          {/* Quick Start Guide */}
+          {userStakes.length === 0 && userFriendlyAddress && (
+            <div className="bg-gradient-to-r from-cyan-900/40 to-blue-900/40 border border-cyan-500/30 rounded-lg p-2 sm:p-3 max-w-2xl mx-auto">
+              <div className="text-cyan-400 font-mono font-bold mb-1 sm:mb-2 text-xs">🎯 QUICK START GUIDE</div>
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-1 sm:gap-2 text-xs text-gray-300">
+                <div className="flex items-center space-x-1">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xs">1</div>
+                  <span>Choose your tier</span>
                 </div>
-                <div className="text-xs font-mono text-gray-500">{progress}%</div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xs">2</div>
+                  <span>Set stake amount</span>
+                </div>
+                <div className="flex items-center space-x-1">
+                  <div className="w-4 h-4 sm:w-5 sm:h-5 bg-cyan-500 rounded-full flex items-center justify-center text-white font-bold text-xs">3</div>
+                  <span>Start earning daily</span>
+                </div>
               </div>
+            </div>
+          )}
+        </div>
+
+        {/* Navigation Tabs */}
+        <div className="flex justify-center mb-2 sm:mb-3">
+          <div className="flex bg-gray-800/50 rounded-lg p-1 border border-gray-600/30 w-full max-w-md">
+            {[
+              { id: 'overview', label: 'PROFIT', icon: '📊' },
+              { id: 'tiers', label: 'TIERS', icon: '🏆' },
+              { id: 'stakes', label: 'STAKES', icon: '🔥' },
+              { id: 'synergy', label: 'BOOSTS', icon: '⚡' }
+            ].map((tab) => (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id as any)}
+                className={`flex-1 px-2 py-1.5 rounded-md text-xs font-mono font-bold transition-all duration-200 ${
+                  activeTab === tab.id
+                    ? 'bg-gradient-to-r from-cyan-500 to-blue-500 text-white shadow-lg'
+                    : 'text-gray-400 hover:text-white'
+                }`}
+              >
+                {tab.icon} {tab.label}
+              </button>
             ))}
           </div>
         </div>
-      </div>
 
-      {/* Category Filter */}
-      <div className="flex gap-2 mb-2 overflow-x-auto">
-        {[
-          { id: 'all', name: 'All Tasks', icon: '📋' },
-          { id: 'meditation', name: 'Meditation', icon: '🧘‍♀️' },
-          { id: 'chakra', name: 'Chakra', icon: '🌈' },
-          { id: 'elemental', name: 'Elemental', icon: '⚡' },
-          { id: 'cosmic', name: 'Cosmic', icon: '🌌' },
-          { id: 'mastery', name: 'Mastery', icon: '✨' }
-        ].map(category => (
-          <button
-            key={category.id}
-            onClick={() => setSelectedCategory(category.id as any)}
-            className={`flex items-center gap-2 px-3 py-2 rounded-lg font-mono font-bold text-xs tracking-wider transition-all duration-300 border whitespace-nowrap ${
-              selectedCategory === category.id
-                ? 'bg-cyan-600 text-white border-cyan-400'
-                : 'bg-gray-800/50 text-gray-300 border-gray-600 hover:bg-gray-700/50'
-            }`}
-          >
-            <span>{category.icon}</span>
-            <span>{category.name}</span>
-          </button>
-        ))}
-      </div>
-
-      {/* Task Progress Summary */}
-      <div className="bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 mb-4">
-        <div className="flex items-center justify-between mb-3">
-          <div className="text-cyan-400 font-mono font-bold text-sm">DAILY TASK PROGRESS</div>
-          <div className="text-gray-400 font-mono text-xs">
-            {dailyStreak.completedTasks.length} / {availableTasks.length} completed
-          </div>
-        </div>
-        <div className="w-full bg-gray-700 rounded-full h-3 mb-2">
-          <div 
-            className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-500" 
-            style={{ width: `${availableTasks.length > 0 ? (dailyStreak.completedTasks.length / availableTasks.length) * 100 : 0}%` }}
-          ></div>
-        </div>
-        <div className="flex items-center justify-between text-xs">
-          <div className="text-gray-400">
-            {currentTaskInProgress ? '⏱️ Task in progress...' : '🎯 Ready to practice'}
-          </div>
-          <div className="text-gray-400">
-            {Math.round((dailyStreak.completedTasks.length / availableTasks.length) * 100)}% complete
-          </div>
-        </div>
-      </div>
-
-      {/* Spiritual Tasks */}
-      <div className="space-y-3">
-        {availableTasks.length > 0 ? (
-          availableTasks.map(task => (
-            <div key={task.id} className={`relative bg-black/40 backdrop-blur-xl border rounded-xl p-4 transition-all duration-300 ${
-              dailyStreak.completedTasks.includes(task.id)
-                ? 'border-green-500/50 shadow-[0_0_20px_rgba(34,197,94,0.3)]'
-                : currentTaskInProgress === task.id
-                ? taskCompleted && practiceTimer === 0
-                  ? 'border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.3)]'
-                  : 'border-orange-500/50 shadow-[0_0_20px_rgba(255,165,0,0.3)]'
-                : currentTaskInProgress !== null
-                ? 'border-gray-500/30 shadow-[0_0_20px_rgba(128,128,128,0.1)] opacity-60'
-                : 'border-cyan-500/30 shadow-[0_0_20px_rgba(0,255,255,0.1)]'
-            }`}>
-              {currentTaskInProgress === task.id && (
-                <div className={`absolute -top-2 -right-2 text-white text-xs font-mono font-bold px-2 py-1 rounded-full ${
-                  taskCompleted && practiceTimer === 0
-                    ? 'bg-yellow-500 animate-pulse' 
-                    : 'bg-orange-500 animate-pulse'
-                }`}>
-                  {taskCompleted && practiceTimer === 0 ? '🎁 READY TO CLAIM' : '⏱️ IN PROGRESS'}
-                </div>
-              )}
-              {currentTaskInProgress === null && !dailyStreak.completedTasks.includes(task.id) && (
-                <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-mono font-bold px-2 py-1 rounded-full">
-                  ⏳ NOT COMPLETED
-                </div>
-              )}
-              {dailyStreak.completedTasks.includes(task.id) && (
-                <div className="absolute -top-2 -right-2 bg-green-500 text-white text-xs font-mono font-bold px-2 py-1 rounded-full">
-                  ✅ COMPLETED
-                </div>
-              )}
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-3">
-                  <div className="text-2xl">{task.icon}</div>
-                  <div>
-                    <div className="text-white font-mono font-bold text-sm tracking-wider">{task.name}</div>
-                    <div className="text-gray-400 font-mono text-xs">{task.description}</div>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-purple-400 font-mono font-bold text-sm">+{task.gemReward} gems</div>
-                  <div className="text-yellow-400 font-mono text-xs">+{task.experienceReward} exp</div>
-                </div>
-              </div>
-              
-              {/* Task Status Indicator */}
-              <div className="mb-3">
-                {dailyStreak.completedTasks.includes(task.id) ? (
-                  <div className="flex items-center gap-2 text-green-400">
-                    <div className="text-sm">✅</div>
-                    <div className="text-xs font-mono">Task completed today</div>
-                  </div>
-                ) : currentTaskInProgress === task.id ? (
-                  <div className="flex items-center gap-2 text-orange-400">
-                    <div className="text-sm animate-pulse">⏱️</div>
-                    <div className="text-xs font-mono">
-                      {taskCompleted && practiceTimer === 0 ? 'Practice completed - ready to claim!' : 'Timer in progress - complete timer first'}
+        {/* Overview Tab */}
+        {activeTab === 'overview' && (
+          <>
+            {/* Stats Grid */}
+            <div className="grid grid-cols-2 lg:grid-cols-5 gap-2 mb-3 auto-rows-fr">
+              {/* Balance Card */}
+              <div className="relative group w-full h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-blue-500/20 to-cyan-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-blue-500/30 rounded-xl p-2 hover:border-blue-400/50 transition-all duration-300 hover:scale-[1.02] h-full min-h-[140px] flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-blue-500 to-cyan-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">💰</span>
+                    </div>
+                    <div className="text-blue-400 text-xs font-medium bg-blue-500/10 px-1.5 py-0.5 rounded">
+                      BALANCE
                     </div>
                   </div>
-                ) : currentTaskInProgress !== null ? (
-                  <div className="flex items-center gap-2 text-gray-400">
-                    <div className="text-sm">⏸️</div>
-                    <div className="text-xs font-mono">Another task is active</div>
+                  <div className="text-lg font-bold text-white mb-0.5 font-mono">
+                    {formatNumber(Math.max(0, userBalance))}
                   </div>
-                ) : (
-                  <div className="flex items-center gap-2 text-red-400">
-                    <div className="text-sm">⏳</div>
-                    <div className="text-xs font-mono">Not completed yet</div>
+                  <div className="text-blue-300 text-xs font-medium">TON</div>
+                  
+                  {/* Wallet Status */}
+                  {userFriendlyAddress && (
+                    <div className="mt-1 text-xs text-blue-400 font-mono">
+                      {userFriendlyAddress.slice(0, 6)}...{userFriendlyAddress.slice(-4)}
+                    </div>
+                  )}
+                  
+                  <div className="mt-2 pt-2 border-t border-blue-500/20 mt-auto">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center text-xs text-blue-400">
+                        <div className={`w-1.5 h-1.5 rounded-full mr-1 ${userFriendlyAddress ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                        {userFriendlyAddress ? 'Connected' : 'Not Connected'}
+                      </div>
+                      <button
+                        onClick={() => setShowDepositModal(true)}
+                        disabled={!userFriendlyAddress}
+                        className={`text-xs px-2 py-1 rounded transition-colors ${
+                          userFriendlyAddress 
+                            ? 'bg-blue-500 hover:bg-blue-600 text-white' 
+                            : 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        }`}
+                      >
+                        💰 Deposit
+                      </button>
+                    </div>
                   </div>
-                )}
-              </div>
-              
-              <div className="flex items-center justify-between mb-3">
-                <div className="flex items-center gap-2">
-                  <span className={`text-xs font-mono ${getDifficultyColor(task.difficulty)}`}>
-                    {task.difficulty.toUpperCase()}
-                  </span>
-                  <span className="text-gray-400 text-xs">•</span>
-                  <span className="text-gray-400 text-xs">{getCategoryIcon(task.category)} {task.category}</span>
                 </div>
-                
-                {task.requirements.minLevel && (
-                  <div className="text-gray-400 font-mono text-xs">
-                    Level {task.requirements.minLevel} required
-                  </div>
-                )}
               </div>
-              
-                            <div className="flex gap-2">
+
+              {/* Earnings Card */}
+              <div className="relative group w-full h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-green-500/20 to-emerald-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-green-500/30 rounded-xl p-2 hover:border-green-400/50 transition-all duration-300 hover:scale-[1.02] h-full min-h-[140px] flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-green-500 to-emerald-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">📈</span>
+                    </div>
+                    <div className="text-green-400 text-xs font-medium bg-green-500/10 px-1.5 py-0.5 rounded">
+                      EARNED
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-0.5 font-mono">
+                    {formatNumber(totalEarnings)}
+                  </div>
+                  <div className="text-green-300 text-xs font-medium">TON</div>
+                  <div className="mt-2 pt-2 border-t border-green-500/20 mt-auto">
+                    <div className="flex items-center text-xs text-green-400">
+                      <div className="w-1.5 h-1.5 bg-green-400 rounded-full mr-1"></div>
+                      Total rewards
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Claimable Card */}
+              <div className="relative group w-full h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-yellow-500/20 to-orange-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-2 hover:border-yellow-400/50 transition-all duration-300 hover:scale-[1.02] h-full min-h-[140px] flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-yellow-500 to-orange-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">⚡</span>
+                    </div>
+                    <div className="text-yellow-400 text-xs font-medium bg-yellow-500/10 px-1.5 py-0.5 rounded">
+                      CLAIMABLE
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-0.5 font-mono">
+                    {formatNumber(availableToClaim)}
+                  </div>
+                  <div className="text-yellow-300 text-xs font-medium">TON</div>
+                  <div className="mt-2 pt-2 border-t border-yellow-500/20 mt-auto">
+                    <div className="flex items-center text-xs text-yellow-400">
+                      <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full mr-1 animate-pulse"></div>
+                      Ready to claim
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Active Stakes Card */}
+              <div className="relative group w-full h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-purple-500/20 to-pink-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-purple-500/30 rounded-xl p-2 hover:border-purple-400/50 transition-all duration-300 hover:scale-[1.02] h-full min-h-[140px] flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-purple-500 to-pink-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">🔥</span>
+                    </div>
+                    <div className="text-purple-400 text-xs font-medium bg-purple-500/10 px-1.5 py-0.5 rounded">
+                      ACTIVE
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-0.5 font-mono">
+                    {userStakes.length}
+                  </div>
+                  <div className="text-purple-300 text-xs font-medium">Stakes</div>
+                  <div className="mt-2 pt-2 border-t border-purple-500/20 mt-auto">
+                    <div className="flex items-center text-xs text-purple-400">
+                      <div className="w-1.5 h-1.5 bg-purple-400 rounded-full mr-1"></div>
+                      Generating rewards
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              {/* Mining Synergy Card */}
+              {/* <div className="relative group w-full h-full">
+                <div className="absolute inset-0 bg-gradient-to-br from-indigo-500/20 to-purple-500/20 rounded-xl blur-lg group-hover:blur-xl transition-all duration-500"></div>
+                <div className="relative bg-gradient-to-br from-slate-900/90 to-slate-800/90 backdrop-blur-xl border border-indigo-500/30 rounded-xl p-2 hover:border-indigo-400/50 transition-all duration-300 hover:scale-[1.02] h-full min-h-[140px] flex flex-col">
+                  <div className="flex items-center justify-between mb-2">
+                    <div className="w-8 h-8 bg-gradient-to-br from-indigo-500 to-purple-500 rounded-lg flex items-center justify-center">
+                      <span className="text-white text-sm">⚡</span>
+                    </div>
+                    <div className="text-indigo-400 text-xs font-medium bg-indigo-500/10 px-1.5 py-0.5 rounded">
+                      SYNERGY
+                    </div>
+                  </div>
+                  <div className="text-lg font-bold text-white mb-0.5 font-mono">
+                    {miningSynergy.synergyLevel}/10
+                  </div>
+                  <div className="text-indigo-300 text-xs font-medium">Level</div>
+                  <div className="mt-2 pt-2 border-t border-indigo-500/20 mt-auto">
+                    <div className="flex items-center text-xs text-indigo-400">
+                      <div className="w-1.5 h-1.5 bg-indigo-400 rounded-full mr-1 animate-pulse"></div>
+                      {miningSynergy.activeStakesCount} stakes • {formatNumber(miningSynergy.totalStakedAmount)} TON
+                    </div>
+                  </div>
+                </div>
+              </div> */}
+            </div>
+
+            {/* Smart Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-2 mb-3">
+              <button
+                onClick={() => setShowStakeModal(true)}
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-mono font-bold py-2 px-3 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 border border-cyan-400/30 shadow-lg shadow-cyan-500/25"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-base">{userStakes.length > 0 ? '⚡' : '🚀'}</span>
+                  <div>
+                    <div className="text-xs">
+                      {userStakes.length > 0 ? 'STAKE MORE' : 'START STAKING'}
+                    </div>
+                    <div className="text-xs opacity-80">
+                      {userStakes.length > 0 ? 'Upgrade your earnings' : 'Begin earning rewards'}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setShowClaimModal(true)}
+                disabled={availableToClaim <= 0}
+                className={`flex-1 font-mono font-bold py-2 px-3 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 border shadow-lg ${
+                  availableToClaim > 0
+                    ? 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white border-green-400/30 shadow-green-500/25'
+                    : 'bg-gray-600 text-gray-400 border-gray-500/30 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-base">💰</span>
+                  <div>
+                    <div className="text-xs">CLAIM REWARDS</div>
+                    <div className="text-xs opacity-80">
+                      {availableToClaim > 0 ? `${formatNumber(availableToClaim)} TON available` : 'No rewards to claim'}
+                    </div>
+                  </div>
+                </div>
+              </button>
+
+              <button
+                onClick={() => setShowWithdrawalModal(true)}
+                disabled={userBalance <= 0}
+                className={`flex-1 font-mono font-bold py-2 px-3 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95 border shadow-lg ${
+                  userBalance > 0
+                    ? 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white border-orange-400/30 shadow-orange-500/25'
+                    : 'bg-gray-600 text-gray-400 border-gray-500/30 cursor-not-allowed'
+                }`}
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span className="text-base">💳</span>
+                  <div>
+                    <div className="text-xs">WITHDRAW</div>
+                    <div className="text-xs opacity-80">
+                      {userBalance > 0 ? `${formatNumber(userBalance)} TON available` : 'No balance to withdraw'}
+                    </div>
+                  </div>
+                </div>
+              </button>
+            </div>
+
+            {/* Stealth Saving Status Indicator */}
+            <div className="bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-cyan-500/30 rounded-lg p-2 mb-3">
+              <div className="flex items-center justify-between">
+                <div className="flex items-center space-x-2">
+                  <div className={`w-2 h-2 rounded-full ${stealthSaveState.isOnline ? 'bg-green-400' : 'bg-red-400'}`}></div>
+                  <span className="text-xs text-cyan-400 font-mono">
+                    {stealthSaveState.isOnline ? '🔄 Auto-saving enabled' : '📴 Offline mode - queuing changes'}
+                  </span>
+                </div>
+                <div className="flex items-center space-x-2">
+                  {stealthSaveState.isSyncing && (
+                    <div className="flex items-center space-x-1">
+                      <div className="w-3 h-3 border border-cyan-400 border-t-transparent rounded-full animate-spin"></div>
+                      <span className="text-xs text-cyan-400">Syncing...</span>
+                    </div>
+                  )}
+                  {stealthSaveState.pendingOperations.length > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-yellow-400">📝 {stealthSaveState.pendingOperations.length} pending</span>
+                    </div>
+                  )}
+                  {stealthSaveState.syncErrors.length > 0 && (
+                    <div className="flex items-center space-x-1">
+                      <span className="text-xs text-red-400">⚠️ {stealthSaveState.syncErrors.length} errors</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+              {stealthSaveState.pendingOperations.length > 0 && (
+                <div className="mt-1 text-xs text-gray-400">
+                  {stealthSaveState.isOnline 
+                    ? 'Processing offline changes...' 
+                    : 'Changes will sync when connection is restored'
+                  }
+                </div>
+              )}
+            </div>
+
+            {/* Collapsible Earnings Dashboard */}
+            <div className="bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-yellow-500/30 rounded-lg p-3 mb-3">
+              <div className="flex justify-between items-center mb-2">
+                <div className="flex items-center space-x-2">
+                  <span className="text-sm">📈</span>
+                  <span className="text-xs font-mono font-bold text-yellow-400">EARNINGS OVERVIEW</span>
+                </div>
                 <button
-                  onClick={() => {
-                    setSelectedTask(task);
-                    setShowTaskDetails(true);
-                    setWizardStep(1); // Reset wizard step when opening task details
-                    setIsTimerRunning(false); // Reset timer state
-                    setPracticeTimer(0); // Reset timer
-                    setTaskCompleted(false); // Reset completion state
-                  }}
-                  disabled={currentTaskInProgress !== null && currentTaskInProgress !== task.id}
-                  className={`w-full py-3 rounded-lg font-mono font-bold text-sm tracking-wider transition-all duration-300 border flex items-center justify-center gap-2 ${
-                    dailyStreak.completedTasks.includes(task.id)
-                      ? 'bg-gradient-to-r from-green-600 to-emerald-600 text-white border-green-400 cursor-not-allowed'
-                      : currentTaskInProgress !== null && currentTaskInProgress !== task.id
-                      ? 'bg-gray-600 text-gray-400 border-gray-500 cursor-not-allowed'
-                      : currentTaskInProgress === task.id
-                      ? 'bg-gradient-to-r from-orange-600 to-red-600 text-white border-orange-400 hover:scale-105 shadow-lg hover:shadow-orange-500/25'
-                      : 'bg-gradient-to-r from-cyan-600 via-purple-600 to-pink-600 hover:from-cyan-500 hover:via-purple-500 hover:to-pink-500 text-white border-cyan-400 hover:scale-105 shadow-lg hover:shadow-cyan-500/25'
-                  }`}
+                  onClick={() => setShowDetailedEarnings(!showDetailedEarnings)}
+                  className="flex items-center space-x-1 text-xs font-mono text-gray-400 hover:text-white transition-colors"
                 >
-                  <span>
-                    {dailyStreak.completedTasks.includes(task.id) 
-                      ? '✅' 
-                      : currentTaskInProgress === task.id 
-                      ? (taskCompleted && practiceTimer === 0 ? '🎁' : '⏱️')
-                      : '🌟'
-                    }
-                  </span>
-                  <span>
-                    {dailyStreak.completedTasks.includes(task.id)
-                      ? 'TASK COMPLETED'
-                      : currentTaskInProgress === task.id 
-                      ? (taskCompleted && practiceTimer === 0 ? 'READY TO CLAIM' : 'COMPLETE TIMER')
-                      : currentTaskInProgress !== null 
-                      ? 'ANOTHER TASK ACTIVE' 
-                      : 'START WIZARD'
-                    }
-                  </span>
-                  <span>
-                    {dailyStreak.completedTasks.includes(task.id)
-                      ? '🎉'
-                      : currentTaskInProgress === task.id 
-                      ? (taskCompleted && practiceTimer === 0 ? '✨' : '⏰')
-                      : '🧙‍♀️'
-                    }
+                  <span>{showDetailedEarnings ? 'Hide Details' : 'Show Details'}</span>
+                  <span className={`transform transition-transform duration-200 ${showDetailedEarnings ? 'rotate-180' : ''}`}>
+                    ▼
                   </span>
                 </button>
               </div>
-            </div>
-          ))
-        ) : (
-          <div className="text-center py-8">
-            <div className="text-6xl mb-4">🎉</div>
-            <div className="text-white font-mono font-bold text-xl mb-2">All Daily Tasks Completed!</div>
-            <div className="text-green-400 font-mono text-sm mb-4">🌟 Congratulations on your spiritual dedication! 🌟</div>
-            <div className="text-gray-400 font-mono text-sm mb-2">You've completed all available spiritual tasks for today.</div>
-            <div className="text-gray-500 font-mono text-xs">New tasks will be available tomorrow at midnight.</div>
-            
-            {/* Completion Stats */}
-            <div className="mt-6 bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-lg p-4">
-              <div className="text-green-400 font-mono font-bold text-sm mb-2">TODAY'S ACHIEVEMENTS</div>
-              <div className="grid grid-cols-2 gap-4 text-sm">
-                <div className="text-center">
-                  <div className="text-white font-mono font-bold">{dailyStreak.dailyTaskProgress}</div>
-                  <div className="text-gray-400 text-xs">Tasks Completed</div>
+              
+              {/* Primary Stats - Always Visible */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <div className="bg-gradient-to-br from-cyan-800/30 to-cyan-900/30 border border-cyan-500/20 rounded-lg p-2 text-center">
+                  <div className="text-cyan-400 font-bold text-xs mb-1">TOTAL STAKED</div>
+                  <div className="text-white font-mono text-sm font-bold">
+                    {formatNumber(userStakes.reduce((sum, stake) => sum + stake.amount, 0))} TON
+                  </div>
+                  <div className="text-cyan-300 text-xs">Principal Investment</div>
                 </div>
+                
+                <div className="bg-gradient-to-br from-green-800/30 to-green-900/30 border border-green-500/20 rounded-lg p-2 text-center">
+                  <div className="text-green-400 font-bold text-xs mb-1">GROSS EARNINGS</div>
+                  <div className="text-white font-mono text-sm font-bold">{formatNumber(totalEarnings)} TON</div>
+                  <div className="text-green-300 text-xs">Total Generated</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-blue-800/30 to-blue-900/30 border border-blue-500/20 rounded-lg p-2 text-center">
+                  <div className="text-blue-400 font-bold text-xs mb-1">NET RECEIVED</div>
+                  <div className="text-white font-mono text-sm font-bold">
+                    {formatNumber(totalEarnings * 0.6)} TON
+                  </div>
+                  <div className="text-blue-300 text-xs">After Fees (60%)</div>
+                </div>
+                
+                <div className="bg-gradient-to-br from-purple-800/30 to-purple-900/30 border border-purple-500/20 rounded-lg p-2 text-center">
+                  <div className="text-purple-400 font-bold text-xs mb-1">CLAIMABLE NOW</div>
+                  <div className="text-white font-mono text-sm font-bold">{formatNumber(availableToClaim)} TON</div>
+                  <div className="text-purple-300 text-xs">Ready to Claim</div>
+                </div>
+              </div>
+
+              {/* Detailed Breakdown - Collapsible */}
+              {showDetailedEarnings && (
+                <div className="space-y-3">
+
+              {/* Daily Performance */}
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-2 mb-3">
+                <div className="bg-gray-800/40 border border-gray-600/30 rounded-lg p-2">
+                  <div className="text-yellow-400 font-bold text-xs mb-1">DAILY GROSS</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0))} TON
+                  </div>
+                  <div className="text-gray-400 text-xs">Total Daily Generation</div>
+                </div>
+                
+                <div className="bg-gray-800/40 border border-gray-600/30 rounded-lg p-2">
+                  <div className="text-yellow-400 font-bold text-xs mb-1">DAILY NET</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 0.6)} TON
+                  </div>
+                  <div className="text-gray-400 text-xs">Your Daily Income</div>
+                </div>
+                
+                <div className="bg-gray-800/40 border border-gray-600/30 rounded-lg p-2">
+                  <div className="text-yellow-400 font-bold text-xs mb-1">AVG ROI</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {userStakes.length > 0 
+                      ? ((userStakes.reduce((sum, stake) => sum + stake.daily_rate, 0) / userStakes.length) * 100).toFixed(2)
+                      : '0.00'
+                    }%
+                  </div>
+                  <div className="text-gray-400 text-xs">Daily Rate</div>
+                </div>
+              </div>
+
+              {/* Earnings Projections */}
+              {userStakes.length > 0 && (
+                <div className="bg-gradient-to-r from-indigo-900/30 to-purple-900/30 border border-indigo-500/30 rounded-lg p-3">
+                  <div className="text-indigo-400 font-bold text-xs mb-2 text-center">📊 EARNINGS PROJECTIONS</div>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
+                    <div>
+                      <div className="text-indigo-300 font-mono font-bold">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 7)} TON
+                      </div>
+                      <div className="text-indigo-400 text-xs">Weekly (Gross)</div>
+                      <div className="text-indigo-200 text-xs">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 7 * 0.6)} TON net
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-purple-300 font-mono font-bold">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 30)} TON
+                      </div>
+                      <div className="text-purple-400 text-xs">Monthly (Gross)</div>
+                      <div className="text-purple-200 text-xs">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 30 * 0.6)} TON net
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-pink-300 font-mono font-bold">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 90)} TON
+                      </div>
+                      <div className="text-pink-400 text-xs">Quarterly (Gross)</div>
+                      <div className="text-pink-200 text-xs">
+                        {formatNumber(userStakes.reduce((sum, stake) => sum + (stake.amount * stake.daily_rate), 0) * 90 * 0.6)} TON net
+                      </div>
+                    </div>
+                    <div>
+                      <div className="text-cyan-300 font-mono font-bold">
+                        {formatNumber(userStakes.reduce((sum, stake) => {
+                          const tier = getTierForAmount(stake.amount);
+                          const maxEarnings = stake.amount * ((tier?.maxReturn || 300) / 100);
+                          return sum + maxEarnings;
+                        }, 0))} TON
+                      </div>
+                      <div className="text-cyan-400 text-xs">Max Possible</div>
+                      <div className="text-cyan-200 text-xs">
+                        {formatNumber(userStakes.reduce((sum, stake) => {
+                          const tier = getTierForAmount(stake.amount);
+                          const maxEarnings = stake.amount * ((tier?.maxReturn || 300) / 100);
+                          return sum + maxEarnings;
+                        }, 0) * 0.6)} TON net
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              {/* Fee Structure Info */}
+              <div className="mt-2 bg-gray-800/30 border border-gray-600/20 rounded-lg p-2">
+                <div className="text-gray-400 font-bold text-xs mb-1 text-center">💡 EARNINGS DISTRIBUTION</div>
+                <div className="flex justify-center space-x-3 text-xs">
+                  <span className="text-green-400">60% → Your Wallet</span>
+                  <span className="text-blue-400">10% → GLP Pool</span>
+                  <span className="text-purple-400">10% → STK Tokens</span>
+                  <span className="text-yellow-400">20% → Reinvestment</span>
+                </div>
+              </div>
+                </div>
+              )}
+
+              {/* Withdrawal History */}
+              {withdrawalHistory.length > 0 && (
+                <div className="bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-orange-500/30 rounded-lg p-3 mt-3">
+                  <div className="flex justify-between items-center mb-2">
+                    <div className="flex items-center space-x-2">
+                      <span className="text-sm">💳</span>
+                      <span className="text-xs font-mono font-bold text-orange-400">WITHDRAWAL HISTORY</span>
+                    </div>
+                  </div>
+                  
+                  <div className="space-y-2">
+                    {withdrawalHistory.slice(0, 5).map((withdrawal) => (
+                      <div key={withdrawal.id} className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-2">
+                        <div className="flex justify-between items-start mb-1">
+                          <div>
+                            <div className="text-white font-mono font-bold text-xs">
+                              {formatNumber(withdrawal.amount)} TON
+                            </div>
+                            <div className="text-xs text-gray-400 font-mono">
+                              {withdrawal.wallet_address.slice(0, 8)}...{withdrawal.wallet_address.slice(-6)}
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <div className={`text-xs font-mono font-bold px-1.5 py-0.5 rounded ${
+                              withdrawal.status === 'completed' 
+                                ? 'bg-green-500/20 text-green-400' 
+                                : withdrawal.status === 'pending'
+                                ? 'bg-orange-500/20 text-orange-400'
+                                : 'bg-red-500/20 text-red-400'
+                            }`}>
+                              {withdrawal.status.toUpperCase()}
+                            </div>
+                            <div className="text-xs text-gray-400 mt-0.5">
+                              {formatDate(withdrawal.created_at)}
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                  
+                  {withdrawalHistory.length > 5 && (
+                    <div className="text-center mt-2">
+                      <div className="text-xs text-gray-400 font-mono">
+                        Showing 5 of {withdrawalHistory.length} withdrawals
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          </>
+        )}
+
+        {/* Tiers Tab */}
+        {activeTab === 'tiers' && (
+          <div className="space-y-2">
+            {STAKING_TIERS.map((tier) => {
+              // Check if user has active stakes in this tier
+              const hasActiveStakes = userStakes.some(stake => {
+                const stakeTier = getTierForAmount(stake.amount);
+                return stakeTier?.id === tier.id && stake.is_active;
+              });
+              
+              // Calculate total staked in this tier
+              const tierStakes = userStakes.filter(stake => {
+                const stakeTier = getTierForAmount(stake.amount);
+                return stakeTier?.id === tier.id && stake.is_active;
+              });
+              const totalStakedInTier = tierStakes.reduce((sum, stake) => sum + stake.amount, 0);
+              const totalEarnedInTier = tierStakes.reduce((sum, stake) => sum + stake.total_earned, 0);
+              
+              return (
+                <div
+                  key={tier.id}
+                  className={`bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border transition-all duration-300 rounded-lg p-3 relative ${
+                    hasActiveStakes 
+                      ? 'border-green-500/50 shadow-lg shadow-green-500/20' 
+                      : 'border-gray-700 hover:border-cyan-500/50'
+                  }`}
+                  style={!hasActiveStakes ? { borderColor: tier.color + '40' } : {}}
+                >
+                  {/* Active Tier Badge */}
+                  {hasActiveStakes && (
+                    <div className="absolute -top-1 -right-1 bg-gradient-to-r from-green-500 to-emerald-500 text-white text-xs font-mono font-bold px-2 py-0.5 rounded-full shadow-lg">
+                      ✅ ACTIVE
+                    </div>
+                  )}
+                  <div className="flex flex-col md:flex-row md:items-center md:justify-between">
+                    <div className="flex items-center mb-2 md:mb-0">
+                      <div className="text-2xl mr-2">{tier.icon}</div>
+                      <div>
+                        <h3 className="text-base font-mono font-bold text-white mb-1">{tier.name}</h3>
+                        <div className="text-lg font-mono font-bold text-green-400 mb-1">
+                          {(tier.dailyRate * 100).toFixed(1)}% Daily
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {tier.maxReturn}% Max Return • {tier.cycleDuration} Days
+                        </div>
+                        
+                        {/* Active Tier Status */}
+                        {hasActiveStakes && (
+                          <div className="mt-2 p-2 bg-green-500/10 border border-green-500/30 rounded-lg">
+                            <div className="text-xs font-mono text-green-400 font-bold mb-1">
+                              🎯 YOUR ACTIVE STAKES
+                            </div>
+                            <div className="grid grid-cols-2 gap-2 text-xs">
+                              <div>
+                                <div className="text-green-300">Staked:</div>
+                                <div className="text-white font-mono font-bold">{formatNumber(totalStakedInTier)} TON</div>
+                              </div>
+                              <div>
+                                <div className="text-green-300">Earned:</div>
+                                <div className="text-white font-mono font-bold">{formatNumber(totalEarnedInTier)} TON</div>
+                              </div>
+                            </div>
+                            <div className="text-xs text-green-300 mt-1">
+                              {tierStakes.length} active stake{tierStakes.length > 1 ? 's' : ''}
+                            </div>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col md:items-end space-y-1">
+                      <div className="text-xs font-mono text-gray-300">
+                        <span className="text-gray-400">Min:</span> {tier.minAmount} TON
+                        <span className="text-gray-400 ml-2">Max:</span> {tier.maxAmount} TON
+                      </div>
+                      
+                      <div className="flex flex-wrap gap-1 mb-1">
+                        {tier.features.slice(0, 3).map((feature, index) => (
+                          <span key={index} className="text-xs bg-gray-700/50 text-gray-300 px-1.5 py-0.5 rounded">
+                            {feature}
+                          </span>
+                        ))}
+                      </div>
+
+                      <button
+                        onClick={() => {
+                          setSelectedTier(tier);
+                          setStakeAmount(tier.minAmount);
+                          setShowStakeModal(true);
+                        }}
+                        className={`w-full md:w-auto font-mono font-bold py-2 px-4 rounded-lg transition-all duration-200 border ${
+                          hasActiveStakes
+                            ? 'bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 text-white border-green-500/50'
+                            : 'bg-gradient-to-r from-gray-700 to-gray-600 hover:from-gray-600 hover:to-gray-500 text-white'
+                        }`}
+                        style={!hasActiveStakes ? { borderColor: tier.color } : {}}
+                      >
+                        {hasActiveStakes ? '⚡ ADD MORE' : 'SELECT TIER'}
+                      </button>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Stakes Tab */}
+        {activeTab === 'stakes' && (
+          <div className="space-y-2">
+            {userStakes.length > 0 ? (
+              userStakes.map((stake) => {
+                const tier = getTierForAmount(stake.amount);
+                return (
+                  <div
+                    key={stake.id}
+                    className="bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-gray-700 rounded-lg p-3"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-3">
+                      <div className="flex items-center mb-2 md:mb-0">
+                        <div className="text-xl mr-2">{tier?.icon || '💎'}</div>
+                        <div>
+                          <div className="font-mono font-bold text-white text-sm">
+                            {tier?.name || 'Custom Stake'}
+                          </div>
+                          <div className="text-xs text-gray-400">
+                            {formatNumber(stake.amount)} TON • {(stake.daily_rate * 100).toFixed(2)}% Daily
+                          </div>
+                          <div className="text-xs text-blue-400">
+                            Created: {formatDate(stake.start_date)}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="text-right">
+                        <div className="text-base font-mono font-bold text-yellow-400">
+                          {formatNumber(stake.total_earned)} TON
+                        </div>
+                        <div className="text-xs text-green-400">
+                          Net: {formatNumber(stake.total_earned * 0.6)} TON
+                        </div>
+                        <div className="text-xs text-gray-400">
+                          {((stake.total_earned / stake.amount) * 100).toFixed(1)}% of {tier?.maxReturn || 300}%
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Detailed Earnings Breakdown */}
+                    <div className="bg-gray-800/30 rounded-lg p-2 mb-3">
+                      <div className="text-xs font-mono text-gray-400 mb-2 text-center">📊 FULL EARNINGS BREAKDOWN</div>
+                      
+                      <div className="grid grid-cols-2 md:grid-cols-4 gap-2 text-center text-xs">
+                        <div>
+                          <div className="text-green-400 font-bold">GROSS TOTAL</div>
+                          <div className="text-white font-mono">{formatNumber(stake.total_earned)} TON</div>
+                          <div className="text-gray-400">100%</div>
+                        </div>
+                        <div>
+                          <div className="text-blue-400 font-bold">YOUR SHARE</div>
+                          <div className="text-white font-mono">{formatNumber(stake.total_earned * 0.6)} TON</div>
+                          <div className="text-gray-400">60%</div>
+                        </div>
+                        <div>
+                          <div className="text-purple-400 font-bold">DAILY GROSS</div>
+                          <div className="text-white font-mono">{formatNumber(stake.amount * stake.daily_rate)} TON</div>
+                          <div className="text-gray-400">Per 24h</div>
+                        </div>
+                        <div>
+                          <div className="text-yellow-400 font-bold">DAILY NET</div>
+                          <div className="text-white font-mono">{formatNumber(stake.amount * stake.daily_rate * 0.6)} TON</div>
+                          <div className="text-gray-400">To Wallet</div>
+                        </div>
+                      </div>
+
+                      {/* Current Rewards Available */}
+                      <div className="mt-2 pt-2 border-t border-gray-700">
+                        <div className="flex justify-between items-center">
+                          <div>
+                            <div className="text-xs text-gray-400">AVAILABLE TO CLAIM</div>
+                            <div className="text-xs font-mono font-bold text-cyan-400">
+                              {formatNumber(calculateStakeRewards(stake))} TON
+                            </div>
+                          </div>
+                          <div>
+                            <div className="text-xs text-gray-400">YOU RECEIVE</div>
+                            <div className="text-xs font-mono font-bold text-green-400">
+                              {formatNumber(calculateStakeRewards(stake) * 0.6)} TON
+                            </div>
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Projections for this stake */}
+                      <div className="mt-2 pt-2 border-t border-gray-700">
+                        <div className="text-xs text-gray-400 mb-1 text-center">PROJECTIONS (Net to You)</div>
+                        <div className="grid grid-cols-3 gap-1 text-xs text-center">
+                          <div>
+                            <div className="text-indigo-400 font-mono font-bold">
+                              {formatNumber(stake.amount * stake.daily_rate * 7 * 0.6)} TON
+                            </div>
+                            <div className="text-gray-400">Weekly</div>
+                          </div>
+                          <div>
+                            <div className="text-purple-400 font-mono font-bold">
+                              {formatNumber(stake.amount * stake.daily_rate * 30 * 0.6)} TON
+                            </div>
+                            <div className="text-gray-400">Monthly</div>
+                          </div>
+                          <div>
+                            <div className="text-cyan-400 font-mono font-bold">
+                              {formatNumber(stake.amount * ((tier?.maxReturn || 300) / 100) * 0.6)} TON
+                            </div>
+                            <div className="text-gray-400">Max Net</div>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Progress Bar */}
+                    <div className="mb-2">
+                      <div className="flex justify-between text-xs font-mono text-gray-400 mb-1">
+                        <span>Cycle Progress</span>
+                        <span>{((stake.total_earned / stake.amount) * 100).toFixed(1)}%</span>
+                      </div>
+                      <div className="w-full bg-gray-700 rounded-full h-1.5">
+                        <div
+                          className="bg-gradient-to-r from-cyan-500 to-blue-500 h-1.5 rounded-full transition-all duration-300"
+                          style={{
+                            width: `${Math.min((stake.total_earned / stake.amount) * 100, 100)}%`
+                          }}
+                        ></div>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-2 sm:space-y-0">
+                      <div className="text-xs font-mono text-gray-400">
+                        Started: {formatDate(stake.start_date)}
+                      </div>
+                      
+                      <div className="flex space-x-2">
+                        {stake.speed_boost_active ? (
+                          <div className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded">
+                            ⚡ Speed Boost Active
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => activateSpeedBoost(stake.id)}
+                            className="text-xs bg-yellow-500/20 text-yellow-400 px-2 py-1 rounded hover:bg-yellow-500/30 transition-colors"
+                          >
+                            ⚡ Activate Boost
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                );
+              })
+            ) : (
+              <div className="text-center py-6">
+                <div className="text-2xl mb-2">🚀</div>
+                <div className="text-lg font-mono font-bold text-cyan-400 mb-1">No Active Stakes</div>
+                <div className="text-gray-400 mb-3 text-sm">Start staking to earn daily TON rewards</div>
+                <button
+                  onClick={() => setShowStakeModal(true)}
+                  className="bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-mono font-bold py-2 px-4 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  CREATE FIRST STAKE
+                </button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Synergy Tab */}
+        {activeTab === 'synergy' && (
+          <div className="space-y-3">
+            {/* Synergy Overview Card */}
+            <div className="bg-gradient-to-r from-purple-900/80 to-indigo-900/80 backdrop-blur-xl border border-purple-500/30 rounded-lg p-3">
+              <div className="text-center mb-3">
+                <div className="text-2xl mb-1">⚡</div>
+                <h2 className="text-lg font-mono font-bold text-purple-400 mb-1">Mining-Staking Synergy</h2>
+                <p className="text-gray-300 text-xs">
+                  Combine your mining achievements with staking to unlock powerful bonuses
+                </p>
+              </div>
+
+              {/* Current Synergy Level */}
+              <div className="bg-gradient-to-r from-purple-800/50 to-indigo-800/50 border border-purple-500/20 rounded-lg p-2 mb-3">
                 <div className="text-center">
-                  <div className="text-white font-mono font-bold">{dailyStreak.spiritualLevel}</div>
-                  <div className="text-gray-400 text-xs">Spiritual Level</div>
+                  <div className="text-xl font-mono font-bold text-purple-300 mb-1">
+                    Level {miningSynergy.synergyLevel}/10
+                  </div>
+                  <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
+                    <div
+                      className="bg-gradient-to-r from-purple-500 to-indigo-500 h-2 rounded-full transition-all duration-500"
+                      style={{
+                        width: `${Math.min((miningSynergy.totalMiningPoints / miningSynergy.nextSynergyMilestone) * 100, 100)}%`
+                      }}
+                    ></div>
+                  </div>
+                  <div className="text-xs text-gray-400">
+                    {formatNumber(miningSynergy.totalMiningPoints)} / {formatNumber(miningSynergy.nextSynergyMilestone)} points to next level
+                  </div>
+                </div>
+              </div>
+
+              {/* Synergy Stats Grid */}
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-2 mb-3">
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-2 text-center">
+                  <div className="text-purple-400 font-bold text-xs mb-1">MINING POINTS</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {formatNumber(miningSynergy.totalMiningPoints)}
+                  </div>
+                  <div className="text-purple-300 text-xs">Total Earned</div>
+                </div>
+                
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-2 text-center">
+                  <div className="text-indigo-400 font-bold text-xs mb-1">ACTIVE STAKES</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {miningSynergy.activeStakesCount}
+                  </div>
+                  <div className="text-indigo-300 text-xs">Currently Staking</div>
+                </div>
+                
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-2 text-center">
+                  <div className="text-pink-400 font-bold text-xs mb-1">TOTAL STAKED</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {formatNumber(miningSynergy.totalStakedAmount)} TON
+                  </div>
+                  <div className="text-pink-300 text-xs">Principal Amount</div>
+                </div>
+                
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-2 text-center">
+                  <div className="text-cyan-400 font-bold text-xs mb-1">SYNERGY SCORE</div>
+                  <div className="text-white font-mono font-bold text-sm">
+                    {((miningSynergy.totalMiningPoints / 10000 + miningSynergy.totalStakedAmount / 1000) / 2 * 100).toFixed(1)}%
+                  </div>
+                  <div className="text-cyan-300 text-xs">Combined Power</div>
+                </div>
+              </div>
+
+              {/* Current Bonuses */}
+              <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 rounded-lg p-2">
+                <div className="text-green-400 font-mono font-bold text-xs mb-2 text-center">🎯 CURRENT BONUSES</div>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-2 text-center">
+                  <div>
+                    <div className="text-green-300 font-mono font-bold text-sm">
+                      +{(miningSynergy.synergyRewards.miningBoost * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-green-400 text-xs">Mining Speed</div>
+                    <div className="text-gray-400 text-xs">Points per second</div>
+                  </div>
+                  <div>
+                    <div className="text-blue-300 font-mono font-bold text-sm">
+                      +{(miningSynergy.synergyRewards.stakingBoost * 100).toFixed(1)}%
+                    </div>
+                    <div className="text-blue-400 text-xs">Staking Rate</div>
+                    <div className="text-gray-400 text-xs">Daily ROI bonus</div>
+                  </div>
+                  <div>
+                    <div className="text-purple-300 font-mono font-bold text-sm">
+                      +{miningSynergy.synergyRewards.divinePointsBonus}
+                    </div>
+                    <div className="text-purple-400 text-xs">Divine Points</div>
+                    <div className="text-gray-400 text-xs">Per mining cycle</div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            {/* Synergy Milestones */}
+            <div className="bg-gradient-to-r from-yellow-900/80 to-orange-900/80 backdrop-blur-xl border border-yellow-500/30 rounded-lg p-3">
+              <div className="text-center mb-3">
+                <div className="text-xl mb-1">🏆</div>
+                <h3 className="text-base font-mono font-bold text-yellow-400 mb-1">Synergy Milestones</h3>
+                <p className="text-gray-300 text-xs">
+                  Unlock powerful rewards by reaching synergy milestones
+                </p>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
+                {[1, 3, 5, 7, 10].map((level) => (
+                  <div
+                    key={level}
+                    className={`border rounded-lg p-2 ${
+                      miningSynergy.synergyLevel >= level
+                        ? 'bg-green-500/20 border-green-500/50'
+                        : 'bg-gray-800/30 border-gray-600/30'
+                    }`}
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <div className="flex items-center space-x-1">
+                        <span className="text-sm">{miningSynergy.synergyLevel >= level ? '✅' : '🔒'}</span>
+                        <span className="font-mono font-bold text-white text-xs">Level {level}</span>
+                      </div>
+                      <span className="text-xs text-gray-400">
+                        {level * 1000} points
+                      </span>
+                    </div>
+                    <div className="text-xs text-gray-300 space-y-0.5">
+                      <div>• +{(level * 5).toFixed(1)}% Mining Speed</div>
+                      <div>• +{(level * 2).toFixed(1)}% Staking Rate</div>
+                      <div>• +{level * 10} Divine Points</div>
+                      {level >= 5 && <div>• ⚡ Speed Boost Unlocked</div>}
+                      {level >= 7 && <div>• 💎 Gem Rewards</div>}
+                      {level >= 10 && <div>• 🌟 Ultimate Synergy</div>}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Synergy Actions */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <button
+                onClick={() => setShowSynergyModal(true)}
+                className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-mono font-bold py-2 px-3 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span>⚡</span>
+                  <span>Claim Synergy Rewards</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={() => setShowStakeModal(true)}
+                className="flex-1 bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white font-mono font-bold py-2 px-3 rounded-lg transition-all duration-300 hover:scale-105 active:scale-95"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span>🚀</span>
+                  <span>Boost Synergy</span>
+                </div>
+              </button>
+              
+              <button
+                onClick={debugSynergy}
+                className="flex-1 bg-gradient-to-r from-gray-500 to-gray-600 hover:from-gray-600 hover:to-gray-700 text-white font-mono font-bold py-3 px-6 rounded-xl transition-all duration-300 hover:scale-105 active:scale-95"
+              >
+                <div className="flex items-center justify-center space-x-2">
+                  <span>🔍</span>
+                  <span>Debug Synergy</span>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* User-Friendly Staking Modal */}
+        {showStakeModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-gradient-to-r from-slate-900/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-4 sm:p-6 max-w-lg w-full border border-cyan-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-mono font-bold text-cyan-400">
+                  {userStakes.length > 0 ? '⚡ Add More Stakes' : '🚀 Create New Stake'}
+                </h3>
+                <button
+                  onClick={() => setShowStakeModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              {selectedTier && (
+                <div className="mb-6 p-4 bg-gradient-to-r from-gray-800/50 to-gray-700/50 rounded-xl border border-gray-600/30">
+                  <div className="text-center">
+                    <div className="text-3xl mb-3">{selectedTier.icon}</div>
+                    <div className="font-mono font-bold text-white text-lg mb-1">{selectedTier.name}</div>
+                    <div className="text-green-400 font-mono font-bold text-xl mb-2">
+                      {(selectedTier.dailyRate * 100).toFixed(1)}% Daily ROI
+                    </div>
+                    <div className="text-xs text-gray-400">
+                      {selectedTier.maxReturn}% Max Return • {selectedTier.cycleDuration} Days
+                    </div>
+                  </div>
+                </div>
+              )}
+
+              <div className="space-y-6">
+                {/* Tier Selection */}
+                {!selectedTier && (
+                  <div>
+                    <label className="block text-sm font-mono font-medium text-gray-300 mb-3">
+                      {userStakes.length > 0 ? '⚡ Choose Additional Tier' : '🏆 Choose Your Tier'}
+                    </label>
+                    <div className="grid grid-cols-1 gap-3">
+                      {STAKING_TIERS.slice(0, 3).map((tier) => (
+                        <button
+                          key={tier.id}
+                          onClick={() => {
+                            setSelectedTier(tier);
+                            setStakeAmount(tier.minAmount);
+                          }}
+                          className="flex items-center justify-between p-3 bg-gray-800/50 border border-gray-600/30 rounded-lg hover:border-cyan-500/50 transition-all duration-200"
+                        >
+                          <div className="flex items-center space-x-2 sm:space-x-3">
+                            <span className="text-xl sm:text-2xl">{tier.icon}</span>
+                            <div className="text-left">
+                              <div className="font-mono font-bold text-white text-sm sm:text-base">{tier.name}</div>
+                              <div className="text-xs sm:text-sm text-green-400">{(tier.dailyRate * 100).toFixed(1)}% Daily</div>
+                            </div>
+                          </div>
+                          <div className="text-right text-xs text-gray-400 hidden sm:block">
+                            <div>Min: {tier.minAmount} TON</div>
+                            <div>Max: {tier.maxAmount} TON</div>
+                          </div>
+                          <div className="text-right text-xs text-gray-400 sm:hidden">
+                            <div>{tier.minAmount}-{tier.maxAmount} TON</div>
+                          </div>
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {/* Amount Input */}
+                {selectedTier && (
+                  <div>
+                    <label className="block text-sm font-mono font-medium text-gray-300 mb-3">
+                      💰 Stake Amount
+                    </label>
+                    <div className="relative">
+                      <input
+                        type="number"
+                        min={selectedTier?.minAmount || 1}
+                        max={selectedTier?.maxAmount || 50000}
+                        value={stakeAmount}
+                        onChange={(e) => setStakeAmount(Number(e.target.value))}
+                        className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white font-mono text-lg focus:border-cyan-500 focus:outline-none focus:ring-2 focus:ring-cyan-500/20"
+                        placeholder="Enter amount..."
+                      />
+                      <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-mono">
+                        TON
+                      </div>
+                    </div>
+                    <div className="flex justify-between text-xs text-gray-400 mt-2 font-mono">
+                      <span>Min: {selectedTier?.minAmount || 1} TON</span>
+                      <span>Max: {selectedTier?.maxAmount || 50000} TON</span>
+                      <span>Balance: {formatNumber(userBalance)} TON</span>
+                    </div>
+                  </div>
+                )}
+
+                {/* Earnings Preview */}
+                {selectedTier && (
+                  <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 rounded-xl p-4">
+                    <div className="text-green-400 font-mono font-bold text-sm mb-3 text-center">
+                      📊 EARNINGS PREVIEW
+                    </div>
+                    <div className="grid grid-cols-2 gap-4 text-center">
+                      <div>
+                        <div className="text-white font-mono font-bold text-lg">
+                          {formatNumber(stakeAmount * (selectedTier?.dailyRate || 0.01))} TON
+                        </div>
+                        <div className="text-green-300 text-xs">Daily (Gross)</div>
+                        <div className="text-green-200 text-xs">
+                          {formatNumber(stakeAmount * (selectedTier?.dailyRate || 0.01) * 0.6)} TON net
+                        </div>
+                      </div>
+                      <div>
+                        <div className="text-white font-mono font-bold text-lg">
+                          {formatNumber(stakeAmount * (selectedTier?.dailyRate || 0.01) * 30)} TON
+                        </div>
+                        <div className="text-green-300 text-xs">Monthly (Gross)</div>
+                        <div className="text-green-200 text-xs">
+                          {formatNumber(stakeAmount * (selectedTier?.dailyRate || 0.01) * 30 * 0.6)} TON net
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowStakeModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleStake}
+                    disabled={isLoading || !selectedTier || stakeAmount < (selectedTier?.minAmount || 1) || stakeAmount > userBalance}
+                    className={`flex-1 font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-300 text-sm ${
+                      isLoading || !selectedTier || stakeAmount < (selectedTier?.minAmount || 1) || stakeAmount > userBalance
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-cyan-500 to-blue-500 hover:from-cyan-600 hover:to-blue-600 text-white hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    {isLoading ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>{userStakes.length > 0 ? 'Adding...' : 'Creating...'}</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center space-x-2">
+                        <span>{userStakes.length > 0 ? '⚡' : '🚀'}</span>
+                        <span>{userStakes.length > 0 ? 'Add Stake' : 'Create Stake'}</span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Validation Messages */}
+                {selectedTier && (
+                  <div className="text-xs text-center">
+                    {stakeAmount > userBalance && (
+                      <div className="text-red-400 mb-1">⚠️ Insufficient balance</div>
+                    )}
+                    {stakeAmount < (selectedTier?.minAmount || 1) && (
+                      <div className="text-yellow-400 mb-1">⚠️ Amount below minimum</div>
+                    )}
+                    {stakeAmount > (selectedTier?.maxAmount || 50000) && (
+                      <div className="text-yellow-400 mb-1">⚠️ Amount above maximum</div>
+                    )}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User-Friendly Claim Modal */}
+        {showClaimModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-r from-slate-900/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-6 max-w-lg w-full border border-green-500/30 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-mono font-bold text-green-400">
+                  💰 Claim Rewards
+                </h3>
+                <button
+                  onClick={() => setShowClaimModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="text-center mb-6">
+                <div className="text-4xl font-mono font-bold text-green-400 mb-2">
+                  {formatNumber(availableToClaim)} TON
+                </div>
+                <div className="text-sm text-gray-400 font-mono mb-4">
+                  Available to claim from your active stakes
+                </div>
+                
+                {/* Success Animation */}
+                <div className="w-16 h-16 bg-green-500/20 rounded-full flex items-center justify-center mx-auto mb-4">
+                  <span className="text-2xl">💰</span>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                {/* Enhanced Fee Breakdown */}
+                <div className="bg-gradient-to-r from-gray-800/50 to-gray-700/50 rounded-xl p-4 border border-gray-600/30">
+                  <div className="text-sm font-mono text-gray-300 mb-3 text-center">📊 Reward Distribution</div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-400">💚</span>
+                        <span className="text-sm font-mono text-white">You Receive</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-green-400 font-mono font-bold">{formatNumber(availableToClaim * 0.6)} TON</div>
+                        <div className="text-xs text-green-300">60% of rewards</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-blue-400">🌊</span>
+                        <span className="text-sm font-mono text-white">GLP Pool</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-blue-400 font-mono font-bold">{formatNumber(availableToClaim * 0.1)} TON</div>
+                        <div className="text-xs text-blue-300">10% for liquidity</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-purple-400">🪙</span>
+                        <span className="text-sm font-mono text-white">STK Tokens</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-purple-400 font-mono font-bold">{formatNumber(availableToClaim * 0.1)} TON</div>
+                        <div className="text-xs text-purple-300">10% for governance</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-yellow-500/10 rounded-lg border border-yellow-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-yellow-400">🔄</span>
+                        <span className="text-sm font-mono text-white">Reinvestment</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-yellow-400 font-mono font-bold">{formatNumber(availableToClaim * 0.2)} TON</div>
+                        <div className="text-xs text-yellow-300">20% for growth</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowClaimModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-mono font-bold py-3 px-4 rounded-xl transition-all duration-200"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleClaimRewards}
+                    disabled={isClaiming || availableToClaim <= 0}
+                    className={`flex-1 font-mono font-bold py-3 px-4 rounded-xl transition-all duration-300 ${
+                      isClaiming || availableToClaim <= 0
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-green-500 to-emerald-500 hover:from-green-600 hover:to-emerald-600 text-white hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    {isClaiming ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Claiming...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center space-x-2">
+                        <span>💰</span>
+                        <span>Claim Rewards</span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Success Message */}
+                {availableToClaim > 0 && (
+                  <div className="text-center text-xs text-green-300 mt-3">
+                    🎉 You'll receive {formatNumber(availableToClaim * 0.6)} TON to your wallet!
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* User-Friendly Withdrawal Modal */}
+        {showWithdrawalModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-2 sm:p-4">
+            <div className="bg-gradient-to-r from-slate-900/95 to-gray-900/95 backdrop-blur-xl rounded-2xl p-4 sm:p-6 max-w-lg w-full border border-orange-500/30 shadow-2xl max-h-[90vh] overflow-y-auto">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-mono font-bold text-orange-400">
+                  💳 Request Withdrawal
+                </h3>
+                <button
+                  onClick={() => setShowWithdrawalModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Balance Display */}
+                <div className="bg-gradient-to-r from-orange-900/30 to-red-900/30 border border-orange-500/20 rounded-xl p-4 text-center">
+                  <div className="text-orange-400 font-mono font-bold text-sm mb-2">AVAILABLE BALANCE</div>
+                  <div className="text-3xl font-mono font-bold text-white mb-2">
+                    {formatNumber(userBalance)} TON
+                  </div>
+                  <div className="text-orange-300 text-xs">Ready for withdrawal</div>
+                </div>
+
+                {/* Withdrawal Amount */}
+                <div>
+                  <label className="block text-sm font-mono font-medium text-gray-300 mb-3">
+                    💰 Withdrawal Amount
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0.1"
+                      max={userBalance}
+                      value={withdrawalAmount}
+                      onChange={(e) => setWithdrawalAmount(Number(e.target.value))}
+                      className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white font-mono text-lg focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                      placeholder="Enter amount..."
+                    />
+                    <div className="absolute right-3 top-1/2 transform -translate-y-1/2 text-gray-400 font-mono">
+                      TON
+                    </div>
+                  </div>
+                  <div className="flex justify-between text-xs text-gray-400 mt-2 font-mono">
+                    <span>Min: 0.1 TON</span>
+                    <span>Max: {formatNumber(userBalance)} TON</span>
+                  </div>
+                </div>
+
+                {/* Wallet Address */}
+                <div>
+                  <label className="block text-sm font-mono font-medium text-gray-300 mb-3">
+                    🏦 TON Wallet Address
+                  </label>
+                  <input
+                    type="text"
+                    value={walletAddress}
+                    onChange={(e) => setWalletAddress(e.target.value)}
+                    className="w-full bg-gray-800 border border-gray-600 rounded-xl px-4 py-3 text-white font-mono text-sm focus:border-orange-500 focus:outline-none focus:ring-2 focus:ring-orange-500/20"
+                    placeholder="Enter your TON wallet address..."
+                  />
+                  <div className="text-xs text-gray-400 mt-2 font-mono">
+                    Funds will be sent to this address
+                  </div>
+                </div>
+
+                {/* Withdrawal Info */}
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4">
+                  <div className="text-sm font-mono text-gray-300 mb-3 text-center">📋 WITHDRAWAL INFORMATION</div>
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span>Processing Time:</span>
+                      <span className="text-orange-400">24-48 hours</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Network Fee:</span>
+                      <span className="text-orange-400">0.05 TON</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Minimum Withdrawal:</span>
+                      <span className="text-orange-400">0.1 TON</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>You'll Receive:</span>
+                      <span className="text-green-400">
+                        {withdrawalAmount > 0 ? formatNumber(Math.max(0, withdrawalAmount - 0.05)) : '0.0000'} TON
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowWithdrawalModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={handleWithdrawalRequest}
+                    disabled={isWithdrawing || !walletAddress.trim() || withdrawalAmount <= 0 || withdrawalAmount > userBalance}
+                    className={`flex-1 font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-300 text-sm ${
+                      isWithdrawing || !walletAddress.trim() || withdrawalAmount <= 0 || withdrawalAmount > userBalance
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 text-white hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    {isWithdrawing ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center space-x-2">
+                        <span>💳</span>
+                        <span>Request Withdrawal</span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Validation Messages */}
+                <div className="text-xs text-center">
+                  {withdrawalAmount > userBalance && (
+                    <div className="text-red-400 mb-1">⚠️ Amount exceeds available balance</div>
+                  )}
+                  {withdrawalAmount < 0.1 && withdrawalAmount > 0 && (
+                    <div className="text-yellow-400 mb-1">⚠️ Amount below minimum</div>
+                  )}
+                  {!walletAddress.trim() && (
+                    <div className="text-yellow-400 mb-1">⚠️ Please enter wallet address</div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Synergy Rewards Modal */}
+        {showSynergyModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-r from-purple-900/95 to-indigo-900/95 backdrop-blur-xl rounded-2xl p-6 max-w-lg w-full border border-purple-500/30 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-mono font-bold text-purple-400">
+                  ⚡ Synergy Rewards
+                </h3>
+                <button
+                  onClick={() => setShowSynergyModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="text-center mb-6">
+                <div className="text-4xl mb-3">🎁</div>
+                <div className="text-2xl font-mono font-bold text-purple-300 mb-2">
+                  Level {miningSynergy.synergyLevel} Synergy Achieved!
+                </div>
+                <div className="text-sm text-gray-400">
+                  Claim your rewards for combining mining and staking
+                </div>
+              </div>
+
+              <div className="space-y-4 mb-6">
+                {/* Available Rewards */}
+                <div className="bg-gradient-to-r from-purple-800/50 to-indigo-800/50 border border-purple-500/20 rounded-xl p-4">
+                  <div className="text-purple-400 font-mono font-bold text-sm mb-3 text-center">🎯 AVAILABLE REWARDS</div>
+                  <div className="space-y-3">
+                    <div className="flex items-center justify-between p-2 bg-green-500/10 rounded-lg border border-green-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-green-400">⚡</span>
+                        <span className="text-sm font-mono text-white">Mining Speed Boost</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-green-400 font-mono font-bold">+{(miningSynergy.synergyRewards.miningBoost * 100).toFixed(1)}%</div>
+                        <div className="text-xs text-green-300">Permanent bonus</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-blue-500/10 rounded-lg border border-blue-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-blue-400">💰</span>
+                        <span className="text-sm font-mono text-white">Staking Rate Bonus</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-blue-400 font-mono font-bold">+{(miningSynergy.synergyRewards.stakingBoost * 100).toFixed(1)}%</div>
+                        <div className="text-xs text-blue-300">Daily ROI increase</div>
+                      </div>
+                    </div>
+                    
+                    <div className="flex items-center justify-between p-2 bg-purple-500/10 rounded-lg border border-purple-500/20">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-purple-400">💎</span>
+                        <span className="text-sm font-mono text-white">Divine Points Bonus</span>
+                      </div>
+                      <div className="text-right">
+                        <div className="text-purple-400 font-mono font-bold">+{miningSynergy.synergyRewards.divinePointsBonus}</div>
+                        <div className="text-xs text-purple-300">Per mining cycle</div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Special Rewards for High Levels */}
+                {miningSynergy.synergyLevel >= 5 && (
+                  <div className="bg-gradient-to-r from-yellow-900/30 to-orange-900/30 border border-yellow-500/20 rounded-xl p-4">
+                    <div className="text-yellow-400 font-mono font-bold text-sm mb-3 text-center">🌟 SPECIAL REWARDS</div>
+                    <div className="space-y-2 text-sm">
+                      {miningSynergy.synergyLevel >= 5 && (
+                        <div className="flex items-center space-x-2 text-yellow-300">
+                          <span>⚡</span>
+                          <span>Speed Boost Unlocked for all stakes</span>
+                        </div>
+                      )}
+                      {miningSynergy.synergyLevel >= 7 && (
+                        <div className="flex items-center space-x-2 text-purple-300">
+                          <span>💎</span>
+                          <span>+50 Gems bonus</span>
+                        </div>
+                      )}
+                      {miningSynergy.synergyLevel >= 10 && (
+                        <div className="flex items-center space-x-2 text-cyan-300">
+                          <span>🌟</span>
+                          <span>Ultimate Synergy: +100% to all bonuses</span>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex gap-3 pt-4">
+                <button
+                  onClick={() => setShowSynergyModal(false)}
+                  className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-mono font-bold py-3 px-4 rounded-xl transition-all duration-200"
+                >
+                  Close
+                </button>
+                <button
+                  onClick={handleApplySynergyRewards}
+                  className="flex-1 bg-gradient-to-r from-purple-500 to-indigo-500 hover:from-purple-600 hover:to-indigo-600 text-white font-mono font-bold py-3 px-4 rounded-xl transition-all duration-300 hover:scale-105 active:scale-95"
+                >
+                  <div className="flex items-center justify-center space-x-2">
+                    <span>⚡</span>
+                    <span>Apply Rewards</span>
+                  </div>
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Deposit Modal */}
+        {showDepositModal && (
+          <div className="fixed inset-0 bg-black/80 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+            <div className="bg-gradient-to-r from-blue-900/95 to-cyan-900/95 backdrop-blur-xl rounded-2xl p-6 max-w-lg w-full border border-blue-500/30 shadow-2xl">
+              <div className="flex justify-between items-center mb-6">
+                <h3 className="text-xl font-mono font-bold text-blue-400">
+                  💰 Deposit TON
+                </h3>
+                <button
+                  onClick={() => setShowDepositModal(false)}
+                  className="text-gray-400 hover:text-white transition-colors"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <div className="space-y-6">
+                {/* Wallet Connection Status */}
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4">
+                  <div className="text-sm font-mono text-gray-300 mb-3 text-center">🔗 WALLET CONNECTION</div>
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span>Status:</span>
+                      <span className={userFriendlyAddress ? 'text-green-400' : 'text-red-400'}>
+                        {userFriendlyAddress ? 'Connected' : 'Not Connected'}
+                      </span>
+                    </div>
+                    {userFriendlyAddress && (
+                      <div className="flex justify-between">
+                        <span>Address:</span>
+                        <span className="text-blue-400 font-mono">
+                          {userFriendlyAddress.slice(0, 6)}...{userFriendlyAddress.slice(-4)}
+                        </span>
+                      </div>
+                    )}
+                    <div className="flex justify-between">
+                      <span>Balance:</span>
+                      <span className="text-green-400">
+                        Wallet Balance
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deposit Amount */}
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4">
+                  <div className="text-sm font-mono text-gray-300 mb-3 text-center">💰 DEPOSIT AMOUNT</div>
+                  <div className="space-y-3">
+                    <div>
+                      <label className="block text-xs text-gray-400 mb-2">Amount (TON)</label>
+                      <input
+                        type="number"
+                        value={depositAmount}
+                        onChange={(e) => setDepositAmount(Number(e.target.value))}
+                        min="1"
+                        step="0.1"
+                        className="w-full bg-gray-700/50 border border-gray-600/30 rounded-lg px-3 py-2 text-white font-mono text-sm focus:outline-none focus:border-blue-500"
+                        placeholder="Enter amount"
+                      />
+                    </div>
+                    
+                    {/* Quick Amount Buttons */}
+                    <div className="grid grid-cols-3 gap-2">
+                      {[1, 5, 10, 25, 50, 100].map((amount) => (
+                        <button
+                          key={amount}
+                          onClick={() => setDepositAmount(amount)}
+                          className="bg-gray-700/50 hover:bg-gray-600/50 border border-gray-600/30 rounded-lg px-2 py-1 text-xs font-mono text-white transition-colors"
+                        >
+                          {amount} TON
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Deposit Information */}
+                <div className="bg-gray-800/30 border border-gray-600/30 rounded-xl p-4">
+                  <div className="text-sm font-mono text-gray-300 mb-3 text-center">📋 DEPOSIT INFORMATION</div>
+                  <div className="space-y-2 text-xs font-mono">
+                    <div className="flex justify-between">
+                      <span>Network:</span>
+                      <span className="text-blue-400">{NETWORK_NAME}</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Deposit Address:</span>
+                      <span className="text-blue-400 font-mono">
+                        {DEPOSIT_ADDRESS.slice(0, 8)}...{DEPOSIT_ADDRESS.slice(-8)}
+                      </span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Minimum Deposit:</span>
+                      <span className="text-orange-400">1 TON</span>
+                    </div>
+                    <div className="flex justify-between">
+                      <span>Processing Time:</span>
+                      <span className="text-green-400">Instant</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Action Buttons */}
+                <div className="flex gap-3 pt-4">
+                  <button
+                    onClick={() => setShowDepositModal(false)}
+                    className="flex-1 bg-gray-600 hover:bg-gray-500 text-white font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-200 text-sm"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    onClick={() => handleDeposit(depositAmount)}
+                    disabled={depositStatus === 'pending' || !userFriendlyAddress || depositAmount < 1}
+                    className={`flex-1 font-mono font-bold py-2 sm:py-3 px-3 sm:px-4 rounded-xl transition-all duration-300 text-sm ${
+                                              depositStatus === 'pending' || !userFriendlyAddress || depositAmount < 1
+                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                        : 'bg-gradient-to-r from-blue-500 to-cyan-500 hover:from-blue-600 hover:to-cyan-600 text-white hover:scale-105 active:scale-95'
+                    }`}
+                  >
+                    {depositStatus === 'pending' ? (
+                      <div className="flex items-center justify-center space-x-2">
+                        <div className="w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                        <span>Processing...</span>
+                      </div>
+                    ) : (
+                      <div className="flex items-center justify-center space-x-2">
+                        <span>💰</span>
+                        <span>Deposit {depositAmount} TON</span>
+                      </div>
+                    )}
+                  </button>
+                </div>
+
+                {/* Validation Messages */}
+                <div className="text-xs text-center">
+                  {!userFriendlyAddress && (
+                    <div className="text-red-400 mb-1">⚠️ Please connect your wallet first</div>
+                  )}
+                  {depositAmount < 1 && depositAmount > 0 && (
+                    <div className="text-yellow-400 mb-1">⚠️ Minimum deposit is 1 TON</div>
+                  )}
+                                      {false && (
+                    <div className="text-red-400 mb-1">⚠️ Insufficient wallet balance</div>
+                  )}
+                  {depositStatus === 'success' && (
+                    <div className="text-green-400 mb-1">✅ Deposit successful!</div>
+                  )}
+                  {depositStatus === 'error' && (
+                    <div className="text-red-400 mb-1">❌ Deposit failed. Please try again.</div>
+                  )}
                 </div>
               </div>
             </div>
           </div>
         )}
       </div>
-
-      {/* Task Detail Modal */}
-      {showTaskDetails && selectedTask && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-          <div className="bg-black/90 border border-cyan-500/30 rounded-xl p-6 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
-            {/* Wizard Header */}
-            <div className="text-center mb-6">
-              <div className="text-4xl mb-2">🌟</div>
-              <div className="text-cyan-400 font-mono font-bold text-lg mb-1">SPIRITUAL JOURNEY WIZARD</div>
-              <div className="text-gray-400 font-mono text-sm">Your path to enlightenment awaits</div>
-            </div>
-
-            {/* Wizard Progress Steps */}
-            <div className="mb-6">
-              <div className="flex items-center justify-between mb-4">
-                <div className="text-cyan-400 font-mono font-bold text-sm">SPIRITUAL JOURNEY PROGRESS</div>
-                <div className="text-gray-400 font-mono text-xs">Step {wizardStep} of 4</div>
-              </div>
-              <div className="w-full bg-gray-700 rounded-full h-3">
-                <div 
-                  className="bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500 h-3 rounded-full transition-all duration-500" 
-                  style={{ width: `${(wizardStep / 4) * 100}%` }}
-                ></div>
-              </div>
-              <div className="flex justify-between mt-2">
-                <div className={`text-xs font-mono ${wizardStep >= 1 ? 'text-cyan-400' : 'text-gray-500'}`}>📋 Overview</div>
-                <div className={`text-xs font-mono ${wizardStep >= 2 ? 'text-purple-400' : 'text-gray-500'}`}>🎯 Preparation</div>
-                <div className={`text-xs font-mono ${wizardStep >= 3 ? 'text-green-400' : 'text-gray-500'}`}>🚀 Practice</div>
-                <div className={`text-xs font-mono ${wizardStep >= 4 ? 'text-yellow-400' : 'text-gray-500'}`}>✨ Completion</div>
-              </div>
-            </div>
-
-            {/* Step 1: Task Overview */}
-            {wizardStep === 1 && (
-              <div className="space-y-6">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-3">
-                    <div className="text-3xl">{selectedTask.icon}</div>
-                    <div>
-                      <div className="text-white font-mono font-bold text-lg">{selectedTask.name}</div>
-                      <div className="text-gray-400 font-mono text-sm">{selectedTask.description}</div>
-                    </div>
-                  </div>
-                                <button
-                onClick={() => {
-                  setShowTaskDetails(false);
-                  setWizardStep(1); // Reset wizard when closing
-                  setIsTimerRunning(false); // Stop timer when closing
-                  setPracticeTimer(0); // Reset timer
-                  setCurrentTaskInProgress(null); // Clear current task
-                  setTaskCompleted(false); // Reset completion state
-                }}
-                className="text-gray-400 hover:text-white text-2xl"
-              >
-                ×
-              </button>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="text-cyan-400 font-mono font-bold text-sm mb-3">📊 TASK STATISTICS</div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Duration:</span>
-                        <span className="text-white font-mono">{selectedTask.duration} minutes</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Difficulty:</span>
-                        <span className={`font-mono ${getDifficultyColor(selectedTask.difficulty)}`}>
-                          {selectedTask.difficulty.toUpperCase()}
-                        </span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Category:</span>
-                        <span className="text-white font-mono">{getCategoryIcon(selectedTask.category)} {selectedTask.category}</span>
-                      </div>
-                      {selectedTask.timeOfDay && (
-                        <div className="flex justify-between items-center">
-                          <span className="text-gray-400">Best Time:</span>
-                          <span className="text-white font-mono capitalize">{selectedTask.timeOfDay}</span>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="text-purple-400 font-mono font-bold text-sm mb-3">🎁 REWARDS</div>
-                    <div className="space-y-3">
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Gems:</span>
-                        <span className="text-purple-400 font-mono font-bold">+{selectedTask.gemReward}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Experience:</span>
-                        <span className="text-yellow-400 font-mono font-bold">+{selectedTask.experienceReward}</span>
-                      </div>
-                      <div className="flex justify-between items-center">
-                        <span className="text-gray-400">Spiritual Level:</span>
-                        <span className="text-cyan-400 font-mono font-bold">+1 Progress</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-green-400 font-mono font-bold text-sm mb-3">🌟 BENEFITS</div>
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-2">
-                    {selectedTask.benefits.map((benefit, index) => (
-                      <div key={index} className="flex gap-2 items-start">
-                        <div className="text-green-400 mt-0.5">✓</div>
-                        <div className="text-white text-sm">{benefit}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                {selectedTask.scientificBackground && (
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="text-pink-400 font-mono font-bold text-sm mb-3">🔬 SCIENTIFIC BACKGROUND</div>
-                    <div className="text-white text-sm leading-relaxed">{selectedTask.scientificBackground}</div>
-                  </div>
-                )}
-
-                <div className="flex justify-end">
-                  <button
-                    onClick={() => setWizardStep(2)}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gradient-to-r from-cyan-600 to-purple-600 hover:from-cyan-500 hover:to-purple-500 text-white transition-all duration-300 hover:scale-105 flex items-center gap-2"
-                  >
-                    <span>Next Step</span>
-                    <span>→</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 2: Preparation */}
-            {wizardStep === 2 && (
-              <div className="space-y-6">
-                <div className="text-center mb-6">
-                  <div className="text-3xl mb-2">🎯</div>
-                  <div className="text-purple-400 font-mono font-bold text-lg mb-1">PREPARATION PHASE</div>
-                  <div className="text-gray-400 font-mono text-sm">Let's prepare your sacred space and gather materials</div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="text-purple-400 font-mono font-bold text-sm mb-3">📦 REQUIRED MATERIALS</div>
-                    {selectedTask.materials && selectedTask.materials.length > 0 ? (
-                      <div className="space-y-2">
-                        {selectedTask.materials.map((material, index) => (
-                          <div key={index} className="flex items-center gap-2">
-                            <div className="text-purple-400">•</div>
-                            <div className="text-white text-sm">{material}</div>
-                          </div>
-                        ))}
-                      </div>
-                    ) : (
-                      <div className="text-gray-400 text-sm">No special materials required</div>
-                    )}
-                  </div>
-
-                  <div className="bg-gray-800/50 rounded-lg p-4">
-                    <div className="text-blue-400 font-mono font-bold text-sm mb-3">🌍 ENVIRONMENT</div>
-                    <div className="space-y-2">
-                      <div className="flex items-center gap-2">
-                        <div className="text-blue-400">📍</div>
-                        <div className="text-white text-sm">{selectedTask.environment || 'Any comfortable space'}</div>
-                      </div>
-                      {selectedTask.weather && (
-                        <div className="flex items-center gap-2">
-                          <div className="text-blue-400">🌤️</div>
-                          <div className="text-white text-sm capitalize">{selectedTask.weather}</div>
-                        </div>
-                      )}
-                      {selectedTask.timeOfDay && (
-                        <div className="flex items-center gap-2">
-                          <div className="text-blue-400">⏰</div>
-                          <div className="text-white text-sm capitalize">{selectedTask.timeOfDay}</div>
-                        </div>
-                      )}
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-yellow-400 font-mono font-bold text-sm mb-3">💡 PRO TIPS</div>
-                  <div className="space-y-2">
-                    {selectedTask.tips.map((tip, index) => (
-                      <div key={index} className="flex gap-2">
-                        <div className="text-yellow-400">💡</div>
-                        <div className="text-white text-sm">{tip}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-purple-600/20 to-pink-600/20 border border-purple-500/30 rounded-lg p-4">
-                  <div className="text-purple-400 font-mono font-bold text-sm mb-2">🎯 PREPARATION CHECKLIST</div>
-                  <div className="space-y-2">
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500" />
-                      <span className="text-white text-sm">Find a quiet, comfortable space</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500" />
-                      <span className="text-white text-sm">Gather required materials</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500" />
-                      <span className="text-white text-sm">Set aside {selectedTask.duration} minutes</span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <input type="checkbox" className="w-4 h-4 text-purple-600 bg-gray-700 border-gray-600 rounded focus:ring-purple-500" />
-                      <span className="text-white text-sm">Turn off distractions (phone, notifications)</span>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => setWizardStep(1)}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gray-600 hover:bg-gray-500 text-white transition-all duration-300 flex items-center gap-2"
-                  >
-                    <span>←</span>
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      setWizardStep(3);
-                      resetTimer(selectedTask.duration); // Initialize timer when entering practice step
-                    }}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gradient-to-r from-purple-600 to-pink-600 hover:from-purple-500 hover:to-pink-500 text-white transition-all duration-300 hover:scale-105 flex items-center gap-2"
-                  >
-                    <span>Ready to Practice</span>
-                    <span>→</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 3: Practice */}
-            {wizardStep === 3 && (
-              <div className="space-y-6">
-                <div className="text-center mb-6">
-                  <div className="text-3xl mb-2">🚀</div>
-                  <div className="text-green-400 font-mono font-bold text-lg mb-1">PRACTICE PHASE</div>
-                  <div className="text-gray-400 font-mono text-sm">Follow the step-by-step instructions mindfully</div>
-                </div>
-
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-green-400 font-mono font-bold text-sm mb-4">📝 STEP-BY-STEP INSTRUCTIONS</div>
-                  <div className="space-y-4">
-                    {selectedTask.instructions.map((instruction, index) => (
-                      <div key={index} className="flex gap-4 items-start">
-                        <div className="bg-green-600 text-white font-mono font-bold text-sm rounded-full w-8 h-8 flex items-center justify-center flex-shrink-0">
-                          {index + 1}
-                        </div>
-                        <div className="text-white text-sm leading-relaxed flex-1">{instruction}</div>
-                      </div>
-                    ))}
-                  </div>
-                </div>
-
-                <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-lg p-4">
-                  <div className="text-green-400 font-mono font-bold text-sm mb-3">⏱️ PRACTICE TIMER</div>
-                  <div className="text-center">
-                    <div className="text-6xl font-mono font-bold text-white mb-4">
-                      {formatTime(practiceTimer)}
-                    </div>
-                    
-                    {/* Timer Progress Bar */}
-                    <div className="w-full bg-gray-700 rounded-full h-3 mb-4">
-                      <div 
-                        className="bg-gradient-to-r from-green-500 to-emerald-500 h-3 rounded-full transition-all duration-1000" 
-                        style={{ 
-                          width: `${selectedTask.duration > 0 ? ((selectedTask.duration * 60 - practiceTimer) / (selectedTask.duration * 60)) * 100 : 0}%` 
-                        }}
-                      ></div>
-                    </div>
-                    
-                    {/* Timer Controls */}
-                    <div className="flex justify-center gap-3 mb-4">
-                      {!isTimerRunning && practiceTimer === selectedTask.duration * 60 && (
-                        <button
-                          onClick={() => startTimer(selectedTask.duration, selectedTask.id)}
-                          className="px-6 py-2 rounded-lg font-mono font-bold text-sm bg-green-600 hover:bg-green-500 text-white transition-all duration-300 flex items-center gap-2"
-                        >
-                          <span>▶️</span>
-                          <span>Start Timer</span>
-                        </button>
-                      )}
-                      
-                      {isTimerRunning && (
-                        <button
-                          onClick={pauseTimer}
-                          className="px-6 py-2 rounded-lg font-mono font-bold text-sm bg-yellow-600 hover:bg-yellow-500 text-white transition-all duration-300 flex items-center gap-2"
-                        >
-                          <span>⏸️</span>
-                          <span>Pause</span>
-                        </button>
-                      )}
-                      
-                      {!isTimerRunning && practiceTimer < selectedTask.duration * 60 && practiceTimer > 0 && (
-                        <button
-                          onClick={resumeTimer}
-                          className="px-6 py-2 rounded-lg font-mono font-bold text-sm bg-green-600 hover:bg-green-500 text-white transition-all duration-300 flex items-center gap-2"
-                        >
-                          <span>▶️</span>
-                          <span>Resume</span>
-                        </button>
-                      )}
-                      
-                      {practiceTimer < selectedTask.duration * 60 && (
-                        <button
-                          onClick={() => resetTimer(selectedTask.duration)}
-                          className="px-6 py-2 rounded-lg font-mono font-bold text-sm bg-red-600 hover:bg-red-500 text-white transition-all duration-300 flex items-center gap-2"
-                        >
-                          <span>🔄</span>
-                          <span>Reset</span>
-                        </button>
-                      )}
-                    </div>
-                    
-                    {/* Timer Status */}
-                    <div className="text-gray-400 text-sm mb-2">
-                      {isTimerRunning ? '⏱️ Timer is running...' : practiceTimer === 0 ? '✅ Timer completed!' : '⏸️ Timer paused'}
-                    </div>
-                    
-                    {/* Completion Indicator */}
-                    {taskCompleted && practiceTimer === 0 && (
-                      <div className="bg-gradient-to-r from-green-600/20 to-emerald-600/20 border border-green-500/30 rounded-lg p-3 mb-4">
-                        <div className="text-center">
-                          <div className="text-2xl mb-2">🎉</div>
-                          <div className="text-green-400 font-mono font-bold text-sm mb-1">PRACTICE COMPLETED!</div>
-                          <div className="text-white text-sm">You can now proceed to claim your rewards</div>
-                        </div>
-                      </div>
-                    )}
-                    
-                    <div className="text-sm text-gray-300">
-                      {practiceTimer === 0 ? 
-                        'Great job! You\'ve completed your practice session.' : 
-                        'Take your time and don\'t rush. Quality practice is more important than speed.'
-                      }
-                    </div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-blue-400 font-mono font-bold text-sm mb-3">🧘‍♀️ MINDFULNESS REMINDERS</div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <div className="text-blue-400">🌬️</div>
-                      <div className="text-white text-sm">Focus on your breath throughout the practice</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-blue-400">🎯</div>
-                      <div className="text-white text-sm">Stay present and avoid distractions</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-blue-400">💝</div>
-                      <div className="text-white text-sm">Be kind to yourself - there's no perfect way</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-blue-400">🔄</div>
-                      <div className="text-white text-sm">If your mind wanders, gently bring it back</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => setWizardStep(2)}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gray-600 hover:bg-gray-500 text-white transition-all duration-300 flex items-center gap-2"
-                  >
-                    <span>←</span>
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    onClick={() => setWizardStep(4)}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-500 hover:to-emerald-500 text-white transition-all duration-300 hover:scale-105 flex items-center gap-2"
-                  >
-                    <span>Practice Complete</span>
-                    <span>✨</span>
-                  </button>
-                </div>
-              </div>
-            )}
-
-            {/* Step 4: Completion */}
-            {wizardStep === 4 && (
-              <div className="space-y-6">
-                <div className="text-center mb-6">
-                  <div className="text-3xl mb-2">✨</div>
-                  <div className="text-yellow-400 font-mono font-bold text-lg mb-1">COMPLETION PHASE</div>
-                  <div className="text-gray-400 font-mono text-sm">Celebrate your spiritual growth and claim your rewards</div>
-                </div>
-
-                <div className="bg-gradient-to-r from-yellow-600/20 to-orange-600/20 border border-yellow-500/30 rounded-lg p-6 text-center">
-                  <div className="text-4xl mb-4">🎉</div>
-                  <div className="text-yellow-400 font-mono font-bold text-xl mb-2">Congratulations!</div>
-                  <div className="text-white text-lg mb-4">You've completed "{selectedTask.name}"</div>
-                  <div className="text-gray-300 text-sm mb-6">
-                    You've taken another step on your spiritual journey. Every practice session strengthens your connection to your higher self.
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                  <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl mb-2">💎</div>
-                    <div className="text-purple-400 font-mono font-bold text-sm">GEMS EARNED</div>
-                    <div className="text-white font-mono text-lg">+{selectedTask.gemReward}</div>
-                  </div>
-                  <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl mb-2">⭐</div>
-                    <div className="text-yellow-400 font-mono font-bold text-sm">EXPERIENCE</div>
-                    <div className="text-white font-mono text-lg">+{selectedTask.experienceReward}</div>
-                  </div>
-                  <div className="bg-gray-800/50 rounded-lg p-4 text-center">
-                    <div className="text-2xl mb-2">🌟</div>
-                    <div className="text-cyan-400 font-mono font-bold text-sm">SPIRITUAL GROWTH</div>
-                    <div className="text-white font-mono text-lg">+1 Level</div>
-                  </div>
-                </div>
-
-                <div className="bg-gray-800/50 rounded-lg p-4">
-                  <div className="text-green-400 font-mono font-bold text-sm mb-3">🌱 INTEGRATION TIPS</div>
-                  <div className="space-y-2">
-                    <div className="flex gap-2">
-                      <div className="text-green-400">📝</div>
-                      <div className="text-white text-sm">Journal about your experience and insights</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-green-400">🔄</div>
-                      <div className="text-white text-sm">Practice this technique regularly for best results</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-green-400">🎯</div>
-                      <div className="text-white text-sm">Notice how this practice affects your daily life</div>
-                    </div>
-                    <div className="flex gap-2">
-                      <div className="text-green-400">💝</div>
-                      <div className="text-white text-sm">Share your experience with others on their spiritual path</div>
-                    </div>
-                  </div>
-                </div>
-
-                <div className="flex justify-between">
-                  <button
-                    onClick={() => setWizardStep(3)}
-                    className="px-6 py-3 rounded-lg font-mono font-bold text-sm bg-gray-600 hover:bg-gray-500 text-white transition-all duration-300 flex items-center gap-2"
-                  >
-                    <span>←</span>
-                    <span>Previous</span>
-                  </button>
-                  <button
-                    onClick={() => {
-                      completeTask(selectedTask.id);
-                      setShowTaskDetails(false);
-                      setWizardStep(1); // Reset wizard for next use
-                      setCurrentTaskInProgress(null); // Clear current task
-                      setTaskCompleted(false); // Reset completion state
-                    }}
-                    disabled={!(taskCompleted && practiceTimer === 0)}
-                    className={`px-6 py-3 rounded-lg font-mono font-bold text-sm transition-all duration-300 flex items-center gap-2 ${
-                      taskCompleted && practiceTimer === 0
-                        ? 'bg-gradient-to-r from-yellow-600 to-orange-600 hover:from-yellow-500 hover:to-orange-500 text-white hover:scale-105'
-                        : 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                    }`}
-                  >
-                    <span>{taskCompleted && practiceTimer === 0 ? '🎁' : '⏳'}</span>
-                    <span>
-                      {taskCompleted && practiceTimer === 0 ? 'Claim Rewards & Continue' : 'Complete Timer First'}
-                    </span>
-                    <span>{taskCompleted && practiceTimer === 0 ? '🚀' : '⏰'}</span>
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
-        </div>
-      )}
-
-      {/* Completion Result Modal */}
-      {showResult && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
-          <div className="bg-black/90 border border-cyan-500/30 rounded-xl p-6 max-w-sm mx-4">
-            <div className="text-center">
-              <div className="text-4xl mb-4">✨</div>
-              <div className="text-white font-mono font-bold text-lg mb-2">Task Completed!</div>
-              <div className="text-gray-300 font-mono text-sm mb-4">{rewardMessage}</div>
-              <button
-                onClick={() => setShowResult(false)}
-                className="px-6 py-2 rounded-lg font-mono font-bold text-sm bg-gradient-to-r from-cyan-600 to-blue-600 text-white transition-all duration-300 hover:scale-105"
-              >
-                CONTINUE
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
-}; 
+};
+
+export default DailyRewards;

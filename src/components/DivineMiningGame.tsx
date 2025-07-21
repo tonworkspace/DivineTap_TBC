@@ -13,7 +13,7 @@ interface Upgrade {
   baseCost: number;
   costMultiplier: number;
   effectValue: number;
-  category?: 'chakra' | 'mastery' | 'meditation' | 'cosmic' | 'elemental';
+  category?: 'hardware' | 'advanced' | 'software' | 'network' | 'infrastructure';
   description?: string;
   requires?: {
     upgrade: string;
@@ -128,6 +128,31 @@ const HIGH_SCORE_KEY = 'divineMiningHighScore';
 const OFFLINE_EFFICIENCY_CAP = 14; // 14 days max offline earnings
 const OFFLINE_EFFICIENCY_BONUS = 0.1; // 10% bonus per day offline (max 140%)
 
+// Staking Integration Constants
+const MINING_STAKING_BONUSES_KEY = 'divine_mining_staking_bonuses';
+
+// Staking Integration Helper Functions
+const getStakingBonuses = (userId?: string) => {
+  try {
+    const userKey = userId ? `${MINING_STAKING_BONUSES_KEY}_${userId}` : MINING_STAKING_BONUSES_KEY;
+    const stored = localStorage.getItem(userKey);
+    return stored ? JSON.parse(stored) : {
+      miningPointsBonus: 0,
+      stakingRateBonus: 0,
+      divinePointsMultiplier: 1.0,
+      lastSyncTime: Date.now()
+    };
+  } catch (error) {
+    console.error('Error reading staking bonuses from localStorage:', error);
+    return {
+      miningPointsBonus: 0,
+      stakingRateBonus: 0,
+      divinePointsMultiplier: 1.0,
+      lastSyncTime: Date.now()
+    };
+  }
+};
+
 // Add getCurrentTier function with enhanced information
 const getCurrentTier = (level: number) => {
   if (level >= 50) {
@@ -135,8 +160,8 @@ const getCurrentTier = (level: number) => {
       name: 'MASTER', 
       symbol: '🌟', 
       color: 'yellow',
-      description: 'Transcendent wisdom and divine mastery',
-      benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive cosmic upgrades', 'Divine resonance bonus'],
+          description: 'Ultimate TBC mining mastery and expertise',
+    benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive advanced upgrades', 'Performance optimization bonus'],
       nextTier: null
     };
   } else if (level >= 30) {
@@ -144,7 +169,7 @@ const getCurrentTier = (level: number) => {
       name: 'EXPERT', 
       symbol: '💎', 
       color: 'purple',
-      description: 'Advanced spiritual techniques and deep understanding',
+      description: 'Advanced mining techniques and deep TBC knowledge',
       benefits: ['+100% mining efficiency', '+75% energy regeneration', 'Quantum upgrades unlocked', 'Enhanced auto-mining'],
       nextTier: { name: 'MASTER', level: 50, symbol: '🌟' }
     };
@@ -153,7 +178,7 @@ const getCurrentTier = (level: number) => {
       name: 'ADEPT', 
       symbol: '🔮', 
       color: 'blue',
-      description: 'Intermediate spiritual practices and growing awareness',
+      description: 'Intermediate mining practices and growing TBC expertise',
       benefits: ['+50% mining efficiency', '+40% energy regeneration', 'Advanced upgrades unlocked', 'Improved energy management'],
       nextTier: { name: 'EXPERT', level: 30, symbol: '💎' }
     };
@@ -162,7 +187,7 @@ const getCurrentTier = (level: number) => {
       name: 'NOVICE', 
       symbol: '🌱', 
       color: 'green',
-      description: 'Beginning the spiritual journey of divine mining',
+      description: 'Beginning the TBC mining journey with basic operations',
       benefits: ['+25% mining efficiency', '+20% energy regeneration', 'Basic upgrades available', 'Energy conservation'],
       nextTier: { name: 'ADEPT', level: 15, symbol: '🔮' }
     };
@@ -245,7 +270,7 @@ export const DivineMiningGame: React.FC = () => {
   const [showTierInfo, setShowTierInfo] = useState(false);
   
   // Upgrade filtering state
-  const [upgradeFilter, setUpgradeFilter] = useState<'all' | 'affordable' | 'recommended' | 'chakra' | 'mastery' | 'meditation' | 'cosmic' | 'elemental'>('all');
+  const [upgradeFilter, setUpgradeFilter] = useState<'all' | 'affordable' | 'recommended' | 'hardware' | 'advanced' | 'software' | 'network' | 'infrastructure'>('all');
   // const [selectedCategory, setSelectedCategory] = useState<string>('all');
   const [currentUpgradePage, setCurrentUpgradePage] = useState(1);
   const upgradesPerPage = 8;
@@ -810,11 +835,11 @@ export const DivineMiningGame: React.FC = () => {
       case 'all': return 'ALL';
       case 'affordable': return 'AFFORDABLE';
       case 'recommended': return 'RECOMMENDED';
-      case 'chakra': return '🌱 CHAKRA';
-      case 'mastery': return '🧘 MASTERY';
-      case 'meditation': return '🧘‍♀️ MEDITATION';
-      case 'cosmic': return '🌟 COSMIC';
-      case 'elemental': return '⚡ ELEMENTAL';
+      case 'hardware': return '🖥️ HARDWARE';
+      case 'advanced': return '⚡ ADVANCED';
+      case 'software': return '💻 SOFTWARE';
+      case 'network': return '🌐 NETWORK';
+      case 'infrastructure': return '🏗️ INFRASTRUCTURE';
       default: return filter.toUpperCase();
     }
   }, []);
@@ -822,22 +847,22 @@ export const DivineMiningGame: React.FC = () => {
   // Add missing helper functions for upgrade categories
   const getUpgradeCategoryName = useCallback((category: string): string => {
     switch (category) {
-      case 'chakra': return '🌱 CHAKRA';
-      case 'mastery': return '🧘 MASTERY';
-      case 'meditation': return '🧘‍♀️ MEDITATION';
-      case 'cosmic': return '🌟 COSMIC';
-      case 'elemental': return '⚡ ELEMENTAL';
+      case 'hardware': return '🖥️ HARDWARE';
+      case 'advanced': return '⚡ ADVANCED';
+      case 'software': return '💻 SOFTWARE';
+      case 'network': return '🌐 NETWORK';
+      case 'infrastructure': return '🏗️ INFRASTRUCTURE';
       default: return category.toUpperCase();
     }
   }, []);
 
   const getUpgradeCategoryColor = useCallback((category: string): string => {
     switch (category) {
-      case 'chakra': return 'text-green-400 bg-green-900/20 border-green-500/30';
-      case 'mastery': return 'text-purple-400 bg-purple-900/20 border-purple-500/30';
-      case 'meditation': return 'text-blue-400 bg-blue-900/20 border-blue-500/30';
-      case 'cosmic': return 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30';
-      case 'elemental': return 'text-orange-400 bg-orange-900/20 border-orange-500/30';
+      case 'hardware': return 'text-green-400 bg-green-900/20 border-green-500/30';
+      case 'advanced': return 'text-purple-400 bg-purple-900/20 border-purple-500/30';
+      case 'software': return 'text-blue-400 bg-blue-900/20 border-blue-500/30';
+      case 'network': return 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30';
+      case 'infrastructure': return 'text-orange-400 bg-orange-900/20 border-orange-500/30';
       default: return 'text-gray-400 bg-gray-900/20 border-gray-500/30';
     }
   }, []);
@@ -1416,24 +1441,24 @@ export const DivineMiningGame: React.FC = () => {
   const tutorialSteps: TutorialStep[] = [
     {
       id: 'welcome',
-      title: 'Welcome to Divine Mining!',
-      description: 'This tutorial will guide you through the basics of mining divine points. Let\'s start by understanding your main resource.',
-      target: '.divine-points-display',
+      title: 'Welcome to TBC Mining!',
+      description: 'This tutorial will guide you through the basics of mining TBC coins. Let\'s start by understanding your main currency.',
+      target: '.tbc-coins-display',
       position: 'center',
       action: 'info'
     },
     {
-      id: 'divine-points',
-      title: 'Divine Points',
-      description: 'These are your main currency. You earn them by mining, and spend them on upgrades. Watch the number increase as you mine!',
-      target: '.divine-points-display',
+      id: 'tbc-coins',
+      title: 'TBC Coins',
+      description: 'These are your main currency. You earn them by mining, and spend them on hardware and software upgrades. Watch the number increase as you mine!',
+      target: '.tbc-coins-display',
       position: 'bottom',
       action: 'info'
     },
     {
       id: 'mining-station',
       title: 'Mining Station',
-      description: 'This is where the magic happens! Click "ACTIVATE MINING" to start earning points. The glowing core shows mining status.',
+      description: 'This is where the TBC mining happens! Click "ACTIVATE MINING" to start earning coins. The core shows mining status.',
       target: '.mining-station',
       position: 'bottom',
       action: 'click'
@@ -1449,7 +1474,7 @@ export const DivineMiningGame: React.FC = () => {
     {
       id: 'first-mine',
       title: 'Start Mining!',
-      description: 'Click the "ACTIVATE MINING" button to start earning points. Watch your divine points increase!',
+      description: 'Click the "ACTIVATE MINING" button to start earning TBC coins. Watch your balance increase!',
       target: '.mining-button',
       position: 'bottom',
       action: 'click',
@@ -1458,95 +1483,66 @@ export const DivineMiningGame: React.FC = () => {
     {
       id: 'mining-active',
       title: 'Mining Active!',
-      description: 'Great! You\'re now mining. Notice how your points increase and energy decreases. The core glows when active.',
+      description: 'Great! You\'re now mining TBC. Notice how your coins increase and energy decreases. The core glows when active.',
       target: '.mining-station',
       position: 'bottom',
       action: 'info',
       condition: (state) => state.isMining
     },
     {
-      id: 'upgrades-intro',
-      title: 'Upgrades',
-      description: 'Upgrades make you more efficient. They increase mining speed, energy capacity, and unlock new features.',
-      target: '.upgrades-section',
+      id: 'energy-management',
+      title: 'Energy Management',
+      description: 'Watch your energy bar! When it gets low, mining will slow down. Energy regenerates automatically over time.',
+      target: '.energy-status',
       position: 'top',
-      action: 'info'
+      action: 'info',
+      condition: (state) => state.currentEnergy < state.maxEnergy * 0.3
     },
     {
       id: 'first-upgrade',
-      title: 'Buy Your First Upgrade',
-      description: 'Try buying "MINING SPEED" upgrade. It will increase how many points you earn per second!',
-      target: '.upgrade-mining-speed',
-      position: 'right',
+      title: 'Your First Upgrade!',
+      description: 'You\'ve earned enough TBC coins for an upgrade! Click the upgrade button to see available hardware and software improvements.',
+      target: '.upgrade-button',
+      position: 'top',
       action: 'click',
       condition: (state) => state.divinePoints >= 25
     },
     {
-      id: 'upgrade-effect',
-      title: 'Upgrade Effect',
-      description: 'Notice how your mining rate increased! Upgrades stack, so buy more to become even more powerful.',
-      target: '.divine-points-display',
+      id: 'mining-rig',
+      title: 'Mining Rig Upgrade',
+      description: 'The Mining Rig is your foundation upgrade. It increases your hash rate (TBC earned per second). Great choice for beginners!',
+      target: '.upgrade-mining-rig',
+      position: 'right',
+      action: 'info',
+      condition: (state) => state.divinePoints >= 25,
+      skipIf: () => false
+    },
+    {
+      id: 'upgrade-purchased',
+      title: 'Upgrade Complete!',
+      description: 'Excellent! Your mining rate has increased. Keep earning TBC coins and buying more upgrades to build a mining empire!',
+      target: '.mining-stats',
       position: 'bottom',
       action: 'info',
-      condition: (state) => state.upgradesPurchased > 0
+      condition: (state) => state.upgradesPurchased >= 1
     },
     {
-      id: 'energy-upgrades',
-      title: 'Energy Management',
-      description: 'Energy upgrades are crucial! They reduce energy costs and increase regeneration. Invest in them early.',
-      target: '.upgrade-energy-efficiency',
-      position: 'right',
-      action: 'info'
-    },
-    {
-      id: 'auto-mining',
-      title: 'Auto-Mining',
-      description: 'Auto-mining automatically starts mining when you have enough energy. It\'s a game-changer!',
-      target: '.upgrade-auto-mining',
-      position: 'right',
-      action: 'info'
-    },
-    {
-      id: 'offline-rewards',
-      title: 'Offline Rewards',
-      description: 'You earn points even when the game is closed! Longer offline time = bigger bonuses (up to 140%).',
-      target: '.offline-predictions',
-      position: 'top',
+      id: 'categories',
+      title: 'Upgrade Categories',
+      description: 'Upgrades are organized into categories: Hardware 🖥️, Software 💻, Network 🌐, Infrastructure 🏗️, and Advanced ⚡. Each type offers different benefits!',
+      target: '.upgrade-categories',
+      position: 'bottom',
       action: 'info',
-      condition: (state) => state.isMining
+      condition: (state) => state.upgradesPurchased >= 1
     },
     {
-      id: 'achievements',
-      title: 'Achievements',
-      description: 'Complete milestones to unlock achievements. They provide bonuses and track your progress.',
-      target: '.achievements-section',
-      position: 'top',
-      action: 'info',
-      condition: (state) => state.totalPointsEarned > 0
-    },
-    {
-      id: 'statistics',
-      title: 'Statistics',
-      description: 'Track your progress here. Session time, total earned, and efficiency stats help you optimize your strategy.',
-      target: '.statistics-section',
-      position: 'top',
-      action: 'info'
-    },
-    {
-      id: 'help-system',
-      title: 'Help & Tips',
-      description: 'Click "SHOW HELP" anytime for detailed game mechanics and pro tips. The debug menu has advanced features.',
-      target: '.help-button',
-      position: 'left',
-      action: 'info'
-    },
-    {
-      id: 'tutorial-complete',
+      id: 'completion',
       title: 'Tutorial Complete!',
-      description: 'You\'re ready to become a Divine Mining master! Remember: balance mining speed with energy efficiency for optimal results.',
-      target: '.divine-points-display',
+      description: 'You\'ve mastered the basics of TBC mining! Continue upgrading your equipment, manage your energy wisely, and build the ultimate mining operation. Good luck, miner!',
+      target: '.mining-station',
       position: 'center',
-      action: 'info'
+      action: 'info',
+      condition: (state) => state.upgradesPurchased >= 1
     }
   ];
 
@@ -1962,7 +1958,7 @@ export const DivineMiningGame: React.FC = () => {
               baseCost: Math.max(1, upgrade.baseCost || 25),
               costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
               effectValue: upgrade.effectValue || 0,
-              category: upgrade.category || 'chakra',
+              category: upgrade.category || 'hardware',
               description: upgrade.description || 'An upgrade',
               requires: upgrade.requires || undefined,
               detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
@@ -1992,74 +1988,74 @@ export const DivineMiningGame: React.FC = () => {
       console.error('Error loading upgrades from localStorage:', error);
     }
     
-    // Spiritual progression upgrades - unlocking different parts of the soul
+    // TBC Mining progression upgrades - building comprehensive mining infrastructure
     return [
-      // 🌱 ROOT CHAKRA - Foundation & Grounding
+      // 🖥️ MINING RIG - Foundation & Setup
       {
-        id: 'root-chakra',
-        name: '🌱 ROOT CHAKRA',
+        id: 'mining-rig',
+        name: '🖥️ MINING RIG',
         level: 0,
-        effect: '+0.5 wisdom/sec (Grounding)',
+        effect: '+0.5 hash/sec (Basic Setup)',
         baseCost: 25,
         costMultiplier: 1.12,
         effectValue: 0.5,
-        category: 'chakra',
-        description: 'Unlock your foundation - stability and security',
+        category: 'hardware',
+        description: 'Set up your first TBC mining rig - the foundation of your operation',
         maxLevel: 20,
-        unlockReward: 'Unlock the ability to use cosmic upgrades',
-        benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive cosmic upgrades', 'Divine resonance bonus'],
+        unlockReward: 'Unlock the ability to use power supply upgrades',
+        benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive hardware upgrades', 'Performance optimization bonus'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade unlocks the ability to use cosmic upgrades, which are powerful and unique. As you progress through the tiers, you\'ll gain access to more advanced features and bonuses. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade establishes the foundation for your TBC mining operation, providing the basic infrastructure needed for more advanced mining equipment. As you progress through the tiers, you\'ll gain access to more advanced features and bonuses. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'earth-connection',
-        name: '🌍 EARTH CONNECTION',
+        id: 'power-supply',
+        name: '🔌 POWER SUPPLY',
         level: 0,
-        effect: '+50 spiritual capacity',
+        effect: '+50 energy capacity',
         baseCost: 75,
         costMultiplier: 1.15,
         effectValue: 50,
-        category: 'chakra',
-        description: 'Deepen your connection to Mother Earth',
+        category: 'hardware',
+        description: 'Install power supply unit for stable mining operations',
         maxLevel: 10,
-        unlockReward: 'Unlock the ability to use solar plexus upgrades',
-        benefits: ['+50% spiritual capacity', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        unlockReward: 'Unlock the ability to use CPU upgrades',
+        benefits: ['+50% energy capacity', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade deepens your connection to Mother Earth, increasing your spiritual capacity and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade provides stable power delivery to your mining hardware, increasing your energy capacity and system reliability. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 🧘 SACRAL CHAKRA - Creativity & Flow
+      // 🖥️ CPU UPGRADE - Processing Power Enhancement
       {
-        id: 'sacral-chakra',
-        name: '🧘 SACRAL CHAKRA',
+        id: 'cpu-upgrade',
+        name: '🖥️ CPU UPGRADE',
         level: 0,
-        effect: '+1.0 wisdom/sec (Creativity)',
+        effect: '+1.0 hash/sec (Processing Power)',
         baseCost: 200,
         costMultiplier: 1.18,
         effectValue: 1.0,
-        category: 'chakra',
-        description: 'Awaken your creative energy and emotional flow',
-        requires: { upgrade: 'root-chakra', level: 3 },
+        category: 'hardware',
+        description: 'Upgrade CPU for better hash processing capabilities',
+        requires: { upgrade: 'mining-rig', level: 3 },
         maxLevel: 15,
-        unlockReward: 'Unlock the ability to use heart chakra upgrades',
-        benefits: ['+100% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        unlockReward: 'Unlock the ability to use advanced CPU upgrades',
+        benefits: ['+100% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade awakens your creative energy and emotional flow, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade enhances your CPU processing power for faster hash calculations, increasing your mining rate and energy efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'flow-state',
-        name: '🌊 FLOW STATE',
+        id: 'auto-miner',
+        name: '🤖 AUTO-MINER',
         level: 0,
-        effect: 'Auto-meditation when ready',
+        effect: 'Auto-mining when conditions are optimal',
         baseCost: 500000,
         costMultiplier: 2.0,
         effectValue: 1,
-        category: 'chakra',
-        description: 'Enter automatic meditation when conditions are perfect',
-        requires: { upgrade: 'sacral-chakra', level: 5 },
+        category: 'software',
+        description: 'Deploy automated mining bot for continuous TBC generation',
+        requires: { upgrade: 'cpu-upgrade', level: 5 },
         maxLevel: 1,
         unlockReward: 'Unlock the ability to use energy mastery upgrades',
         benefits: ['Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2068,36 +2064,18 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade allows you to enter automatic meditation when your energy levels are high, providing a consistent boost to your mining rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 💪 SOLAR PLEXUS - Willpower & Confidence
+
       {
-        id: 'solar-plexus',
-        name: '💪 SOLAR PLEXUS',
-        level: 0,
-        effect: '+2.0 wisdom/sec (Willpower)',
-        baseCost: 750,
-        costMultiplier: 1.22,
-        effectValue: 2.0,
-        category: 'chakra',
-        description: 'Strengthen your personal power and confidence',
-        requires: { upgrade: 'sacral-chakra', level: 3 },
-        maxLevel: 12,
-        unlockReward: 'Unlock the ability to use air element upgrades',
-        benefits: ['+200% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
-        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
-        unlockProgress: 0,
-        detailedDescription: 'This upgrade strengthens your personal power and confidence, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
-      },
-      {
-        id: 'inner-strength',
-        name: '⚡ INNER STRENGTH',
+        id: 'power-optimization',
+        name: '⚡ POWER OPTIMIZATION',
         level: 0,
         effect: '-10% energy cost',
         baseCost: 50000,
         costMultiplier: 1.5,
         effectValue: -0.1,
-        category: 'chakra',
-        description: 'Harness your inner power for greater efficiency',
-        requires: { upgrade: 'solar-plexus', level: 3 },
+        category: 'hardware',
+        description: 'Optimize power consumption for enhanced mining efficiency',
+        requires: { upgrade: 'power-supply', level: 3 },
         maxLevel: 8,
         unlockReward: 'Unlock the ability to use energy mastery upgrades',
         benefits: ['-10% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2106,74 +2084,74 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade harnesses your inner power, reducing energy costs and increasing your energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 💚 HEART CHAKRA - Love & Compassion
+      // 🎮 GRAPHICS CARD - GPU Mining Power
       {
-        id: 'heart-chakra',
-        name: '💚 HEART CHAKRA',
+        id: 'graphics-card',
+        name: '🎮 GRAPHICS CARD',
         level: 0,
-        effect: '+5.0 wisdom/sec (Love)',
+        effect: '+5.0 hash/sec (GPU Mining)',
         baseCost: 3000,
         costMultiplier: 1.25,
         effectValue: 5.0,
-        category: 'chakra',
-        description: 'Open your heart to universal love and compassion',
-        requires: { upgrade: 'solar-plexus', level: 5 },
+        category: 'hardware',
+        description: 'Install high-performance graphics card for GPU mining',
+        requires: { upgrade: 'cpu-upgrade', level: 5 },
         maxLevel: 10,
-        unlockReward: 'Unlock the ability to use cosmic consciousness upgrades',
-        benefits: ['+500% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        unlockReward: 'Unlock the ability to use GPU boost upgrades',
+        benefits: ['+500% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade opens your heart to universal love and compassion, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade provides high-performance GPU mining capabilities, dramatically increasing your hash rate and mining efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'compassion-resonance',
-        name: '💝 COMPASSION RESONANCE',
+        id: 'gpu-boost',
+        name: '🚀 GPU BOOST',
         level: 0,
-        effect: '+50% boost effectiveness',
+        effect: '+50% mining efficiency',
         baseCost: 1000000,
         costMultiplier: 2.5,
         effectValue: 0.5,
-        category: 'chakra',
-        description: 'Your love amplifies all spiritual practices',
-        requires: { upgrade: 'heart-chakra', level: 5 },
+        category: 'hardware',
+        description: 'Overclock GPU for maximum mining performance',
+        requires: { upgrade: 'graphics-card', level: 5 },
         maxLevel: 5,
-        unlockReward: 'Unlock the ability to use throat chakra upgrades',
+        unlockReward: 'Unlock the ability to use motherboard upgrades',
         benefits: ['+50% boost effectiveness', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade amplifies the effectiveness of your boosts, increasing your energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 🗣️ THROAT CHAKRA - Communication & Truth
+      // 🔌 MINING MOTHERBOARD - System Integration
       {
-        id: 'throat-chakra',
-        name: '🗣️ THROAT CHAKRA',
+        id: 'mining-motherboard',
+        name: '🔌 MINING MOTHERBOARD',
         level: 0,
-        effect: '+10.0 wisdom/sec (Truth)',
+        effect: '+10.0 hash/sec (System Integration)',
         baseCost: 10000,
         costMultiplier: 1.3,
         effectValue: 10.0,
-        category: 'chakra',
-        description: 'Speak your truth and manifest through vibration',
-        requires: { upgrade: 'heart-chakra', level: 5 },
+        category: 'hardware',
+        description: 'High-performance motherboard for multi-GPU mining setups',
+        requires: { upgrade: 'graphics-card', level: 5 },
         maxLevel: 8,
         unlockReward: 'Unlock the ability to use vibrational harmony upgrades',
-        benefits: ['+100% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+100% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade allows you to speak your truth and manifest through vibration, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'vibrational-harmony',
-        name: '🎵 VIBRATIONAL HARMONY',
+        id: 'ram-upgrade',
+        name: '💾 RAM UPGRADE',
         level: 0,
         effect: '+2000 max energy',
         baseCost: 75000,
         costMultiplier: 1.6,
         effectValue: 2000,
-        category: 'chakra',
-        description: 'Your voice resonates with cosmic frequencies',
-        requires: { upgrade: 'throat-chakra', level: 3 },
+        category: 'hardware',
+        description: 'High-speed RAM for enhanced mining operations',
+        requires: { upgrade: 'mining-motherboard', level: 3 },
         maxLevel: 6,
         unlockReward: 'Unlock the ability to use third eye upgrades',
         benefits: ['+2000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2182,145 +2160,145 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade increases your max energy and your energy regeneration, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 👁️ THIRD EYE - Intuition & Insight
+      // 💽 SSD STORAGE - Fast Data Access
       {
-        id: 'third-eye',
-        name: '👁️ THIRD EYE',
+        id: 'ssd-storage',
+        name: '💽 SSD STORAGE',
         level: 0,
-        effect: '+25.0 wisdom/sec (Insight)',
+        effect: '+25.0 hash/sec (Fast Access)',
         baseCost: 50000,
         costMultiplier: 1.35,
         effectValue: 25.0,
-        category: 'chakra',
-        description: 'Open your inner eye to see beyond the veil',
-        requires: { upgrade: 'throat-chakra', level: 5 },
+        category: 'hardware',
+        description: 'High-speed SSD storage for blockchain data and mining operations',
+        requires: { upgrade: 'mining-motherboard', level: 5 },
         maxLevel: 6,
         unlockReward: 'Unlock the ability to use psychic awareness upgrades',
-        benefits: ['+25% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+25% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade opens your inner eye, increasing your intuition and insight, and boosting your mining rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'psychic-awareness',
-        name: '🔮 PSYCHIC AWARENESS',
+        id: 'monitoring-system',
+        name: '📊 MONITORING SYSTEM',
         level: 0,
         effect: '+1.0 energy/sec',
         baseCost: 100000,
         costMultiplier: 1.7,
         effectValue: 1.0,
-        category: 'chakra',
-        description: 'Your intuition guides your spiritual journey',
-        requires: { upgrade: 'third-eye', level: 3 },
+        category: 'software',
+        description: 'Advanced monitoring system tracks mining performance and efficiency',
+        requires: { upgrade: 'ssd-storage', level: 3 },
         maxLevel: 10,
-        unlockReward: 'Unlock the ability to use crown chakra upgrades',
-        benefits: ['+100% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        unlockReward: 'Unlock the ability to use ASIC miner upgrades',
+        benefits: ['+100% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade increases your wisdom and energy regeneration, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 👑 CROWN CHAKRA - Enlightenment & Unity
+      // 🔥 ASIC MINER - Professional Mining Hardware
       {
-        id: 'crown-chakra',
-        name: '👑 CROWN CHAKRA',
+        id: 'asic-miner',
+        name: '🔥 ASIC MINER',
         level: 0,
-        effect: '+100.0 wisdom/sec (Enlightenment)',
+        effect: '+100.0 hash/sec (Professional Mining)',
         baseCost: 250000,
         costMultiplier: 1.4,
         effectValue: 100.0,
-        category: 'chakra',
-        description: 'Connect to divine consciousness and universal wisdom',
-        requires: { upgrade: 'third-eye', level: 7 },
+        category: 'hardware',
+        description: 'Industrial-grade ASIC miner for maximum TBC generation',
+        requires: { upgrade: 'ssd-storage', level: 7 },
         maxLevel: 5,
-        unlockReward: 'Unlock the ability to use cosmic consciousness upgrades',
+        unlockReward: 'Unlock the ability to use monitoring system upgrades',
         benefits: ['+5% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade connects you to divine consciousness and universal wisdom, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade provides industrial-grade ASIC mining capabilities with maximum TBC generation efficiency, dramatically boosting your mining performance and energy management. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'cosmic-consciousness',
-        name: '🌟 COSMIC CONSCIOUSNESS',
+        id: 'mining-pool',
+        name: '🏊 MINING POOL',
         level: 0,
         effect: '+5% offline bonus',
         baseCost: 150000,
         costMultiplier: 1.8,
         effectValue: 0.05,
-        category: 'chakra',
-        description: 'Your consciousness transcends time and space',
+        category: 'network',
+        description: 'Join mining pool for continuous TBC rewards even offline',
         maxLevel: 3,
-        unlockReward: 'Unlock the ability to use cosmic upgrades',
+        unlockReward: 'Unlock the ability to use advanced mining upgrades',
         benefits: ['+5% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade transcends time and space, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade connects you to a mining pool network, allowing continuous TBC generation even when offline. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
       // 🧘‍♀️ ADVANCED PRACTICES - Mastery
       {
-        id: 'energy-mastery',
-        name: '🧘‍♀️ ENERGY MASTERY',
+        id: 'efficiency-master',
+        name: '🔋 EFFICIENCY MASTER',
         level: 0,
         effect: '-30% energy cost',
         baseCost: 5000000,
         costMultiplier: 4.0,
         effectValue: -0.3,
-        category: 'mastery',
-        description: 'Master the flow of spiritual energy',
+        category: 'advanced',
+        description: 'Master energy efficiency for sustainable mining operations',
         maxLevel: 3,
         unlockReward: 'Unlock the ability to use energy mastery upgrades',
         benefits: ['-30% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade masters the flow of spiritual energy, reducing energy costs and increasing your energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade masters energy efficiency optimization, reducing power costs and increasing your mining system performance. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'divine-resonance',
-        name: '✨ DIVINE RESONANCE',
+        id: 'performance-optimizer',
+        name: '⚡ PERFORMANCE OPTIMIZER',
         level: 0,
         effect: '+2.0 energy/sec',
         baseCost: 3000000,
         costMultiplier: 3.5,
         effectValue: 2.0,
-        category: 'mastery',
-        description: 'Resonate with the divine frequency',
+        category: 'advanced',
+        description: 'Optimize system performance for maximum mining efficiency',
         maxLevel: 5,
         unlockReward: 'Unlock the ability to use divine resonance upgrades',
-        benefits: ['+200% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+200% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade resonates with the divine frequency, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade optimizes system performance for maximum mining efficiency, increasing your hash rate and energy management. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'transcendence',
-        name: '🚀 TRANSCENDENCE',
+        id: 'ultimate-mining-setup',
+        name: '🏭 ULTIMATE MINING SETUP',
         level: 0,
         effect: '+5000 max energy',
         baseCost: 2000000,
         costMultiplier: 3.0,
         effectValue: 5000,
-        category: 'mastery',
-        description: 'Transcend physical limitations',
+        category: 'advanced',
+        description: 'Ultimate mining configuration with maximum energy capacity',
         maxLevel: 1,
-        unlockReward: 'Unlock the ability to use transcendence upgrades',
+        unlockReward: 'Unlock the ability to use ultimate mining upgrades',
         benefits: ['+5000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade transcends physical limitations, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade provides the ultimate mining configuration with maximum energy capacity for extended mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
       // 🧘‍♀️ MEDITATION PRACTICES - Inner Peace & Focus
       {
-        id: 'mindful-breathing',
-        name: '🫁 MINDFUL BREATHING',
+        id: 'power-management',
+        name: '🔋 POWER MANAGEMENT',
         level: 0,
         effect: '+0.3 energy/sec',
         baseCost: 150,
         costMultiplier: 1.14,
         effectValue: 0.3,
-        category: 'meditation',
-        description: 'Master the art of conscious breathing',
+        category: 'software',
+        description: 'Advanced power management software for energy optimization',
         maxLevel: 15,
         unlockReward: 'Unlock the ability to use mindful breathing upgrades',
         benefits: ['+30% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2329,85 +2307,85 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade masters the art of conscious breathing, increasing your energy regeneration and boosting your mining rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'zen-focus',
-        name: '🎯 ZEN FOCUS',
+        id: 'hash-rate-optimizer',
+        name: '🎯 HASH RATE OPTIMIZER',
         level: 0,
-        effect: '+1.5 wisdom/sec',
+        effect: '+1.5 hash/sec',
         baseCost: 400,
         costMultiplier: 1.16,
         effectValue: 1.5,
-        category: 'meditation',
-        description: 'Achieve perfect mental clarity',
+        category: 'software',
+        description: 'Optimize hash rate calculations for maximum mining output',
         maxLevel: 10,
         unlockReward: 'Unlock the ability to use zen focus upgrades',
-        benefits: ['+150% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+150% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade improves your mental clarity, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'aura-purification',
-        name: '✨ AURA PURIFICATION',
+        id: 'system-cleaner',
+        name: '🧹 SYSTEM CLEANER',
         level: 0,
         effect: '-15% energy cost',
         baseCost: 25000,
         costMultiplier: 1.4,
         effectValue: -0.15,
-        category: 'meditation',
-        description: 'Purify your spiritual aura',
+        category: 'software',
+        description: 'Clean system files and optimize mining software performance',
         maxLevel: 8,
         unlockReward: 'Unlock the ability to use aura purification upgrades',
         benefits: ['-15% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade purifies your spiritual aura, reducing energy costs and increasing your energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade cleans system files and optimizes mining software performance, reducing energy costs and increasing mining efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'kundalini-awakening',
-        name: '🐍 KUNDALINI AWAKENING',
+        id: 'turbo-boost',
+        name: '🚀 TURBO BOOST',
         level: 0,
-        effect: '+50.0 wisdom/sec',
+        effect: '+50.0 hash/sec',
         baseCost: 1000000,
         costMultiplier: 2.0,
         effectValue: 50.0,
-        category: 'meditation',
-        description: 'Awaken your serpent power',
+        category: 'software',
+        description: 'Enable turbo boost mode for explosive mining performance',
         maxLevel: 3,
-        unlockReward: 'Unlock the ability to use kundalini awakening upgrades',
-        benefits: ['+500% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        unlockReward: 'Unlock the ability to use turbo boost upgrades',
+        benefits: ['+500% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade awakens your serpent power, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade enables turbo boost mode for explosive mining performance, dramatically increasing your hash rate and system efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       
-      // 🌟 COSMIC POWERS - Beyond Physical Reality
+      // 🌐 NETWORK OPTIMIZATION - Beyond Standard Performance
       {
-        id: 'quantum-leap',
-        name: '⚛️ QUANTUM LEAP',
+        id: 'mining-acceleration',
+        name: '🚀 MINING ACCELERATION',
         level: 0,
-        effect: '+1000% wisdom/sec',
+        effect: '+1000% hash/sec',
         baseCost: 10000000,
         costMultiplier: 5.0,
         effectValue: 1000.0,
-        category: 'cosmic',
-        description: 'Transcend quantum limitations',
+        category: 'network',
+        description: 'Accelerate mining operations through network optimization',
         maxLevel: 1,
         unlockReward: 'Unlock the ability to use quantum leap upgrades',
-        benefits: ['+1000% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+1000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
-        detailedDescription: 'This upgrade transcends quantum limitations, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+        detailedDescription: 'This upgrade accelerates mining operations through advanced network optimization, dramatically boosting your TBC generation rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'time-dilation',
-        name: '⏰ TIME DILATION',
+        id: 'latency-optimizer',
+        name: '⏱️ LATENCY OPTIMIZER',
         level: 0,
         effect: '+10% offline bonus',
         baseCost: 500000,
         costMultiplier: 2.5,
         effectValue: 0.1,
-        category: 'cosmic',
-        description: 'Bend the fabric of time',
+        category: 'network',
+        description: 'Optimize network latency for faster mining responses',
         maxLevel: 5,
         unlockReward: 'Unlock the ability to use time dilation upgrades',
         benefits: ['+10% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2416,15 +2394,15 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade bends the fabric of time, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'space-bending',
-        name: '🌌 SPACE BENDING',
+        id: 'bandwidth-expander',
+        name: '📶 BANDWIDTH EXPANDER',
         level: 0,
         effect: '+3000 max energy',
         baseCost: 750000,
         costMultiplier: 2.2,
         effectValue: 3000,
-        category: 'cosmic',
-        description: 'Manipulate spatial dimensions',
+        category: 'network',
+        description: 'Expand network bandwidth for massive mining operations',
         maxLevel: 3,
         unlockReward: 'Unlock the ability to use space bending upgrades',
         benefits: ['+3000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2433,15 +2411,15 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade manipulates spatial dimensions, allowing you to mine for longer periods. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'reality-shift',
-        name: '🌀 REALITY SHIFT',
+        id: 'system-override',
+        name: '🔥 SYSTEM OVERRIDE',
         level: 0,
         effect: '+500% all bonuses',
         baseCost: 5000000,
         costMultiplier: 10.0,
         effectValue: 5.0,
-        category: 'cosmic',
-        description: 'Shift to a higher reality',
+        category: 'network',
+        description: 'Override system limitations for maximum mining performance',
         maxLevel: 1,
         unlockReward: 'Unlock the ability to use reality shift upgrades',
         benefits: ['+500% all bonuses', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2452,32 +2430,32 @@ export const DivineMiningGame: React.FC = () => {
       
       // ⚡ ELEMENTAL MASTERY - Natural Forces
       {
-        id: 'fire-element',
-        name: '🔥 FIRE ELEMENT',
+        id: 'heating-system',
+        name: '🔥 HEATING SYSTEM',
         level: 0,
-        effect: '+3.0 wisdom/sec',
+        effect: '+3.0 hash/sec',
         baseCost: 600,
         costMultiplier: 1.2,
         effectValue: 3.0,
-        category: 'elemental',
-        description: 'Harness the power of fire',
+        category: 'infrastructure',
+        description: 'Industrial heating system for optimal mining conditions',
         maxLevel: 12,
         unlockReward: 'Unlock the ability to use fire element upgrades',
-        benefits: ['+300% wisdom/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        benefits: ['+300% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade harnesses the power of fire, increasing your wisdom and energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'water-element',
-        name: '💧 WATER ELEMENT',
+        id: 'water-cooling',
+        name: '💧 WATER COOLING',
         level: 0,
         effect: '+2.0 energy/sec',
         baseCost: 800,
         costMultiplier: 1.18,
         effectValue: 2.0,
-        category: 'elemental',
-        description: 'Flow like water',
+        category: 'infrastructure',
+        description: 'Industrial water cooling system for continuous operation',
         maxLevel: 10,
         unlockReward: 'Unlock the ability to use water element upgrades',
         benefits: ['+200% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2486,15 +2464,15 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade allows you to flow like water, increasing your energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'earth-element',
-        name: '🌍 EARTH ELEMENT',
+        id: 'foundation-structure',
+        name: '🏗️ FOUNDATION STRUCTURE',
         level: 0,
         effect: '+1000 max energy',
         baseCost: 1200,
         costMultiplier: 1.25,
         effectValue: 1000,
-        category: 'elemental',
-        description: 'Stand firm like a mountain',
+        category: 'infrastructure',
+        description: 'Solid foundation structure for stable mining operations',
         maxLevel: 8,
         unlockReward: 'Unlock the ability to use earth element upgrades',
         benefits: ['+1000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
@@ -2503,21 +2481,468 @@ export const DivineMiningGame: React.FC = () => {
         detailedDescription: 'This upgrade allows you to stand firm like a mountain, increasing your max energy. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       },
       {
-        id: 'air-element',
-        name: '💨 AIR ELEMENT',
+        id: 'ventilation-system',
+        name: '💨 VENTILATION SYSTEM',
         level: 0,
         effect: '-20% energy cost',
         baseCost: 2000,
         costMultiplier: 1.3,
         effectValue: -0.2,
-        category: 'elemental',
-        description: 'Move freely like the wind',
+        category: 'infrastructure',
+        description: 'Advanced ventilation system for optimal air flow and efficiency',
         maxLevel: 6,
         unlockReward: 'Unlock the ability to use air element upgrades',
         benefits: ['-20% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
         unlockProgress: 0,
         detailedDescription: 'This upgrade allows you to move freely like the wind, reducing energy costs. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // ⚡ EFFICIENCY OPTIMIZER - Power Management
+      {
+        id: 'efficiency-optimizer',
+        name: '⚡ EFFICIENCY OPTIMIZER',
+        level: 0,
+        effect: '-10% energy cost',
+        baseCost: 5000,
+        costMultiplier: 1.5,
+        effectValue: -0.1,
+        category: 'hardware',
+        description: 'Optimize power consumption for longer mining sessions',
+        requires: { upgrade: 'power-supply', level: 3 },
+        maxLevel: 8,
+        unlockReward: 'Unlock the ability to use cooling system upgrades',
+        benefits: ['-10% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade optimizes your power consumption, allowing for longer mining sessions. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // ❤️ COOLING SYSTEM - Temperature Management
+      {
+        id: 'cooling-system',
+        name: '❤️ COOLING SYSTEM',
+        level: 0,
+        effect: '+5.0 hash/sec (Cool Operation)',
+        baseCost: 2500,
+        costMultiplier: 1.25,
+        effectValue: 5.0,
+        category: 'hardware',
+        description: 'Install advanced cooling system to prevent overheating',
+        requires: { upgrade: 'power-supply', level: 5 },
+        maxLevel: 10,
+        unlockReward: 'Unlock the ability to use thermal management upgrades',
+        benefits: ['+500% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade installs an advanced cooling system to prevent overheating and maintain optimal mining performance. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'thermal-boost',
+        name: '🌡️ THERMAL BOOST',
+        level: 0,
+        effect: '+50% all bonuses',
+        baseCost: 150000,
+        costMultiplier: 2.5,
+        effectValue: 0.5,
+        category: 'hardware',
+        description: 'Advanced thermal management amplifies all mining operations',
+        requires: { upgrade: 'cooling-system', level: 5 },
+        maxLevel: 5,
+        unlockReward: 'Unlock the ability to use network interface upgrades',
+        benefits: ['+50% all bonuses', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade provides advanced thermal management that amplifies all your mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 🌐 NETWORK INTERFACE - Communication
+      {
+        id: 'network-interface',
+        name: '🌐 NETWORK INTERFACE',
+        level: 0,
+        effect: '+10.0 hash/sec (Network Speed)',
+        baseCost: 10000,
+        costMultiplier: 1.3,
+        effectValue: 10.0,
+        category: 'network',
+        description: 'High-speed network interface for faster blockchain sync',
+        requires: { upgrade: 'cooling-system', level: 5 },
+        maxLevel: 8,
+        unlockReward: 'Unlock the ability to use bandwidth upgrades',
+        benefits: ['+1000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade installs a high-speed network interface for faster blockchain synchronization and improved mining performance. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'bandwidth-boost',
+        name: '📡 BANDWIDTH BOOST',
+        level: 0,
+        effect: '+2000 max energy',
+        baseCost: 75000,
+        costMultiplier: 1.6,
+        effectValue: 2000,
+        category: 'network',
+        description: 'Increase bandwidth capacity for massive mining operations',
+        requires: { upgrade: 'network-interface', level: 3 },
+        maxLevel: 6,
+        unlockReward: 'Unlock the ability to use AI assistant upgrades',
+        benefits: ['+2000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade increases your bandwidth capacity, allowing for massive mining operations with higher energy limits. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 🤖 AI ASSISTANT - Advanced Intelligence
+      {
+        id: 'ai-assistant',
+        name: '🤖 AI ASSISTANT',
+        level: 0,
+        effect: '+25.0 hash/sec (AI Optimization)',
+        baseCost: 50000,
+        costMultiplier: 1.35,
+        effectValue: 25.0,
+        category: 'advanced',
+        description: 'Deploy AI assistant to optimize mining algorithms',
+        requires: { upgrade: 'network-interface', level: 5 },
+        maxLevel: 6,
+        unlockReward: 'Unlock the ability to use machine learning upgrades',
+        benefits: ['+2500% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade deploys an AI assistant to optimize your mining algorithms and improve performance. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'machine-learning',
+        name: '🧠 MACHINE LEARNING',
+        level: 0,
+        effect: '+1.0 energy/sec',
+        baseCost: 100000,
+        costMultiplier: 1.7,
+        effectValue: 1.0,
+        category: 'advanced',
+        description: 'Machine learning algorithms predict optimal mining conditions',
+        requires: { upgrade: 'ai-assistant', level: 3 },
+        maxLevel: 10,
+        unlockReward: 'Unlock the ability to use quantum processing upgrades',
+        benefits: ['+100% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade uses machine learning algorithms to predict optimal mining conditions and automatically adjust your operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // ⚛️ QUANTUM PROCESSOR - Ultimate Power
+      {
+        id: 'quantum-processor',
+        name: '⚛️ QUANTUM PROCESSOR',
+        level: 0,
+        effect: '+100.0 hash/sec (Quantum Computing)',
+        baseCost: 250000,
+        costMultiplier: 1.4,
+        effectValue: 100.0,
+        category: 'advanced',
+        description: 'Quantum processor for exponential mining performance',
+        requires: { upgrade: 'ai-assistant', level: 7 },
+        maxLevel: 5,
+        unlockReward: 'Unlock the ability to use quantum superposition upgrades',
+        benefits: ['+10000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade installs a quantum processor that provides exponential mining performance improvements through quantum computing principles. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'quantum-superposition',
+        name: '🌌 QUANTUM SUPERPOSITION',
+        level: 0,
+        effect: '+5% offline bonus',
+        baseCost: 150000,
+        costMultiplier: 1.8,
+        effectValue: 0.05,
+        category: 'advanced',
+        description: 'Quantum superposition allows mining in parallel dimensions',
+        maxLevel: 3,
+        unlockReward: 'Unlock the ability to use advanced mining software',
+        benefits: ['+5% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade uses quantum superposition to allow mining operations in parallel dimensions, increasing offline rewards. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 💻 MINING SOFTWARE UPGRADES
+      {
+        id: 'mining-software',
+        name: '💻 MINING SOFTWARE',
+        level: 0,
+        effect: '+0.3 energy/sec',
+        baseCost: 150,
+        costMultiplier: 1.14,
+        effectValue: 0.3,
+        category: 'software',
+        description: 'Optimized mining software for better energy management',
+        maxLevel: 15,
+        unlockReward: 'Unlock the ability to use algorithm optimization upgrades',
+        benefits: ['+30% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade installs optimized mining software that provides better energy management and efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'algorithm-optimization',
+        name: '⚙️ ALGORITHM OPTIMIZATION',
+        level: 0,
+        effect: '+1.5 hash/sec',
+        baseCost: 400,
+        costMultiplier: 1.16,
+        effectValue: 1.5,
+        category: 'software',
+        description: 'Advanced algorithms for maximum mining efficiency',
+        requires: { upgrade: 'mining-software', level: 5 },
+        maxLevel: 10,
+        unlockReward: 'Unlock the ability to use code optimization upgrades',
+        benefits: ['+150% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade implements advanced algorithms that provide maximum mining efficiency through optimized code execution. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'code-optimization',
+        name: '🔧 CODE OPTIMIZATION',
+        level: 0,
+        effect: '-15% energy cost',
+        baseCost: 25000,
+        costMultiplier: 1.4,
+        effectValue: -0.15,
+        category: 'software',
+        requires: { upgrade: 'algorithm-optimization', level: 5 },
+        description: 'Optimize mining code for reduced energy consumption',
+        maxLevel: 8,
+        unlockReward: 'Unlock the ability to use quantum algorithm upgrades',
+        benefits: ['-15% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade optimizes your mining code to reduce energy consumption while maintaining peak performance. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'quantum-algorithms',
+        name: '🔮 QUANTUM ALGORITHMS',
+        level: 0,
+        effect: '+50.0 hash/sec',
+        baseCost: 1000000,
+        costMultiplier: 2.0,
+        effectValue: 50.0,
+        category: 'software',
+        description: 'Quantum-enhanced mining algorithms for maximum output',
+        requires: { upgrade: 'code-optimization', level: 5 },
+        maxLevel: 3,
+        unlockReward: 'Unlock the ability to use network infrastructure upgrades',
+        benefits: ['+5000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade implements quantum-enhanced mining algorithms that provide maximum output through advanced computational techniques. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 🌐 NETWORK INFRASTRUCTURE UPGRADES
+      {
+        id: 'blockchain-sync',
+        name: '⛓️ BLOCKCHAIN SYNC',
+        level: 0,
+        effect: '+1000% hash/sec',
+        baseCost: 10000000,
+        costMultiplier: 5.0,
+        effectValue: 1000.0,
+        category: 'network',
+        description: 'Ultra-fast blockchain synchronization for maximum mining',
+        maxLevel: 1,
+        unlockReward: 'Unlock the ability to use network optimization upgrades',
+        benefits: ['+1000000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade provides ultra-fast blockchain synchronization that maximizes your mining potential through seamless network integration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'network-optimization',
+        name: '📡 NETWORK OPTIMIZATION',
+        level: 0,
+        effect: '+10% offline bonus',
+        baseCost: 500000,
+        costMultiplier: 2.5,
+        effectValue: 0.1,
+        category: 'network',
+        requires: { upgrade: 'quantum-processor', level: 5 },
+        description: 'Optimize network protocols for continuous mining rewards',
+        maxLevel: 5,
+        unlockReward: 'Unlock the ability to use global mining network upgrades',
+        benefits: ['+10% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade optimizes network protocols to ensure continuous mining rewards even when offline. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'global-mining-network',
+        name: '🌍 GLOBAL MINING NETWORK',
+        level: 0,
+        effect: '+3000 max energy',
+        baseCost: 750000,
+        costMultiplier: 2.2,
+        effectValue: 3000,
+        category: 'network',
+        requires: { upgrade: 'network-optimization', level: 3 },
+        description: 'Connect to global mining network for expanded operations',
+        maxLevel: 3,
+        unlockReward: 'Unlock the ability to use distributed mining upgrades',
+        benefits: ['+3000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade connects you to the global mining network, expanding your operations and energy capacity. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'distributed-mining',
+        name: '🔗 DISTRIBUTED MINING',
+        level: 0,
+        effect: '+500% all bonuses',
+        baseCost: 5000000,
+        costMultiplier: 10.0,
+        effectValue: 5.0,
+        category: 'network',
+        requires: { upgrade: 'global-mining-network', level: 3 },
+        description: 'Harness distributed computing for exponential rewards',
+        maxLevel: 1,
+        unlockReward: 'Unlock the ability to use infrastructure upgrades',
+        benefits: ['+500% all bonuses', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade harnesses distributed computing power for exponential mining rewards through global network participation. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 🏗️ INFRASTRUCTURE UPGRADES
+      {
+        id: 'mining-facility',
+        name: '🏭 MINING FACILITY',
+        level: 0,
+        effect: '+3.0 hash/sec',
+        baseCost: 600,
+        costMultiplier: 1.2,
+        effectValue: 3.0,
+        category: 'infrastructure',
+        requires: { upgrade: 'mining-rig', level: 5 },
+        description: 'Dedicated mining facility for industrial-scale operations',
+        maxLevel: 12,
+        unlockReward: 'Unlock the ability to use server farm upgrades',
+        benefits: ['+300% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade builds a dedicated mining facility for industrial-scale TBC mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'server-farm',
+        name: '💾 SERVER FARM',
+        level: 0,
+        effect: '+2.0 energy/sec',
+        baseCost: 800,
+        costMultiplier: 1.18,
+        effectValue: 2.0,
+        category: 'infrastructure',
+        requires: { upgrade: 'cpu-upgrade', level: 5 },
+        description: 'Massive server farm for parallel mining operations',
+        maxLevel: 10,
+        unlockReward: 'Unlock the ability to use data center upgrades',
+        benefits: ['+200% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade builds a massive server farm that enables parallel mining operations with increased energy regeneration. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'data-center',
+        name: '🏢 DATA CENTER',
+        level: 0,
+        effect: '+1000 max energy',
+        baseCost: 1500,
+        costMultiplier: 1.25,
+        effectValue: 1000,
+        category: 'infrastructure',
+        requires: { upgrade: 'cooling-system', level: 5 },
+        description: 'Enterprise-grade data center for maximum capacity',
+        maxLevel: 8,
+        unlockReward: 'Unlock the ability to use cloud mining upgrades',
+        benefits: ['+1000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade builds an enterprise-grade data center that provides maximum energy capacity for large-scale mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'cloud-mining',
+        name: '☁️ CLOUD MINING',
+        level: 0,
+        effect: '-20% energy cost',
+        baseCost: 1200,
+        costMultiplier: 1.3,
+        effectValue: -0.2,
+        category: 'infrastructure',
+        requires: { upgrade: 'network-interface', level: 5 },
+        description: 'Cloud-based mining infrastructure for optimal efficiency',
+        maxLevel: 6,
+        unlockReward: 'Unlock the ability to use advanced mining infrastructure',
+        benefits: ['-20% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade implements cloud-based mining infrastructure that provides optimal efficiency through distributed computing resources. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      
+      // 🚀 ADVANCED MINING SYSTEMS
+      {
+        id: 'energy-efficiency',
+        name: '🔋 ENERGY EFFICIENCY',
+        level: 0,
+        effect: '-30% energy cost',
+        baseCost: 5000000,
+        costMultiplier: 4.0,
+        effectValue: -0.3,
+        category: 'advanced',
+        requires: { upgrade: 'quantum-processor', level: 5 },
+        description: 'Master energy efficiency for sustainable mining operations',
+        maxLevel: 3,
+        unlockReward: 'Unlock the ability to use mining mastery upgrades',
+        benefits: ['-30% energy cost', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade masters energy efficiency, allowing for sustainable mining operations with dramatically reduced energy consumption. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'mining-mastery',
+        name: '⚡ MINING MASTERY',
+        level: 0,
+        effect: '+2.0 energy/sec',
+        baseCost: 3000000,
+        costMultiplier: 3.5,
+        effectValue: 2.0,
+        category: 'advanced',
+        requires: { upgrade: 'energy-efficiency', level: 3 },
+        description: 'Achieve mastery over all mining operations',
+        maxLevel: 5,
+        unlockReward: 'Unlock the ability to use quantum mining upgrades',
+        benefits: ['+200% energy/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade achieves mastery over all mining operations, providing exceptional energy regeneration and operational efficiency. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+      },
+      {
+        id: 'quantum-mining',
+        name: '⚛️ QUANTUM MINING',
+        level: 0,
+        effect: '+5000 max energy',
+        baseCost: 2000000,
+        costMultiplier: 3.0,
+        effectValue: 5000,
+        category: 'advanced',
+        requires: { upgrade: 'mining-mastery', level: 3 },
+        description: 'Utilize quantum computing technology for ultimate TBC mining',
+        maxLevel: 1,
+        unlockReward: 'Complete mastery of TBC mining operations',
+        benefits: ['+5000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
+        tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
+        unlockProgress: 0,
+        detailedDescription: 'This upgrade utilizes quantum computing technology to break through traditional mining limitations, providing massive energy capacity for ultimate TBC mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
       }
     ];
   };
@@ -2619,7 +3044,7 @@ export const DivineMiningGame: React.FC = () => {
   //   };
   // }, [getOfflineMiningRate, upgrades]);
 
-  // Enhanced mining rate calculation with divine resonance
+  // Enhanced mining rate calculation with divine resonance and staking bonuses
   const getEnhancedMiningRate = useCallback(() => {
     const miningBoosts = activeBoosts.filter(boost => boost.type === 'mining');
     const baseMultiplier = miningBoosts.reduce((sum, boost) => {
@@ -2636,17 +3061,29 @@ export const DivineMiningGame: React.FC = () => {
     }, 0);
     const enhancedMultiplier = baseMultiplier * (1 + (isNaN(resonanceBonus) ? 0 : resonanceBonus));
     
+    // Apply staking synergy bonuses
+    const stakingBonuses = getStakingBonuses(user?.id?.toString());
+    const stakingMiningBonus = stakingBonuses.miningPointsBonus || 0;
+    const stakingMultiplier = 1.0 + stakingMiningBonus;
+    
     const baseRate = Number(gameState.pointsPerSecond);
-    return (isNaN(baseRate) ? 1.0 : baseRate) * enhancedMultiplier;
-  }, [gameState.pointsPerSecond, activeBoosts, upgrades]);
+    const finalRate = (isNaN(baseRate) ? 1.0 : baseRate) * enhancedMultiplier * stakingMultiplier;
+    
+    // Log staking bonus if active
+    if (stakingMiningBonus > 0) {
+      console.log(`⚡ Staking synergy bonus applied: +${(stakingMiningBonus * 100).toFixed(1)}% mining speed`);
+    }
+    
+    return finalRate;
+  }, [gameState.pointsPerSecond, activeBoosts, upgrades, user?.id]);
 
   // Calculate energy regeneration rate including upgrades
   const getEnergyRegenerationRate = useCallback(() => {
     const baseRegenRate = 0.5; // Base energy regeneration per second
     
-    // Add energy regeneration upgrades
+    // Add energy regeneration upgrades using categorization system
     const energyRegenUpgrades = upgrades.filter(u => 
-      ['psychic-awareness', 'divine-resonance', 'mindful-breathing', 'water-element'].includes(u.id)
+      UPGRADE_CATEGORIES.ENERGY_REGENERATION.includes(u.id)
     );
     
     const regenBonus = energyRegenUpgrades.reduce((sum, u) => {
@@ -2655,13 +3092,16 @@ export const DivineMiningGame: React.FC = () => {
       return sum + ((isNaN(effectValue) ? 0 : effectValue) * (isNaN(level) ? 0 : level));
     }, 0);
     
-    return baseRegenRate + regenBonus;
+    const totalRegen = baseRegenRate + regenBonus;
+    console.log(`Energy regeneration calculation: base=${baseRegenRate}, bonus=${regenBonus}, total=${totalRegen}`);
+    
+    return totalRegen;
   }, [upgrades]);
 
   // Calculate energy efficiency bonus from upgrades
   const getEnergyEfficiencyBonus = useCallback(() => {
     const efficiencyUpgrades = upgrades.filter(u => 
-      ['inner-strength', 'aura-purification', 'energy-mastery', 'air-element'].includes(u.id)
+      UPGRADE_CATEGORIES.ENERGY_EFFICIENCY.includes(u.id)
     );
     
     const efficiencyBonus = efficiencyUpgrades.reduce((sum, u) => {
@@ -2670,12 +3110,15 @@ export const DivineMiningGame: React.FC = () => {
       return sum + ((isNaN(effectValue) ? 0 : effectValue) * (isNaN(level) ? 0 : level));
     }, 0);
     
-    return Math.max(-0.95, efficiencyBonus); // Cap at -95% to prevent negative energy costs
+    const cappedBonus = Math.max(-0.95, efficiencyBonus); // Cap at -95% to prevent negative energy costs
+    console.log(`Energy efficiency calculation: bonus=${efficiencyBonus}, capped=${cappedBonus}`);
+    
+    return cappedBonus;
   }, [upgrades]);
 
   // Sync game state with loaded upgrades on initialization - IMPROVED VERSION
   useEffect(() => {
-    // Calculate total effect from all upgrades, properly categorized
+    // Calculate total effect from all upgrades, properly categorized using new system
     const totalPointsPerSecondEffect = upgrades.reduce((sum, upgrade) => {
       const effectValue = Number(upgrade.effectValue);
       const level = Number(upgrade.level);
@@ -2683,11 +3126,7 @@ export const DivineMiningGame: React.FC = () => {
       const validLevel = isNaN(level) ? 0 : level;
       
       // Only count upgrades that affect points per second (most upgrades)
-      const isPPSUpgrade = !['energy-capacity', 'energy-overflow', 'vibrational-harmony', 'transcendence', 
-                            'space-bending', 'earth-element', 'inner-strength', 'aura-purification', 
-                            'energy-mastery', 'air-element', 'psychic-awareness', 'divine-resonance', 
-                            'mindful-breathing', 'water-element', 'cosmic-consciousness', 'time-dilation', 
-                            'reality-shift'].includes(upgrade.id);
+      const isPPSUpgrade = isPPSUpgradeType(upgrade.id);
       
       return sum + (isPPSUpgrade ? validEffectValue * validLevel : 0);
     }, 0);
@@ -2699,7 +3138,7 @@ export const DivineMiningGame: React.FC = () => {
       const validLevel = isNaN(level) ? 0 : level;
       
       // Only count offline bonus upgrades
-      const isOfflineUpgrade = ['cosmic-consciousness', 'time-dilation'].includes(upgrade.id);
+      const isOfflineUpgrade = UPGRADE_CATEGORIES.OFFLINE_BONUS.includes(upgrade.id);
       
       return sum + (isOfflineUpgrade ? validEffectValue * validLevel : 0);
     }, 0);
@@ -2894,7 +3333,7 @@ export const DivineMiningGame: React.FC = () => {
             baseCost: Math.max(1, sanitizeNumber(upgrade.baseCost, 25)),
             costMultiplier: Math.max(1.01, sanitizeNumber(upgrade.costMultiplier, 1.12)),
             effectValue: sanitizeNumber(upgrade.effectValue, 0),
-            category: upgrade.category || 'chakra',
+            category: upgrade.category || 'hardware',
             description: upgrade.description || 'An upgrade',
             requires: upgrade.requires || undefined,
             detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
@@ -3116,7 +3555,7 @@ export const DivineMiningGame: React.FC = () => {
             baseCost: Math.max(1, upgrade.baseCost || 25),
             costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
             effectValue: upgrade.effectValue || 0,
-            category: upgrade.category || 'chakra',
+            category: upgrade.category || 'hardware',
             description: upgrade.description || 'An upgrade',
             requires: upgrade.requires || undefined,
             detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
@@ -3474,38 +3913,58 @@ export const DivineMiningGame: React.FC = () => {
           upgradesPurchased: prev.upgradesPurchased + 1
         };
         
-        // Handle different types of upgrades with proper effect application
-        if (upgradeId === 'energy-capacity' || upgradeId === 'energy-overflow' || upgradeId === 'vibrational-harmony' || upgradeId === 'transcendence' || upgradeId === 'space-bending' || upgradeId === 'earth-element') {
-          // Energy capacity upgrades
-          newState = {
-            ...newState,
-            maxEnergy: prev.maxEnergy + validEffectValue,
-            currentEnergy: Math.min(prev.currentEnergy, prev.maxEnergy + validEffectValue)
-          };
-        } else if (upgradeId === 'inner-strength' || upgradeId === 'aura-purification' || upgradeId === 'energy-mastery' || upgradeId === 'air-element') {
-          // Energy efficiency upgrades (negative effect values)
-          // These are handled in the mining calculation, no immediate state change needed
-          console.log(`Applied energy efficiency upgrade: ${upgrade.name} with effect ${validEffectValue}`);
-        } else if (upgradeId === 'psychic-awareness' || upgradeId === 'divine-resonance' || upgradeId === 'mindful-breathing' || upgradeId === 'water-element') {
-          // Energy regeneration upgrades
-          // These are handled in the energy regeneration calculation, no immediate state change needed
-          console.log(`Applied energy regeneration upgrade: ${upgrade.name} with effect ${validEffectValue}`);
-        } else if (upgradeId === 'cosmic-consciousness' || upgradeId === 'time-dilation') {
-          // Offline bonus upgrades
-          newState = {
-            ...newState,
-            offlineEfficiencyBonus: prev.offlineEfficiencyBonus + validEffectValue
-          };
-        } else if (upgradeId === 'reality-shift') {
-          // Global bonus upgrades
-          // This affects all bonuses, handled in calculations
-          console.log(`Applied global bonus upgrade: ${upgrade.name} with effect ${validEffectValue}`);
-        } else {
-          // Default: Points per second upgrades (most upgrades fall here)
-          newState = {
-            ...newState,
-            pointsPerSecond: prev.pointsPerSecond + validEffectValue
-          };
+        // Handle different types of upgrades with proper effect application using categorization system
+        const upgradeCategory = getUpgradeCategory(upgradeId);
+        
+        switch (upgradeCategory) {
+          case 'ENERGY_CAPACITY':
+            // Energy capacity upgrades - increase maxEnergy
+            newState = {
+              ...newState,
+              maxEnergy: prev.maxEnergy + validEffectValue,
+              currentEnergy: Math.min(prev.currentEnergy, prev.maxEnergy + validEffectValue)
+            };
+            console.log(`Applied energy capacity upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'ENERGY_EFFICIENCY':
+            // Energy efficiency upgrades (negative effect values) - handled in mining calculation
+            console.log(`Applied energy efficiency upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'ENERGY_REGENERATION':
+            // Energy regeneration upgrades - handled in energy regeneration calculation
+            console.log(`Applied energy regeneration upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'OFFLINE_BONUS':
+            // Offline bonus upgrades - increase offline efficiency
+            newState = {
+              ...newState,
+              offlineEfficiencyBonus: prev.offlineEfficiencyBonus + validEffectValue
+            };
+            console.log(`Applied offline bonus upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'GLOBAL_BONUS':
+            // Global bonus upgrades - affect all bonuses, handled in calculations
+            console.log(`Applied global bonus upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'AUTO_MINING':
+            // Auto-mining upgrades - enable automatic mining
+            console.log(`Applied auto-mining upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
+            
+          case 'POINTS_PER_SECOND':
+          default:
+            // Default: Points per second upgrades (most upgrades fall here)
+            newState = {
+              ...newState,
+              pointsPerSecond: prev.pointsPerSecond + validEffectValue
+            };
+            console.log(`Applied PPS upgrade: ${upgrade.name} with effect ${validEffectValue}`);
+            break;
         }
         
         console.log(`Upgrade applied: ${upgrade.name}`, {
@@ -3702,7 +4161,7 @@ export const DivineMiningGame: React.FC = () => {
 
   // Auto-mining effect
   useEffect(() => {
-    const autoMiningUpgrades = upgrades.filter(u => u.id === 'auto-mining');
+    const autoMiningUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.AUTO_MINING.includes(u.id));
     const hasAutoMining = autoMiningUpgrades.some(u => u.level > 0);
     
     if (!hasAutoMining || gameState.isMining) {
@@ -3797,6 +4256,42 @@ export const DivineMiningGame: React.FC = () => {
     setUpgradeFilter('all');
   }, []);
 
+  // Function to test all upgrade effects
+  const testUpgradeEffects = useCallback(() => {
+    console.log('🧪 Testing all upgrade effects...');
+    
+    // Test energy regeneration
+    const energyRegen = getEnergyRegenerationRate();
+    console.log(`Energy Regeneration: ${energyRegen}/sec`);
+    
+    // Test energy efficiency
+    const energyEfficiency = getEnergyEfficiencyBonus();
+    console.log(`Energy Efficiency Bonus: ${(energyEfficiency * 100).toFixed(1)}%`);
+    
+    // Test enhanced mining rate
+    const enhancedRate = getEnhancedMiningRate();
+    console.log(`Enhanced Mining Rate: ${enhancedRate}/sec`);
+    
+    // Test upgrade categorization
+    upgrades.forEach(upgrade => {
+      const category = getUpgradeCategory(upgrade.id);
+      const isPPS = isPPSUpgradeType(upgrade.id);
+      console.log(`Upgrade ${upgrade.name} (${upgrade.id}): Category=${category}, PPS=${isPPS}, Level=${upgrade.level}, Effect=${upgrade.effectValue}`);
+    });
+    
+    // Test auto-mining
+    const autoMiningUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.AUTO_MINING.includes(u.id));
+    const hasAutoMining = autoMiningUpgrades.some(u => u.level > 0);
+    console.log(`Auto-mining: ${hasAutoMining ? 'ENABLED' : 'DISABLED'}`);
+    
+    // Test offline bonus
+    const offlineUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.OFFLINE_BONUS.includes(u.id));
+    const offlineBonus = offlineUpgrades.reduce((sum, u) => sum + (u.effectValue * u.level), 0);
+    console.log(`Offline Bonus: ${(offlineBonus * 100).toFixed(1)}%`);
+    
+    showSystemNotification('Upgrade Test Complete', 'Check console for detailed upgrade effect analysis', 'info');
+  }, [upgrades, getEnergyRegenerationRate, getEnergyEfficiencyBonus, getEnhancedMiningRate, showSystemNotification]);
+
   // Function to force reload upgrades
   const forceReloadUpgrades = useCallback(() => {
     console.log('🔄 Force reloading upgrades...');
@@ -3821,7 +4316,7 @@ export const DivineMiningGame: React.FC = () => {
             baseCost: Math.max(1, upgrade.baseCost || 25),
             costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
             effectValue: upgrade.effectValue || 0,
-            category: upgrade.category || 'chakra',
+            category: upgrade.category || 'hardware',
             description: upgrade.description || 'An upgrade',
             requires: upgrade.requires || undefined,
             detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
@@ -3934,6 +4429,59 @@ export const DivineMiningGame: React.FC = () => {
     };
   }, [showUpgradeShop, closeUpgradeShop]);
 
+  // Add upgrade categorization system after the interfaces
+  const UPGRADE_CATEGORIES = {
+    // Energy capacity upgrades (increase maxEnergy)
+    ENERGY_CAPACITY: [
+      'energy-capacity', 'energy-overflow', 'vibrational-harmony', 'ultimate-mining-setup',
+      'bandwidth-expander', 'foundation-structure', 'power-supply', 'ram-upgrade',
+      'bandwidth-boost', 'space-bending', 'transcendence'
+    ],
+    
+    // Energy efficiency upgrades (reduce energy consumption - negative effect values)
+    ENERGY_EFFICIENCY: [
+      'inner-strength', 'aura-purification', 'energy-mastery', 'air-element',
+      'power-optimization', 'ventilation-system', 'efficiency-optimizer', 'code-optimization',
+      'thermal-boost'
+    ],
+    
+    // Energy regeneration upgrades (increase energy regen rate)
+    ENERGY_REGENERATION: [
+      'psychic-awareness', 'divine-resonance', 'mindful-breathing', 'water-element',
+      'mining-software', 'machine-learning'
+    ],
+    
+    // Offline bonus upgrades (increase offline mining efficiency)
+    OFFLINE_BONUS: [
+      'mining-acceleration', 'latency-optimizer', 'quantum-superposition', 'time-dilation'
+    ],
+    
+    // Global bonus upgrades (affect all bonuses)
+    GLOBAL_BONUS: [
+      'reality-shift', 'thermal-boost', 'gpu-boost'
+    ],
+    
+    // Auto-mining upgrades (enable automatic mining)
+    AUTO_MINING: [
+      'auto-miner', 'auto-mining'
+    ]
+  };
+
+  // Helper function to categorize upgrades
+  const getUpgradeCategory = (upgradeId: string): string => {
+    for (const [category, ids] of Object.entries(UPGRADE_CATEGORIES)) {
+      if (ids.includes(upgradeId)) {
+        return category;
+      }
+    }
+    return 'POINTS_PER_SECOND'; // Default category
+  };
+
+  // Helper function to check if upgrade is PPS (points per second)
+const isPPSUpgradeType = (upgradeId: string): boolean => {
+  return !Object.values(UPGRADE_CATEGORIES).flat().includes(upgradeId);
+};
+
   return (
     <div className="flex-1 flex flex-col items-center justify-center space-y-4 overflow-y-auto game-scrollbar">
       {/* Loading Screen */}
@@ -3943,13 +4491,13 @@ export const DivineMiningGame: React.FC = () => {
             <div className="text-center space-y-4">
               <div className="w-16 h-16 mx-auto border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
               <div className="text-cyan-400 font-mono font-bold text-lg tracking-wider">
-                LOADING DIVINE MINING
+                INITIALIZING TBC MINING RIG
               </div>
               <div className="text-gray-300 font-mono text-sm">
                 {loadingMessage}
               </div>
               <div className="text-gray-500 font-mono text-xs">
-                Please wait while we initialize your spiritual journey...
+                Please wait while we initialize your mining setup...
               </div>
             </div>
           </div>
@@ -3958,39 +4506,64 @@ export const DivineMiningGame: React.FC = () => {
       
       {/* Compact Centered Divine Mining Card */}
       <div className="relative w-full max-w-xl overflow-hidden game-card-frame">
-        {/* Compact Header */}
-        <div className="relative z-10 flex items-center justify-between mb-4">
-          <div className="flex items-center space-x-3">
-            <div className={`w-3 h-3 rounded-full ${gameState.isMining ? 'bg-green-400 animate-pulse' : 'bg-gray-400'}`}></div>
-            <div>
-              <div className="text-base font-mono font-bold text-cyan-400 tracking-wider">SPIRITUAL AWAKENING</div>
-              <div className="text-xs font-mono text-cyan-300">
-                {gameState.isMining ? 'ENLIGHTENMENT ACTIVE' : 'PREPARING FOR MEDITATION'}
+        {/* Professional Mining Dashboard Header */}
+        <div className="relative z-10 rounded-xl mb-4">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center space-x-4">
+              {/* Mining Status Indicator */}
+              <div className="flex items-center space-x-2">
+                <div className={`w-4 h-4 rounded-full border-2 ${gameState.isMining 
+                  ? 'bg-green-400 border-green-300 animate-pulse shadow-[0_0_10px_rgba(34,197,94,0.6)]' 
+                  : 'bg-gray-500 border-gray-400'
+                }`}></div>
+                <div className="flex flex-col">
+                  <div className="text-sm font-mono font-bold text-white tracking-wider">
+                    DIVINE TAPS
+                  </div>
+                  <div className={`text-sm font-mono font-semibold ${gameState.isMining ? 'text-green-400' : 'text-gray-400'}`}>
+                    {gameState.isMining ? 'ACTIVE MINING' : 'STANDBY MODE'}
+                  </div>
+                </div>
+              </div>
+              
+              {/* Live Stats */}
+              <div className="sm:flex items-center space-x-6 ml-8">
+                <div className="text-center">
+                  <div className="text-sm font-mono font-bold text-cyan-400">HASH RATE</div>
+                  <div className="text-lg font-mono font-bold text-white">
+                    {getBoostedMiningRate().toFixed(1)}/s
+                  </div>
+                </div>
               </div>
             </div>
+            
+            {/* Professional Tier Badge */}
+            {(() => {
+              const currentTier = getCurrentTier(gameState.miningLevel);
+              const tierColors = {
+                green: 'text-green-400 bg-green-900/30 border-green-500/30 hover:bg-green-800/40 hover:border-green-400/50',
+                blue: 'text-blue-400 bg-blue-900/30 border-blue-500/30 hover:bg-blue-800/40 hover:border-blue-400/50',
+                purple: 'text-purple-400 bg-purple-900/30 border-purple-500/30 hover:bg-purple-800/40 hover:border-purple-400/50',
+                yellow: 'text-yellow-400 bg-yellow-900/30 border-yellow-500/30 hover:bg-yellow-800/40 hover:border-yellow-400/50'
+              };
+              return (
+                <button
+                  onClick={() => setShowTierInfo(true)}
+                  className={`text-sm font-mono font-bold px-4 py-2 rounded-lg border-2 flex items-center space-x-2 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-lg ${tierColors[currentTier.color as keyof typeof tierColors]}`}
+                  title="Click for mining tier information"
+                >
+                  <span className="text-lg">{currentTier.symbol}</span>
+                  <div className="flex flex-col">
+                    <span className="text-xs opacity-75">TIER</span>
+                    <span>{currentTier.name}</span>
+                  </div>
+                </button>
+              );
+            })()}
           </div>
-          
-          {/* Compact Tier Badge */}
-          {(() => {
-            const currentTier = getCurrentTier(gameState.miningLevel);
-            const tierColors = {
-              green: 'text-green-400 bg-green-900/30 border-green-500/30 hover:bg-green-800/40 hover:border-green-400/50',
-              blue: 'text-blue-400 bg-blue-900/30 border-blue-500/30 hover:bg-blue-800/40 hover:border-blue-400/50',
-              purple: 'text-purple-400 bg-purple-900/30 border-purple-500/30 hover:bg-purple-800/40 hover:border-purple-400/50',
-              yellow: 'text-yellow-400 bg-yellow-900/30 border-yellow-500/30 hover:bg-yellow-800/40 hover:border-yellow-400/50'
-            };
-            return (
-              <button
-                onClick={() => setShowTierInfo(true)}
-                className={`text-xs font-mono font-bold px-3 py-1.5 rounded-full border flex items-center space-x-1.5 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer ${tierColors[currentTier.color as keyof typeof tierColors]}`}
-                title="Click for tier information"
-              >
-                <span className="text-sm">{currentTier.symbol}</span>
-                <span>{currentTier.name}</span>
-              </button>
-            );
-          })()}
         </div>
+          
+
 
         {/* Compact Main Points Display */}
         <div className="relative z-10 text-center mb-6">
@@ -4005,48 +4578,137 @@ export const DivineMiningGame: React.FC = () => {
           }`}>
             {formatNumber(gameState.divinePoints)}
           </div>
-          <div className="text-sm font-mono text-cyan-400 tracking-wider mb-1">SPIRITUAL ESSENCE</div>
+          <div className="text-sm font-mono text-cyan-400 tracking-wider mb-1">TBC COINS</div>
           <div className="text-sm font-mono text-cyan-300">
-            +{getBoostedMiningRate().toFixed(1)} wisdom/sec
+            +{getBoostedMiningRate().toFixed(1)} TBC/sec
             {gameState.miningCombo > 1.1 && (
               <span className="ml-2 text-yellow-400 font-bold text-base">
-                {gameState.miningCombo.toFixed(1)}x focus
+                {gameState.miningCombo.toFixed(1)}x boost
               </span>
             )}
           </div>
         </div>
 
-        {/* Compact Mining Button */}
+        {/* Professional Mining Control Panel */}
         <div className="relative z-10 flex justify-center items-center mb-8">
-          <button 
-            onClick={toggleMining}
-            disabled={!gameState.isMining && gameState.currentEnergy < 1}
-            className={`
-              relative w-48 h-48 rounded-full transition-all duration-300 font-mono font-bold
-              ${gameState.isMining 
-                ? 'bg-gradient-to-br from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white shadow-[0_0_40px_rgba(239,68,68,0.6)] border-4 border-red-400 hover:shadow-[0_0_50px_rgba(239,68,68,0.8)]' 
-                : gameState.currentEnergy < 1
-                ? 'bg-gradient-to-br from-gray-600 to-gray-500 text-gray-400 cursor-not-allowed border-4 border-gray-400'
-                : 'bg-gradient-to-br from-cyan-600 to-blue-600 hover:from-cyan-500 hover:to-blue-500 text-white shadow-[0_0_40px_rgba(0,255,255,0.6)] border-4 border-cyan-400 hover:shadow-[0_0_50px_rgba(0,255,255,0.8)]'
-              }
-              ${gameState.isMining ? 'animate-pulse' : ''}
-              hover:scale-105 active:scale-95
-            `}
+          <div className="relative">
+            {/* Mining Status Ring */}
+            <div className={`absolute inset-0 w-52 h-52 rounded-full ${gameState.isMining ? 'animate-spin' : ''}`} style={{ animationDuration: '8s' }}>
+              <div className="w-full h-full rounded-full border-4 border-transparent" style={{
+                background: `conic-gradient(${gameState.isMining ? '#00ff88, #0088ff, #8800ff, #ff0088, #00ff88' : '#404040, #404040'})`,
+                padding: '2px'
+              }}>
+                <div className="w-full h-full rounded-full bg-gray-900"></div>
+              </div>
+            </div>
+            
+            {/* Main Mining Button */}
+            <button 
+              onClick={toggleMining}
+              disabled={!gameState.isMining && gameState.currentEnergy < 1}
+              className={`
+                relative w-48 h-48 rounded-full transition-all duration-300 font-mono font-bold z-10
+                ${gameState.isMining 
+                  ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-400 hover:via-red-500 hover:to-red-600 text-white shadow-[0_0_50px_rgba(239,68,68,0.8)] border-2 border-red-300' 
+                  : gameState.currentEnergy < 1
+                  ? 'bg-gradient-to-br from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed border-2 border-gray-500'
+                  : 'bg-gradient-to-br from-green-500 via-cyan-500 to-blue-500 hover:from-green-400 hover:via-cyan-400 hover:to-blue-400 text-white shadow-[0_0_50px_rgba(0,255,255,0.8)] border-2 border-cyan-300'
+                }
+                hover:scale-105 active:scale-95
+                backdrop-blur-sm
+              `}
+            >
+              <div className="flex flex-col items-center justify-center h-full">
+                {/* Mining Icon */}
+                <div className="text-5xl mb-2">
+                  {gameState.isMining ? '⏹️' : gameState.currentEnergy < 1 ? '⚡' : '⛏️'}
+                </div>
+                {/* Mining Status */}
+                <div className="text-lg font-mono font-bold tracking-wider mb-1">
+                  {gameState.isMining ? 'STOP MINING' : gameState.currentEnergy < 1 ? 'LOW POWER' : 'START MINING'}
+                </div>
+                {/* Hash Rate Display */}
+                <div className="text-xs font-mono text-white/80">
+                  {gameState.isMining ? `${getBoostedMiningRate().toFixed(1)} TBC/s` : 'Ready to Mine'}
+                </div>
+                {/* Mining Streak Badge */}
+                {gameState.miningStreak > 0 && (
+                  <div className="absolute -top-3 -right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-sm font-mono font-bold px-3 py-1 rounded-full border-2 border-yellow-300 shadow-[0_0_15px_rgba(251,191,36,0.6)]">
+                    🔥 {gameState.miningStreak}
+                  </div>
+                )}
+              </div>
+            </button>
+          </div>
+        </div>
+
+        <div className="relative z-10 mb-4">
+          <button
+            onClick={() => setShowUpgradeShop(true)}
+            className="w-full flex items-center justify-between p-3 rounded-lg transition-all duration-300 font-mono font-bold border hover:scale-[1.01] active:scale-[0.99] bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-yellow-500/30 group"
           >
-            <div className="flex flex-col items-center justify-center h-full">
-              <div className="text-5xl mb-2">
-                {gameState.isMining ? '⏸️' : gameState.currentEnergy < 1 ? '⚠️' : '▶️'}
-              </div>
-              <div className="text-lg font-mono font-bold tracking-wider">
-                {gameState.isMining ? 'PAUSE' : 'MEDITATE'}
-              </div>
-              {gameState.miningStreak > 0 && (
-                <div className="absolute -top-2 -right-2 bg-yellow-500 text-black text-sm font-mono font-bold px-2 py-1 rounded-full border border-yellow-300 shadow-lg">
-                  {gameState.miningStreak}
+            <div className="flex items-center space-x-2">
+              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+              <span className="text-sm tracking-wider">🕉️ ENHANCEMENTS</span>
+              {gameState.upgradesPurchased > 0 && (
+                <div className="text-xs px-2 py-1 rounded border border-cyan-400/30 bg-cyan-400/10">
+                  {gameState.upgradesPurchased}
                 </div>
               )}
             </div>
+            <div className="flex items-center space-x-2">
+              <div className="text-xs font-mono text-cyan-400">
+                {formatNumber(gameState.divinePoints)} ESSENCE
+              </div>
+              <div className="text-cyan-300">
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                  <path d="M7 10l5 5 5-5z"/>
+                </svg>
+              </div>
+            </div>
           </button>
+        </div>
+        
+        {/* Professional Energy Progress Bar */}
+        <div className="relative z-10 mb-4">
+          <div className="bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-4 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
+            <div className="flex justify-between items-center mb-3">
+              <div className="flex items-center space-x-2">
+                <span className="text-lg">🔋</span>
+                <span className="text-sm font-mono font-bold text-yellow-400">POWER SYSTEM</span>
+              </div>
+              <div className="text-sm font-mono font-bold text-white">
+                {Math.round(gameState.currentEnergy)}/{gameState.maxEnergy} kWh
+              </div>
+            </div>
+            
+            {/* Power Bar */}
+            <div className="relative h-4 bg-gray-800 rounded-full overflow-hidden border border-gray-700">
+              <div
+                className="absolute top-0 left-0 h-full bg-gradient-to-r from-yellow-500 via-orange-500 to-red-500 transition-all duration-500 rounded-full"
+                style={{ width: `${Math.max(0, Math.min(100, (gameState.currentEnergy / gameState.maxEnergy) * 100))}%` }}
+              >
+                <div className="absolute inset-0 bg-gradient-to-r from-transparent via-white/20 to-transparent animate-pulse"></div>
+              </div>
+              
+              {/* Power Level Indicator */}
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-xs font-mono font-bold text-white drop-shadow-lg">
+                  {((gameState.currentEnergy / gameState.maxEnergy) * 100).toFixed(0)}%
+                </span>
+              </div>
+            </div>
+            
+            {/* Power Status */}
+            <div className="flex justify-between items-center mt-2 text-xs font-mono">
+              <span className={`font-bold ${gameState.currentEnergy > gameState.maxEnergy * 0.7 ? 'text-green-400' : gameState.currentEnergy > gameState.maxEnergy * 0.3 ? 'text-yellow-400' : 'text-red-400'}`}>
+                {gameState.currentEnergy > gameState.maxEnergy * 0.7 ? '🟢 OPTIMAL' : gameState.currentEnergy > gameState.maxEnergy * 0.3 ? '🟡 MODERATE' : '🔴 LOW POWER'}
+              </span>
+              <span className="text-gray-400">
+                Regen: +{getEnergyRegenerationRate().toFixed(1)}/sec
+              </span>
+            </div>
+          </div>
         </div>
 
         
@@ -4080,7 +4742,7 @@ export const DivineMiningGame: React.FC = () => {
         </div> */}
 
         {/* Compact Progress Bars */}
-        <div className="relative z-10 space-y-3 mb-6">
+        <div className="relative z-10 space-y-3 mb-4">
           {/* Experience Progress */}
           {/* <div>
             <div className="flex justify-between text-xs font-mono mb-1">
@@ -4098,9 +4760,9 @@ export const DivineMiningGame: React.FC = () => {
           </div> */}
 
           {/* Energy Bar */}
-          <div>
+          {/* <div>
             <div className="flex justify-between text-xs font-mono mb-1">
-              <span className="text-cyan-400 font-medium">Spiritual Energy</span>
+                              <span className="text-cyan-400 font-medium">Mining Power</span>
               <span className="text-cyan-300 font-medium">
                 {Math.round(gameState.currentEnergy)}/{gameState.maxEnergy}
               </span>
@@ -4115,36 +4777,11 @@ export const DivineMiningGame: React.FC = () => {
                 style={{ width: `${(gameState.currentEnergy / gameState.maxEnergy) * 100}%` }}
               />
             </div>
-          </div>
+          </div> */}
         </div>
 
         {/* Compact Upgrade Store Button */}
-        <div className="relative z-10 mb-4">
-          <button
-            onClick={() => setShowUpgradeShop(true)}
-            className="w-full flex items-center justify-between p-3 rounded-lg transition-all duration-300 font-mono font-bold border hover:scale-[1.01] active:scale-[0.99] bg-gradient-to-r from-cyan-900/50 to-blue-900/50 border-cyan-500/50 text-cyan-300 shadow-[0_0_20px_rgba(0,255,255,0.3)] hover:shadow-[0_0_30px_rgba(0,255,255,0.5)] group"
-          >
-            <div className="flex items-center space-x-2">
-              <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-              <span className="text-sm tracking-wider">🕉️ ENHANCEMENTS</span>
-              {gameState.upgradesPurchased > 0 && (
-                <div className="text-xs px-2 py-1 rounded border border-cyan-400/30 bg-cyan-400/10">
-                  {gameState.upgradesPurchased}
-                </div>
-              )}
-            </div>
-            <div className="flex items-center space-x-2">
-              <div className="text-xs font-mono text-cyan-400">
-                {formatNumber(gameState.divinePoints)} ESSENCE
-              </div>
-              <div className="text-cyan-300">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-                  <path d="M7 10l5 5 5-5z"/>
-                </svg>
-              </div>
-            </div>
-          </button>
-        </div>
+      
 
         {/* Compact Status */}
         <div className="relative z-10 flex justify-between items-center text-xs font-mono text-gray-400 bg-gray-900/20 rounded-lg p-3 border border-gray-600/30">
@@ -4240,8 +4877,8 @@ export const DivineMiningGame: React.FC = () => {
               <div className="flex items-center space-x-2">
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
                 <div>
-                  <h2 className="text-lg font-mono font-bold text-cyan-300 tracking-wider">🕉️ SPIRITUAL ENHANCEMENTS</h2>
-                  <p className="text-xs font-mono text-cyan-400">Awaken new abilities and deepen your journey</p>
+                  <h2 className="text-lg font-mono font-bold text-cyan-300 tracking-wider">🔧 TBC MINING UPGRADES</h2>
+                  <p className="text-xs font-mono text-cyan-400">Enhance your mining operation with advanced equipment</p>
                 </div>
               </div>
               <div className="flex items-center space-x-2">
@@ -4249,7 +4886,7 @@ export const DivineMiningGame: React.FC = () => {
                   <div className="text-sm font-mono font-bold text-cyan-300">
                     {formatNumber(gameState.divinePoints)}
                   </div>
-                  <div className="text-xs font-mono text-cyan-400">SPIRITUAL ESSENCE</div>
+                  <div className="text-xs font-mono text-cyan-400">TBC COINS</div>
                 </div>
                 <button
                   onClick={closeUpgradeShop}
@@ -4267,7 +4904,7 @@ export const DivineMiningGame: React.FC = () => {
             <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
               {/* Filter Tabs */}
               <div className="flex space-x-2 mb-4 overflow-x-auto pb-2">
-                {['all', 'affordable', 'recommended', 'chakra', 'mastery', 'meditation', 'cosmic', 'elemental'].map((filter) => (
+                {['all', 'affordable', 'recommended', 'hardware', 'advanced', 'software', 'network', 'infrastructure'].map((filter) => (
                   <button
                     key={filter}
                     onClick={() => {
@@ -4380,7 +5017,7 @@ export const DivineMiningGame: React.FC = () => {
                                   ? 'Maximum level reached' 
                                   : canAfford 
                                   ? 'Click to purchase' 
-                                  : 'Not enough spiritual essence'
+                                  : 'Not enough TBC coins'
                               }
                             >
                               {purchasingUpgrade === upgrade.id ? '⏳' : !isAvailable ? '🔒' : isMaxed ? 'MAX' : canAfford ? 'BUY' : '💰'}
@@ -4397,21 +5034,21 @@ export const DivineMiningGame: React.FC = () => {
                         ? 'No affordable upgrades available' 
                         : upgradeFilter === 'recommended' 
                         ? 'No recommended upgrades available' 
-                        : upgradeFilter === 'chakra' 
-                        ? 'No chakra upgrades available' 
-                        : upgradeFilter === 'mastery' 
-                        ? 'No mastery upgrades available' 
-                        : upgradeFilter === 'meditation' 
-                        ? 'No meditation upgrades available' 
-                        : upgradeFilter === 'cosmic' 
-                        ? 'No cosmic upgrades available' 
-                        : upgradeFilter === 'elemental' 
-                        ? 'No elemental upgrades available' 
+                        : upgradeFilter === 'hardware' 
+                        ? 'No hardware upgrades available' 
+                        : upgradeFilter === 'advanced' 
+                        ? 'No advanced upgrades available' 
+                        : upgradeFilter === 'software' 
+                        ? 'No software upgrades available' 
+                        : upgradeFilter === 'network' 
+                        ? 'No network upgrades available' 
+                        : upgradeFilter === 'infrastructure' 
+                        ? 'No infrastructure upgrades available' 
                         : 'No upgrades available'
                       }
                     </div>
                     <div className="text-gray-500 font-mono text-xs">
-                      Try a different filter or earn more spiritual essence
+                      Try a different filter or earn more TBC coins
                     </div>
                   </div>
                 )}
@@ -4481,6 +5118,13 @@ export const DivineMiningGame: React.FC = () => {
                 {/* Debug Buttons */}
                 <div className="mt-3 pt-2 border-t border-gray-600/20 text-center space-y-2">
                   <button
+                    onClick={testUpgradeEffects}
+                    className="px-3 py-1 rounded text-xs font-mono bg-green-700/50 text-green-300 border border-green-600 hover:bg-green-600/50 hover:text-green-200 transition-all duration-300"
+                    title="Test all upgrade effects and check console for detailed analysis"
+                  >
+                    🧪 TEST EFFECTS
+                  </button>
+                  <button
                     onClick={debugUpgradeSystem}
                     className="px-3 py-1 rounded text-xs font-mono bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-600/50 hover:text-gray-200 transition-all duration-300"
                     title="Debug upgrade system and check console for detailed analysis"
@@ -4529,7 +5173,7 @@ export const DivineMiningGame: React.FC = () => {
                 <div className="mt-4 space-y-2 text-left">
                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
                     <span className="text-red-400">•</span>
-                    <span>All divine points ({formatNumber(gameState.divinePoints)})</span>
+                    <span>All TBC coins ({formatNumber(gameState.divinePoints)})</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
                     <span className="text-red-400">•</span>
@@ -4557,7 +5201,7 @@ export const DivineMiningGame: React.FC = () => {
                   </div>
                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
                     <span className="text-red-400">•</span>
-                    <span>Completed tasks and gems</span>
+                    <span>Completed tasks and TBC coins</span>
                   </div>
                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
                     <span className="text-red-400">•</span>
@@ -4601,7 +5245,7 @@ export const DivineMiningGame: React.FC = () => {
                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
                 <div>
                   <h2 className="text-base font-mono font-bold text-cyan-300 tracking-wider">🌟 TIERS</h2>
-                  <p className="text-xs font-mono text-cyan-400">Spiritual journey</p>
+                  <p className="text-xs font-mono text-cyan-400">Mining journey</p>
                 </div>
               </div>
               <button

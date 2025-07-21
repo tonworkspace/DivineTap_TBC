@@ -110,6 +110,11 @@ const generateMockDivinePlayers = (): DivinePlayer[] => {
 export const DivinePointsLeaderboard: React.FC = () => {
   const { user } = useAuth();
   const [currentTab, setCurrentTab] = useState<'all_time' | 'daily' | 'weekly' | 'monthly'>('all_time');
+  const [searchTerm, setSearchTerm] = useState('');
+  const [showOnlyTop10, setShowOnlyTop10] = useState(false);
+  const [showOnlyActive, setShowOnlyActive] = useState(false);
+  const [showFilters, setShowFilters] = useState(false);
+  const [showStats, setShowStats] = useState(false);
   const [leaderboardData, setLeaderboardData] = useState<LeaderboardData>({
     topPlayers: [],
     dailyWinners: [],
@@ -258,13 +263,46 @@ export const DivinePointsLeaderboard: React.FC = () => {
   }, [user?.id, userDivinePoints]);
 
   const getCurrentTabData = () => {
+    let data: DivinePlayer[] = [];
+    
     switch (currentTab) {
-      case 'all_time': return leaderboardData.topPlayers;
-      case 'daily': return leaderboardData.dailyWinners;
-      case 'weekly': return leaderboardData.weeklyWinners;
-      case 'monthly': return leaderboardData.monthlyWinners;
-      default: return leaderboardData.topPlayers;
+      case 'all_time': 
+        data = leaderboardData.topPlayers;
+        break;
+      case 'daily': 
+        data = leaderboardData.dailyWinners;
+        break;
+      case 'weekly': 
+        data = leaderboardData.weeklyWinners;
+        break;
+      case 'monthly': 
+        data = leaderboardData.monthlyWinners;
+        break;
+      default: 
+        data = leaderboardData.topPlayers;
     }
+
+    // Apply search filter
+    if (searchTerm.trim()) {
+      data = data.filter(player => 
+        player.username.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        player.firstName?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+        player.lastName?.toLowerCase().includes(searchTerm.toLowerCase())
+      );
+    }
+
+    // Apply top 10 filter
+    if (showOnlyTop10) {
+      data = data.slice(0, 10);
+    }
+
+    // Apply active players filter (active in last 24 hours)
+    if (showOnlyActive) {
+      const oneDayAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+      data = data.filter(player => new Date(player.lastActive) > oneDayAgo);
+    }
+
+    return data;
   };
 
   const refreshLeaderboard = async () => {
@@ -343,7 +381,7 @@ export const DivinePointsLeaderboard: React.FC = () => {
         <div className="flex items-center justify-between mb-3">
           <div className="flex items-center space-x-2">
             <GiDiamonds className="text-cyan-400 text-xl" />
-            <span className="text-cyan-400 font-mono font-bold tracking-wider text-lg">DIVINE POINTS LEADERBOARD</span>
+                          <span className="text-cyan-400 font-mono font-bold tracking-wider text-lg">LEADERBOARD</span>
             <GiDiamonds className="text-cyan-400 text-xl" />
           </div>
           
@@ -417,70 +455,84 @@ export const DivinePointsLeaderboard: React.FC = () => {
           </div>
         </div>
 
-        {/* Global Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-3">
-          <div className="bg-black/30 rounded-lg p-2 text-center">
-            <div className="text-cyan-400 font-mono text-xs tracking-wider">TOTAL PLAYERS</div>
-            <div className="text-white font-bold text-sm">{formatNumber(stats.totalPlayers)}</div>
-          </div>
-          <div className="bg-black/30 rounded-lg p-2 text-center">
-            <div className="text-yellow-400 font-mono text-xs tracking-wider">TOTAL POINTS</div>
-            <div className="text-white font-bold text-sm">{formatNumber(stats.totalDivinePoints)}</div>
-          </div>
-          <div className="bg-black/30 rounded-lg p-2 text-center">
-            <div className="text-green-400 font-mono text-xs tracking-wider">AVG POINTS</div>
-            <div className="text-white font-bold text-sm">{formatNumber(Math.floor(stats.averageDivinePoints))}</div>
-          </div>
-          <div className="bg-black/30 rounded-lg p-2 text-center">
-            <div className="text-purple-400 font-mono text-xs tracking-wider">MAX POINTS</div>
-            <div className="text-white font-bold text-sm">{formatNumber(stats.maxDivinePoints)}</div>
+        {/* Global Stats Toggle */}
+        <div className="flex items-center justify-between mb-2">
+          <button
+            onClick={() => setShowStats(!showStats)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-300 ${
+              showStats
+                ? 'bg-yellow-500/30 text-yellow-300 border border-yellow-400/50'
+                : 'bg-black/40 text-gray-400 border border-gray-600 hover:text-yellow-300 hover:border-yellow-400/30'
+            }`}
+          >
+            {showStats ? 'Hide Stats' : 'Show Stats'}
+          </button>
+          
+          {/* Quick Stats Preview (always visible) */}
+          <div className="flex items-center gap-4 text-xs text-gray-400">
+            <span className="font-mono">
+              <span className="text-cyan-400">{formatNumber(stats.totalPlayers)}</span> players
+            </span>
+            <span className="font-mono">
+              <span className="text-yellow-400">{formatNumber(stats.totalDivinePoints)}</span> total
+            </span>
           </div>
         </div>
 
+        {/* Collapsible Global Stats */}
+        {showStats && (
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2 mb-3">
+            <div className="bg-black/30 rounded-lg p-3 text-center border border-cyan-400/20">
+              <div className="text-cyan-400 font-mono text-xs tracking-wider mb-1">DIVINE PLAYERS</div>
+              <div className="text-white font-bold text-lg">{formatNumber(stats.totalPlayers)}</div>
+            </div>
+            <div className="bg-black/30 rounded-lg p-3 text-center border border-yellow-400/20">
+              <div className="text-yellow-400 font-mono text-xs tracking-wider mb-1">TOTAL POINTS</div>
+              <div className="text-white font-bold text-lg">{formatNumber(stats.totalDivinePoints)}</div>
+            </div>
+            <div className="bg-black/30 rounded-lg p-3 text-center border border-green-400/20">
+              <div className="text-green-400 font-mono text-xs tracking-wider mb-1">AVG POINTS</div>
+              <div className="text-white font-bold text-lg">{formatNumber(Math.floor(stats.averageDivinePoints))}</div>
+            </div>
+            <div className="bg-black/30 rounded-lg p-3 text-center border border-purple-400/20">
+              <div className="text-purple-400 font-mono text-xs tracking-wider mb-1">MAX POINTS</div>
+              <div className="text-white font-bold text-lg">{formatNumber(stats.maxDivinePoints)}</div>
+            </div>
+          </div>
+        )}
+
         {/* User Stats */}
         {user && (
-          <div className="flex gap-2 mb-3">
-            <div className="flex-1 relative bg-black/40 backdrop-blur-xl border border-cyan-400/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-              <div className="flex items-center gap-2">
+          <div className="bg-black/40 backdrop-blur-xl border border-cyan-400/20 rounded-xl p-3 mb-3 shadow-[0_0_20px_rgba(0,255,255,0.05)]">
+            <div className="flex flex sm:flex-row sm:items-center justify-between gap-3">
+              {/* User Rank */}
+              <div className="flex items-center gap-3">
                 <div className="w-8 h-8 bg-gradient-to-br from-cyan-400 to-blue-500 rounded-lg flex items-center justify-center">
                   <span className="text-white text-xs font-bold">YOU</span>
                 </div>
-                <div>
-                  <div className="text-cyan-400 font-mono font-bold text-sm tracking-wider">
-                    #{userRank || 'N/A'}
-                    {previousUserRank && userRank && previousUserRank !== userRank && (
-                      <span className={`ml-2 text-xs ${
-                        userRank < previousUserRank ? 'text-green-400' : 'text-red-400'
-                      }`}>
-                        {userRank < previousUserRank ? '↗' : '↘'}
-                      </span>
-                    )}
-                  </div>
-                  <div className="text-cyan-300 text-xs font-mono uppercase tracking-wider">Rank</div>
+                <div className="flex items-center gap-2">
+                  <span className="text-cyan-400 font-mono font-bold text-sm">#{userRank || 'N/A'}</span>
+                  {previousUserRank && userRank && previousUserRank !== userRank && (
+                    <span className={`text-xs ${
+                      userRank < previousUserRank ? 'text-green-400' : 'text-red-400'
+                    }`}>
+                      {userRank < previousUserRank ? '↗' : '↘'}
+                    </span>
+                  )}
                 </div>
               </div>
-            </div>
 
-            <div className="flex-1 relative bg-black/40 backdrop-blur-xl border border-yellow-400/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
-              <div className="flex items-center gap-2">
-                <GiDiamonds className="text-yellow-400 text-lg" />
-                <div>
-                  <div className="text-yellow-400 font-mono font-bold text-sm tracking-wider">
-                    {formatNumber(userDivinePoints)}
+              {/* Stats */}
+              <div className="flex items-center gap-4">
+                {/* Mining Rate */}
+                <div className="flex items-center gap-2">
+                  <GiLightningArc className="text-green-400 text-base" />
+                  <div className="text-right">
+                    <div className="text-green-400 font-mono font-bold text-sm">
+                      +{userPointsPerSecond.toFixed(1)}/s
+                    </div>
+                    <div className="text-green-300 text-xs font-mono">Hash Rate</div>
                   </div>
-                  <div className="text-yellow-300 text-xs font-mono uppercase tracking-wider">Divine Points</div>
-                </div>
-              </div>
-            </div>
-
-            <div className="flex-1 relative bg-black/40 backdrop-blur-xl border border-green-400/30 rounded-xl p-3 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-              <div className="flex items-center gap-2">
-                <GiLightningArc className="text-green-400 text-lg" />
-                <div>
-                  <div className="text-green-400 font-mono font-bold text-sm tracking-wider">
-                    +{userPointsPerSecond.toFixed(1)}/s
-                  </div>
-                  <div className="text-green-300 text-xs font-mono uppercase tracking-wider">Mining Rate</div>
                 </div>
               </div>
             </div>
@@ -488,27 +540,132 @@ export const DivinePointsLeaderboard: React.FC = () => {
         )}
       </div>
 
-      {/* Tab Navigation */}
-      <div className="flex gap-1 bg-black/20 rounded-lg p-1">
-        {[
-          { key: 'all_time', label: 'All Time', icon: <FaCrown /> },
-          { key: 'daily', label: 'Daily', icon: <BiTime /> },
-          { key: 'weekly', label: 'Weekly', icon: <BiTrendingUp /> },
-          { key: 'monthly', label: 'Monthly', icon: <BiStar /> }
-        ].map((tab) => (
+      {/* Compact Filter & Search */}
+      <div className="bg-black/20 rounded-lg p-2">
+        {/* Filter Toggle & Tab Navigation */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 mb-2">
           <button
-            key={tab.key}
-            onClick={() => setCurrentTab(tab.key as any)}
-            className={`flex-1 flex items-center justify-center gap-2 py-2 px-3 rounded-md text-xs font-mono transition-all duration-300 ${
-              currentTab === tab.key
+            onClick={() => setShowFilters(!showFilters)}
+            className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-300 ${
+              showFilters
                 ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50'
-                : 'text-gray-400 hover:text-cyan-300 hover:bg-black/30'
+                : 'bg-black/40 text-gray-400 border border-gray-600 hover:text-cyan-300 hover:border-cyan-400/30'
             }`}
           >
-            {tab.icon}
-            {tab.label}
+            {showFilters ? 'Hide Filters' : 'Show Filters'}
           </button>
-        ))}
+
+          {/* Compact Tab Navigation */}
+          <div className="flex gap-1 flex-1 sm:flex-none">
+            {[
+              { key: 'all_time', label: 'All Time', icon: <FaCrown /> },
+              { key: 'daily', label: 'Daily', icon: <BiTime /> },
+              { key: 'weekly', label: 'Weekly', icon: <BiTrendingUp /> },
+              { key: 'monthly', label: 'Monthly', icon: <BiStar /> }
+            ].map((tab) => (
+              <button
+                key={tab.key}
+                onClick={() => setCurrentTab(tab.key as any)}
+                className={`flex-1 sm:flex-none flex items-center justify-center gap-1 py-1.5 px-2 rounded text-xs font-mono transition-all duration-300 ${
+                  currentTab === tab.key
+                    ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50'
+                    : 'text-gray-400 hover:text-cyan-300 hover:bg-black/30'
+                }`}
+              >
+                <span className="hidden sm:inline">{tab.icon}</span>
+                <span className="text-xs">{tab.label}</span>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Collapsible Filter Content */}
+        {showFilters && (
+          <div className="space-y-2 border-t border-gray-600/30 pt-2">
+            {/* Search Bar */}
+            <div className="flex flex-col sm:flex-row gap-2">
+              <div className="flex-1 relative">
+                <input
+                  type="text"
+                  placeholder="Search players..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="w-full bg-black/40 border border-cyan-400/30 rounded-lg px-3 py-2 text-white text-sm placeholder-gray-400 focus:outline-none focus:border-cyan-400/60 transition-colors"
+                />
+                {searchTerm && (
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="absolute right-2 top-1/2 transform -translate-y-1/2 text-gray-400 hover:text-white"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+              
+              <button
+                onClick={() => setShowOnlyTop10(!showOnlyTop10)}
+                className={`px-3 py-2 rounded-lg text-xs font-mono transition-all duration-300 ${
+                  showOnlyTop10
+                    ? 'bg-cyan-500/30 text-cyan-300 border border-cyan-400/50'
+                    : 'bg-black/40 text-gray-400 border border-gray-600 hover:text-cyan-300 hover:border-cyan-400/30'
+                }`}
+              >
+                Top 10
+              </button>
+            </div>
+
+            {/* Filter Buttons */}
+            <div className="flex flex-wrap gap-2 justify-center">
+              <button
+                onClick={() => setShowOnlyActive(!showOnlyActive)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-mono transition-all duration-300 ${
+                  showOnlyActive
+                    ? 'bg-green-500/30 text-green-300 border border-green-400/50'
+                    : 'bg-black/40 text-gray-400 border border-gray-600 hover:text-green-300 hover:border-green-400/30'
+                }`}
+              >
+                Active (24h)
+              </button>
+              
+              {(searchTerm || showOnlyTop10 || showOnlyActive) && (
+                <button
+                  onClick={() => {
+                    setSearchTerm('');
+                    setShowOnlyTop10(false);
+                    setShowOnlyActive(false);
+                  }}
+                  className="px-3 py-1.5 rounded-lg text-xs font-mono bg-red-500/20 text-red-300 border border-red-400/30 hover:bg-red-500/30 transition-all duration-300"
+                >
+                  Clear All
+                </button>
+              )}
+            </div>
+
+            {/* Results Count */}
+            <div className="text-center text-gray-400 text-xs font-mono">
+              Showing {getCurrentTabData().length} players
+              {searchTerm && ` matching "${searchTerm}"`}
+              {showOnlyTop10 && ' (Top 10 only)'}
+              {showOnlyActive && ' (Active only)'}
+            </div>
+          </div>
+        )}
+
+        {/* Always show active filters indicator */}
+        {(searchTerm || showOnlyTop10 || showOnlyActive) && !showFilters && (
+          <div className="flex flex-wrap items-center justify-center gap-2 text-xs text-cyan-300 font-mono">
+            <span>Filters active:</span>
+            {searchTerm && <span className="bg-cyan-500/20 px-2 py-1 rounded">Search: "{searchTerm}"</span>}
+            {showOnlyTop10 && <span className="bg-cyan-500/20 px-2 py-1 rounded">Top 10</span>}
+            {showOnlyActive && <span className="bg-green-500/20 px-2 py-1 rounded">Active</span>}
+            <button
+              onClick={() => setShowFilters(true)}
+              className="text-cyan-400 hover:text-cyan-300 underline"
+            >
+              Edit
+            </button>
+          </div>
+        )}
       </div>
 
       {/* Leaderboard */}

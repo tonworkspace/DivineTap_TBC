@@ -3,13 +3,10 @@ import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { OnboardingScreen } from './OnboardingScreen';
 import { DivineMiningGame } from '@/components/DivineMiningGame';
-import { DailyRewards } from '@/components/DailyRewards';
 import { DivinePointsLeaderboard } from '@/components/DivinePointsLeaderboard';
 import { TaskCenter } from '@/components/TaskCenter';
 import { ReferralSystem } from '@/components/ReferralSystem';
-// import { useTonAddress } from '@tonconnect/ui-react';
-// import { isValidAddress } from '@/utility/address';
-// import { Address } from '@ton/core';
+import { useTonAddress, TonConnectButton, useTonConnectUI } from '@tonconnect/ui-react';
 import { useReferralIntegration } from '@/hooks/useReferralIntegration';
 import { GameProvider, useGameContext } from '@/contexts/GameContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
@@ -22,6 +19,8 @@ import {
 import { BiHome } from 'react-icons/bi';
 // Import gem sync test utilities for debugging
 import '@/utils/gemSyncTest';
+import DailyRewards from '@/components/DailyRewards';
+
 
 
 // interface GameState {
@@ -44,58 +43,98 @@ import '@/utils/gemSyncTest';
 // }
 
 // Header component that uses GameContext
-const GameHeader: FC<{ user: any; currentTab: string }> = ({ user, currentTab }) => {
-  const { gems } = useGameContext();
+const GameHeader: FC<{ 
+  user: any; 
+  currentTab: string; 
+  userFriendlyAddress?: string;
+  walletBalance: string;
+  isLoadingBalance: boolean;
+  NETWORK_NAME: string;
+  fetchWalletBalance: () => void;
+}> = ({ user, userFriendlyAddress, walletBalance, isLoadingBalance }) => {
+  const { gems, } = useGameContext();
+  
+  // Helper function to format numbers
+  const formatNumber = (num: number) => {
+    if (num >= 1000000) return `${(num / 1000000).toFixed(1)}M`;
+    if (num >= 1000) return `${(num / 1000).toFixed(1)}K`;
+    return num.toString();
+  };
   
   return (
-    <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 mb-2 shadow-[0_0_30px_rgba(0,255,255,0.1)] overflow-hidden game-card-frame">
+    <div className="relative bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-yellow-500/30 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-4 mb-2 shadow-[0_0_30px_rgba(0,255,255,0.1)] overflow-hidden game-card-frame">
       {/* Futuristic Corner Accents */}
-      <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-cyan-400 corner-accent"></div>
-      <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-cyan-400 corner-accent"></div>
-      <div className="absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 border-cyan-400 corner-accent"></div>
-      <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-cyan-400 corner-accent"></div>
+      <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-yellow-500/30 corner-accent"></div>
+      <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-yellow-500/30 corner-accent"></div>
+      <div className="absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 border-yellow-500/30 corner-accent"></div>
+      <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-yellow-500/30 corner-accent"></div>
       
       {/* Dynamic Background Glow */}
       <div className="absolute inset-0 rounded-xl transition-all duration-1000 bg-gradient-to-br from-cyan-500/10 via-blue-500/5 to-purple-500/10 animate-pulse"></div>
       
       {/* Single Line Content */}
       <div className="relative z-10 flex items-center justify-between space-x-2">
-        {/* Status + Title */}
-        <div className="flex items-center space-x-1.5">
-          <div className="w-2 h-2 bg-gradient-to-r from-cyan-400 to-cyan-500 rounded-full animate-pulse shadow-lg shadow-cyan-400/50"></div>
-          <span className="text-cyan-400 font-mono font-bold text-[10px] tracking-wider">MINING</span>
-          <div className="w-px h-3 bg-gradient-to-b from-transparent via-cyan-500/50 to-transparent"></div>
-          <div className="text-cyan-300 font-mono text-[9px] font-medium">
-            {currentTab === 'zodiac' ? 'ACTIVE' : 'ONLINE'}
-          </div>
-        </div>
-        
-        {/* Stats Section */}
-        <div className="flex items-center space-x-3">
-          {/* Gems */}
-          <div className="flex items-center space-x-1">
-            <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></div>
-            <span className="text-purple-400 font-mono font-bold text-[9px] uppercase">💎</span>
-            <span className="text-purple-300 font-mono font-bold text-sm">
-              {gems >= 1000 ? `${(gems / 1000).toFixed(1)}K` : gems.toString()}
-            </span>
-          </div>
-          
-          {/* Separator */}
-          <div className="w-px h-3 bg-gradient-to-b from-transparent via-gray-500/50 to-transparent"></div>
-        </div>
-        
+         
         {/* User Badge */}
         {user?.username && (
           <div className="flex items-center space-x-1 bg-gradient-to-r from-gray-900/80 to-black/80 rounded-full px-1.5 py-0.5 border border-cyan-500/30 backdrop-blur-sm">
             <div className="w-4 h-4 bg-gradient-to-br from-cyan-400 to-blue-600 rounded-full flex items-center justify-center text-[10px] font-bold text-black shadow-lg">
               {user.username.charAt(0).toUpperCase()}
             </div>
-            <span className="text-cyan-300 font-mono font-bold text-[10px] truncate max-w-[100px]">
+            <span className="text-cyan-300 font-mono font-bold text-[10px] truncate max-w-[80px]">
               {user.username}
             </span>
           </div>
         )}
+
+        {/* Stats Section */}
+        <div className="flex items-center space-x-2">
+          {/* TBC Balance */}
+          {/* <div className="flex items-center space-x-1">
+            <div className="w-1.5 h-1.5 bg-yellow-400 rounded-full animate-pulse"></div>
+            <span className="text-yellow-400 font-mono font-bold text-[9px] uppercase">💰</span>
+            <span className="text-yellow-300 font-mono font-bold text-sm">
+              {formatNumber(points)} TBC
+            </span>
+          </div> */}
+          
+          {/* Separator */}
+          <div className="w-px h-3 bg-gradient-to-b from-transparent via-gray-500/50 to-transparent"></div>
+          
+          {/* Gems */}
+          <div className="flex items-center space-x-1">
+            <div className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse"></div>
+            <span className="text-purple-400 font-mono font-bold text-[9px] uppercase">💎</span>
+            <span className="text-purple-300 font-mono font-bold text-[11px]">
+              {formatNumber(gems)}
+            </span>
+          </div>
+
+          {/* Wallet Balance */}
+          {userFriendlyAddress && (
+            <>
+              {/* Separator */}
+              <div className="w-px h-3 bg-gradient-to-b from-transparent via-gray-500/50 to-transparent"></div>
+              
+              {/* TON Balance */}
+              <div className="flex items-center space-x-1">
+                <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                <span className="text-green-400 font-mono font-bold text-[9px] uppercase">⚡</span>
+                <span className="text-green-300 font-mono font-bold text-[11px]">
+                  {isLoadingBalance ? (
+                    <span className="inline-flex items-center">
+                      <div className="w-2.5 h-2.5 border border-green-400 border-t-transparent rounded-full animate-spin mr-1"></div>
+                      ...
+                    </span>
+                  ) : (
+                    formatNumber(Number(walletBalance))
+                  )} TON
+                </span>
+              </div>
+            </>
+          )}
+        </div>
+       
       </div>
     </div>
   );
@@ -109,10 +148,91 @@ export const IndexPage: FC = () => {
   const { theme } = useTheme();
   const [currentTab, setCurrentTab] = useState('zodiac');
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
-  // const connectedAddressString = useTonAddress();
+  
+  // TON Wallet State
+  const userFriendlyAddress = useTonAddress();
+  const [tonConnectUI] = useTonConnectUI();
+  const [walletBalance, setWalletBalance] = useState<string>('0');
+  const [isLoadingBalance, setIsLoadingBalance] = useState(false);
+  
+  // TON Network Configuration
+  const isMainnet = false; // You can toggle this for testing
+  const NETWORK_NAME = isMainnet ? 'Mainnet' : 'Testnet';
+  const MAINNET_API_KEY = 'ba0e3b7f5080add7ba9bc310b2652ce4d33654575152d5ab90fde863309f6118';
+  const TESTNET_API_KEY = 'bb31868e5cf6529efb16bcf547beb3c534a28d1e139bd63356fd936c168fe662';
   
   // Add referral integration
   useReferralIntegration();
+  
+  // Function to fetch wallet balance from TON Center API
+  const fetchWalletBalance = async () => {
+    if (!userFriendlyAddress) {
+      setWalletBalance('0');
+      return;
+    }
+
+    setIsLoadingBalance(true);
+    try {
+      const apiKey = isMainnet ? MAINNET_API_KEY : TESTNET_API_KEY;
+      const baseUrl = isMainnet ? 'https://toncenter.com/api/v2' : 'https://testnet.toncenter.com/api/v2';
+      
+      // Fetch wallet balance from TON Center API
+      const response = await fetch(`${baseUrl}/getAddressBalance?address=${userFriendlyAddress}`, {
+        headers: {
+          'X-API-Key': apiKey
+        }
+      });
+
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
+
+      const data = await response.json();
+      
+      if (data.ok) {
+        // Convert nano TON to TON (1 TON = 1,000,000,000 nano TON)
+        const balanceInNano = parseInt(data.result);
+        const balanceInTon = balanceInNano / 1_000_000_000;
+        setWalletBalance(balanceInTon.toFixed(4));
+        console.log(`💰 Wallet balance updated: ${balanceInTon.toFixed(4)} TON (${NETWORK_NAME})`);
+      } else {
+        console.error('API error:', data.error);
+        setWalletBalance('0');
+      }
+    } catch (error) {
+      console.error('Error fetching wallet balance:', error);
+      setWalletBalance('0');
+    } finally {
+      setIsLoadingBalance(false);
+    }
+  };
+
+  // Function to disconnect wallet
+  const handleDisconnectWallet = async () => {
+    try {
+      await tonConnectUI.disconnect();
+      setWalletBalance('0');
+      console.log('🔌 Wallet disconnected successfully');
+    } catch (error) {
+      console.error('Error disconnecting wallet:', error);
+    }
+  };
+
+  // Fetch wallet balance when wallet is connected
+  useEffect(() => {
+    fetchWalletBalance();
+  }, [userFriendlyAddress]);
+
+  // Refresh wallet balance every 30 seconds when connected
+  useEffect(() => {
+    if (!userFriendlyAddress) return;
+
+    const interval = setInterval(() => {
+      fetchWalletBalance();
+    }, 30000); // 30 seconds
+
+    return () => clearInterval(interval);
+  }, [userFriendlyAddress]);
   
   // Monitor network status
   useEffect(() => {
@@ -350,7 +470,7 @@ export const IndexPage: FC = () => {
           {/* Futuristic Loading Text */}
           <div className="text-center space-y-3">
             <div className="text-2xl font-mono font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 animate-pulse transition-all duration-1000 tracking-wider">
-              ⚡ CYBERPUNK REALM ⚡
+              ⚡ DIVINE TAPSTERS ⚡
             </div>
             <div className="text-sm text-cyan-300 font-mono font-medium transition-all duration-1000 tracking-wide">
               Initializing neural interface...
@@ -494,8 +614,67 @@ export const IndexPage: FC = () => {
          <div className="flex-1 pb-20 px-4 pt-4 max-w-md mx-auto">
            
            {/* Ultra-Compact Cyberpunk Stats Header */}
-           <GameHeader user={user} currentTab={currentTab} />
+           {userFriendlyAddress && (
+             <GameHeader 
+               user={user} 
+               currentTab={currentTab}
+               userFriendlyAddress={userFriendlyAddress}
+               walletBalance={walletBalance}
+               isLoadingBalance={isLoadingBalance}
+               NETWORK_NAME={NETWORK_NAME}
+               fetchWalletBalance={fetchWalletBalance}
+             />
+           )}
 
+           {/* Compact Wallet Connection Section */}
+           {!userFriendlyAddress && (
+             <div className="bg-gradient-to-r from-orange-900/30 to-red-900/30 border border-orange-500/20 rounded-lg p-2 mb-2">
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center space-x-2">
+                   <div className="w-1.5 h-1.5 bg-red-400 rounded-full animate-pulse"></div>
+                   <span className="text-orange-400 font-mono font-bold text-[10px]">🔗 CONNECT WALLET</span>
+                 </div>
+                 <div className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.5 rounded">
+                   🌐 {NETWORK_NAME}
+                 </div>
+               </div>
+               <div className="flex items-center justify-between mt-1.5">
+                 <p className="text-[9px] text-gray-300">
+                   Connect your TON wallet to access all features
+                 </p>
+                 <TonConnectButton 
+                   className=""
+                 />
+               </div>
+             </div>
+           )}
+
+           {/* Compact Wallet Status Bar */}
+           {userFriendlyAddress && (
+             <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 rounded-lg p-2 mb-2">
+               <div className="flex items-center justify-between">
+                 <div className="flex items-center space-x-2">
+                   <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>
+                   <span className="text-green-400 font-mono font-bold text-[10px]">WALLET CONNECTED</span>
+                   <span className="text-gray-400 font-mono text-[9px]">
+                     {userFriendlyAddress.slice(0, 6)}...{userFriendlyAddress.slice(-4)}
+                   </span>
+                 </div>
+                 <div className="flex items-center space-x-2">
+                   <div className="text-[9px] text-blue-400 font-mono bg-blue-500/10 px-1.5 py-0.5 rounded">
+                     🌐 {NETWORK_NAME}
+                   </div>
+                   <button
+                     onClick={handleDisconnectWallet}
+                     className="text-[9px] text-red-400 font-mono bg-red-500/10 px-1.5 py-0.5 rounded hover:bg-red-500/20 transition-colors duration-200 border border-red-500/20 hover:border-red-500/40"
+                     title="Disconnect Wallet"
+                   >
+                     🔌
+                   </button>
+                 </div>
+               </div>
+             </div>
+           )}
 
           {currentTab === 'zodiac' && <DivineMiningGame />}
           {currentTab === 'daily' && <DailyRewards />}
@@ -526,11 +705,11 @@ export const IndexPage: FC = () => {
            <div className="max-w-lg mx-auto px-3 py-3 relative">
              <div className="grid grid-cols-5 items-center gap-2">
                {[
-                 { id: 'zodiac', text: 'Play', Icon: BiHome, color: 'cyan' },
+                 { id: 'zodiac', text: 'Mine', Icon: BiHome, color: 'cyan' },
                  { id: 'daily', text: 'Rewards', Icon: GiCrystalBall, color: 'purple' },
-                 { id: 'divine', text: 'Divine', Icon: GiDiamonds, color: 'yellow' },
+                 { id: 'divine', text: 'Leaderboard', Icon: GiDiamonds, color: 'yellow' },
                  { id: 'crystals', text: 'Tasks', Icon: GiCrystalCluster, color: 'green' },
-                 { id: 'spells', text: 'Friends', Icon: GiSpellBook, color: 'pink' }, 
+                 { id: 'spells', text: 'Referrals', Icon: GiSpellBook, color: 'pink' }, 
                ].map(({ id, text, Icon, color }) => {
                  const isActive = currentTab === id;
                  

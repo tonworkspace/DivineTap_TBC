@@ -889,26 +889,23 @@ export const NotificationSystemProvider: React.FC<NotificationSystemProps> = ({ 
           `
         }} />
 
-        {/* Notification Bell */}
-        <div className="fixed top-[225px] sm:top-4 right-[32px] sm:right-4 z-[9999] flex flex-col gap-2">
-          {/* Test Button (only in development) */}
-          <button
-            onClick={() => setShowNotificationCenter(!showNotificationCenter)}
-            className="relative p-2 sm:p-3 bg-black/80 backdrop-blur-xl border-2 border-cyan-500/50 rounded-lg hover:bg-black/90 hover:border-cyan-400/70 transition-all duration-300 group shadow-lg"
-            title="Notifications"
-          >
-            <div className="w-6 h-6 text-cyan-400 group-hover:text-cyan-300 transition-colors text-lg">
-              🔔
-            </div>
-            {notificationCount > 0 && (
+        {/* Notification Bell - Auto-hide when no notifications */}
+        {notificationCount > 0 && (
+          <div className="fixed top-[225px] sm:top-4 right-[32px] sm:right-4 z-[9999] flex flex-col gap-2">
+            <button
+              onClick={() => setShowNotificationCenter(!showNotificationCenter)}
+              className="relative p-2 sm:p-3 bg-black/80 backdrop-blur-xl border-2 border-cyan-500/50 rounded-lg hover:bg-black/90 hover:border-cyan-400/70 transition-all duration-300 group shadow-lg animate-bounce"
+              title="Notifications"
+            >
+              <div className="w-6 h-6 text-cyan-400 group-hover:text-cyan-300 transition-colors text-lg">
+                🔔
+              </div>
               <div className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white text-xs rounded-full flex items-center justify-center font-bold animate-pulse border-2 border-white">
                 {notificationCount > 99 ? '99+' : notificationCount}
               </div>
-            )}
-          </button>
-          
-         
-        </div>
+            </button>
+          </div>
+        )}
 
         {/* Notification Center */}
         {showNotificationCenter && (
