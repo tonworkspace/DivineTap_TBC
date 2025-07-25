@@ -49,6 +49,12 @@ interface ReferralUser {
   telegram_id?: number;
   rank?: string;
   total_earned?: number;
+  balance?: number;
+  // TBC Coins specific data
+  tbcCoins?: number;
+  totalTbcEarned?: number;
+  pointSource?: 'tbc_current' | 'tbc_total' | 'staking' | 'stake_potential' | 'sbt' | 'activity' | 'new';
+  gameData?: any;
 }
 
 interface DatabaseReferral {
@@ -293,7 +299,7 @@ export const useReferralIntegration = () => {
     try {
       console.log('Loading referral data for user:', user.id);
       
-      // Get user's referrals from database
+      // Get user's referrals from database with enhanced data
       const { data: referrals, error: referralsError } = await supabase
         .from('referrals')
         .select(`
@@ -303,9 +309,13 @@ export const useReferralIntegration = () => {
             username,
             telegram_id,
             total_earned,
+            total_sbt,
+            balance,
             rank,
             is_active,
-            created_at
+            created_at,
+            login_streak,
+            last_active
           )
         `)
         .eq('referrer_id', user.id)
@@ -317,6 +327,56 @@ export const useReferralIntegration = () => {
       }
 
       console.log('Loaded referrals:', referrals?.length || 0);
+
+      // Get additional data for friends' TBC coins and other points
+      const friendIds = referrals?.map(r => r.referred.id) || [];
+      let gameDataMap: { [key: string]: any } = {};
+      let stakesDataMap: { [key: string]: any[] } = {};
+
+      if (friendIds.length > 0) {
+        // Get friends' Divine Mining Game data (TBC Coins)
+        const { data: gameData } = await supabase
+          .from('user_game_data')
+          .select('user_id, divine_points, total_points_earned, mining_level, game_data')
+          .in('user_id', friendIds);
+
+        if (gameData) {
+          gameData.forEach(data => {
+            // Extract additional data from game_data JSONB field
+            const gameState = data.game_data || {};
+            gameDataMap[data.user_id] = {
+              ...data,
+              // TBC Coins data
+              divinePoints: data.divine_points || gameState.divinePoints || 0,
+              totalPointsEarned: data.total_points_earned || gameState.totalPointsEarned || 0,
+              miningLevel: data.mining_level || gameState.miningLevel || 1,
+              // Additional game metrics
+              pointsPerSecond: gameState.pointsPerSecond || 0,
+              highScore: gameState.highScore || 0,
+              allTimeHighScore: gameState.allTimeHighScore || 0,
+              upgradesPurchased: gameState.upgradesPurchased || 0,
+              isMining: gameState.isMining || false,
+              currentEnergy: gameState.currentEnergy || 0,
+              maxEnergy: gameState.maxEnergy || 1000
+            };
+          });
+        }
+
+        // Get friends' staking data
+        const { data: stakesData } = await supabase
+          .from('stakes')
+          .select('user_id, amount, total_earned, is_active')
+          .in('user_id', friendIds);
+
+        if (stakesData) {
+          stakesData.forEach(stake => {
+            if (!stakesDataMap[stake.user_id]) {
+              stakesDataMap[stake.user_id] = [];
+            }
+            stakesDataMap[stake.user_id].push(stake);
+          });
+        }
+      }
 
       // Get referral earnings
       const { data: earnings, error: earningsError } = await supabase
@@ -332,18 +392,69 @@ export const useReferralIntegration = () => {
       const totalReferrals = referrals?.length || 0;
       const activeReferrals = referrals?.filter(r => r.referred?.is_active).length || 0;
 
-      // Convert database referrals to display format
-      const referralUsers: ReferralUser[] = (referrals as DatabaseReferral[])?.map(r => ({
-        id: r.referred.id.toString(),
-        username: r.referred.username || `User_${r.referred.telegram_id}`,
-        joinedAt: new Date(r.created_at).getTime(),
-        isActive: r.referred.is_active,
-        pointsEarned: Math.floor(Number(r.referred.total_earned) * 100), // Convert to points
-        avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.referred.username}`,
-        telegram_id: r.referred.telegram_id,
-        rank: r.referred.rank,
-        total_earned: Number(r.referred.total_earned)
-      })) || [];
+      // Convert database referrals to display format with TBC Coins prioritized
+      const referralUsers: ReferralUser[] = (referrals as DatabaseReferral[])?.map(r => {
+        const userId = r.referred.id;
+        const gameData = gameDataMap[userId];
+        const stakesData = stakesDataMap[userId] || [];
+        
+        // Get TBC Coins (Divine Points) - this is the primary currency to display
+        const tbcCoins = gameData?.divinePoints || 0;
+        const totalTbcEarned = gameData?.totalPointsEarned || 0;
+        
+        // Calculate friend's total value from multiple sources
+        let friendPoints = 0;
+        let pointSource: 'tbc_current' | 'tbc_total' | 'staking' | 'stake_potential' | 'sbt' | 'activity' | 'new' = 'new'; // Track the source for display
+        
+        // Priority 1: TBC Coins (Divine Points) from mining game
+        if (tbcCoins > 0 || totalTbcEarned > 0) {
+          friendPoints = Math.max(tbcCoins, totalTbcEarned);
+          pointSource = tbcCoins > totalTbcEarned ? 'tbc_current' : 'tbc_total';
+        }
+        // Priority 2: Staking earnings (converted to points)
+        else if (r.referred.total_earned && Number(r.referred.total_earned) > 0) {
+          friendPoints = Math.floor(Number(r.referred.total_earned) * 100);
+          pointSource = 'staking';
+        }
+        // Priority 3: Active staking potential
+        else if (stakesData.length > 0) {
+          const totalStakeEarned = stakesData.reduce((sum, stake) => sum + Number(stake.total_earned || 0), 0);
+          if (totalStakeEarned > 0) {
+            friendPoints = Math.floor(totalStakeEarned * 100);
+            pointSource = 'stake_potential';
+          }
+        }
+        // Priority 4: SBT tokens
+        else if ((r.referred as any).total_sbt && Number((r.referred as any).total_sbt) > 0) {
+          friendPoints = Math.floor(Number((r.referred as any).total_sbt));
+          pointSource = 'sbt';
+        }
+        // Priority 5: Activity-based points for new users
+        else {
+          const daysSinceJoined = Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24));
+          const activityPoints = ((r.referred as any).login_streak || 0) * 10;
+          friendPoints = Math.max(0, Math.min(daysSinceJoined * 50 + activityPoints, 1000)); // Cap at 1000 for new users
+          pointSource = daysSinceJoined < 1 ? 'new' : 'activity';
+        }
+
+        return {
+          id: r.referred.id.toString(),
+          username: r.referred.username || `User_${r.referred.telegram_id}`,
+          joinedAt: new Date(r.created_at).getTime(),
+          isActive: r.referred.is_active,
+          pointsEarned: Math.max(0, friendPoints),
+          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.referred.username}`,
+          telegram_id: r.referred.telegram_id,
+          rank: r.referred.rank,
+          total_earned: Number(r.referred.total_earned || 0),
+          balance: Number((r.referred as any).balance || 0),
+          // Additional data for enhanced display
+          tbcCoins: tbcCoins,
+          totalTbcEarned: totalTbcEarned,
+          pointSource: pointSource,
+          gameData: gameData
+        };
+      }) || [];
 
       // Calculate level based on referrals
       const level = Math.floor(totalReferrals / 5) + 1;
@@ -423,10 +534,41 @@ export const useReferralIntegration = () => {
         return;
       }
       
+      // Enhanced duplicate prevention checks
       if (existingUser?.referrer_id) {
         console.log('User already has a referrer:', existingUser.referrer_id);
         await trackReferralAttempt(startParam, 'duplicate', 'Already has referrer');
         setDebugInfo(prev => ({ ...prev, error: 'Already has referrer', processed: true }));
+        return;
+      }
+
+      // Check if referral relationship already exists in referrals table
+      const { data: existingReferral, error: existingReferralError } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referrer_id', referrerId)
+        .eq('referred_id', user.id)
+        .single();
+
+      if (existingReferralError && existingReferralError.code !== 'PGRST116') {
+        console.error('Error checking existing referral:', existingReferralError);
+        await trackReferralAttempt(startParam, 'failed', 'Database error checking duplicates');
+        setDebugInfo(prev => ({ ...prev, error: 'Database error', processed: true }));
+        return;
+      }
+
+      if (existingReferral) {
+        console.log('Referral relationship already exists:', existingReferral.id);
+        await trackReferralAttempt(startParam, 'duplicate', 'Referral relationship exists');
+        setDebugInfo(prev => ({ ...prev, error: 'Referral relationship already exists', processed: true }));
+        return;
+      }
+
+      // Prevent self-referral
+      if (referrerId === user.id) {
+        console.log('Self-referral attempt detected');
+        await trackReferralAttempt(startParam, 'invalid', 'Cannot refer yourself');
+        setDebugInfo(prev => ({ ...prev, error: 'Cannot refer yourself', processed: true }));
         return;
       }
       
@@ -441,6 +583,25 @@ export const useReferralIntegration = () => {
         console.log('Referrer not found:', referrerId);
         await trackReferralAttempt(startParam, 'failed', 'Referrer not found');
         setDebugInfo(prev => ({ ...prev, error: 'Referrer not found', processed: true }));
+        return;
+      }
+
+      // Prevent circular referrals (check if referrer was referred by current user)
+      const { data: circularCheck, error: circularError } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referrer_id', user.id)
+        .eq('referred_id', referrerId)
+        .single();
+
+      if (circularError && circularError.code !== 'PGRST116') {
+        console.error('Error checking circular referrals:', circularError);
+      }
+
+      if (circularCheck) {
+        console.log('Circular referral attempt detected');
+        await trackReferralAttempt(startParam, 'invalid', 'Circular referral not allowed');
+        setDebugInfo(prev => ({ ...prev, error: 'Circular referral not allowed', processed: true }));
         return;
       }
       
@@ -749,7 +910,7 @@ export const useReferralIntegration = () => {
       
       const referrerId = parseInt(referrerIdMatch[1]);
       
-      // Check if user already has a referrer
+      // Enhanced duplicate prevention checks
       const { data: existingUser } = await supabase
         .from('users')
         .select('referrer_id')
@@ -759,6 +920,31 @@ export const useReferralIntegration = () => {
       if (existingUser?.referrer_id) {
         await trackReferralAttempt(referralCode, 'duplicate', 'User already has a referrer');
         return { success: false, error: 'You already have a referrer' };
+      }
+
+      // Check if referral relationship already exists in referrals table
+      const { data: existingReferral, error: existingReferralError } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referrer_id', referrerId)
+        .eq('referred_id', user.id)
+        .single();
+
+      if (existingReferralError && existingReferralError.code !== 'PGRST116') {
+        console.error('Error checking existing referral:', existingReferralError);
+        await trackReferralAttempt(referralCode, 'failed', 'Database error checking duplicates');
+        return { success: false, error: 'Database error occurred' };
+      }
+
+      if (existingReferral) {
+        await trackReferralAttempt(referralCode, 'duplicate', 'Referral relationship already exists');
+        return { success: false, error: 'Referral relationship already exists' };
+      }
+
+      // Prevent self-referral
+      if (referrerId === user.id) {
+        await trackReferralAttempt(referralCode, 'invalid', 'Cannot refer yourself');
+        return { success: false, error: 'You cannot refer yourself' };
       }
       
       // Check if referrer exists
@@ -772,11 +958,22 @@ export const useReferralIntegration = () => {
         await trackReferralAttempt(referralCode, 'failed', 'Referrer not found');
         return { success: false, error: 'Referrer not found' };
       }
-      
-      // Prevent self-referral
-      if (referrer.id === user.id) {
-        await trackReferralAttempt(referralCode, 'invalid', 'Cannot refer yourself');
-        return { success: false, error: 'Cannot refer yourself' };
+
+      // Prevent circular referrals (check if referrer was referred by current user)
+      const { data: circularCheck, error: circularError } = await supabase
+        .from('referrals')
+        .select('id')
+        .eq('referrer_id', user.id)
+        .eq('referred_id', referrerId)
+        .single();
+
+      if (circularError && circularError.code !== 'PGRST116') {
+        console.error('Error checking circular referrals:', circularError);
+      }
+
+      if (circularCheck) {
+        await trackReferralAttempt(referralCode, 'invalid', 'Circular referral not allowed');
+        return { success: false, error: 'Circular referral not allowed - you cannot refer someone who referred you' };
       }
       
       // Create referral relationship

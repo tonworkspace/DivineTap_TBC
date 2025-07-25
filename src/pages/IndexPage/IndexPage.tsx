@@ -148,6 +148,7 @@ export const IndexPage: FC = () => {
   const { theme } = useTheme();
   const [currentTab, setCurrentTab] = useState('zodiac');
   const [showNetworkWarning, setShowNetworkWarning] = useState(false);
+  const [showWalletStatus, setShowWalletStatus] = useState(false);
   
   // TON Wallet State
   const userFriendlyAddress = useTonAddress();
@@ -164,6 +165,17 @@ export const IndexPage: FC = () => {
   // Add referral integration
   useReferralIntegration();
   
+  // Show wallet status when address changes or balance updates
+  useEffect(() => {
+    if (userFriendlyAddress) {
+      setShowWalletStatus(true);
+      const timer = setTimeout(() => {
+        setShowWalletStatus(false);
+      }, 5000); // Hide after 5 seconds
+      return () => clearTimeout(timer);
+    }
+  }, [userFriendlyAddress, walletBalance]);
+
   // Function to fetch wallet balance from TON Center API
   const fetchWalletBalance = async () => {
     if (!userFriendlyAddress) {
@@ -171,6 +183,7 @@ export const IndexPage: FC = () => {
       return;
     }
 
+    setShowWalletStatus(true); // Show status when fetching balance
     setIsLoadingBalance(true);
     try {
       const apiKey = isMainnet ? MAINNET_API_KEY : TESTNET_API_KEY;
@@ -209,6 +222,7 @@ export const IndexPage: FC = () => {
 
   // Function to disconnect wallet
   const handleDisconnectWallet = async () => {
+    setShowWalletStatus(true); // Show status when disconnecting
     try {
       await tonConnectUI.disconnect();
       setWalletBalance('0');
@@ -650,8 +664,8 @@ export const IndexPage: FC = () => {
            )}
 
            {/* Compact Wallet Status Bar */}
-           {userFriendlyAddress && (
-             <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 rounded-lg p-2 mb-2">
+           {userFriendlyAddress && showWalletStatus && (
+             <div className="bg-gradient-to-r from-green-900/30 to-emerald-900/30 border border-green-500/20 rounded-lg p-2 mb-2 transition-all duration-300">
                <div className="flex items-center justify-between">
                  <div className="flex items-center space-x-2">
                    <div className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse"></div>

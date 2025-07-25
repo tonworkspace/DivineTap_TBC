@@ -32,6 +32,9 @@ export const TaskCenter: React.FC = () => {
   const { addGems } = useGameContext();
   const { user } = useAuth();
   
+  // Add state for hiding completed tasks
+  const [hideCompleted, setHideCompleted] = useState(true);
+  
   // Centralized state management
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
   const [taskProgress, setTaskProgress] = useState<TaskProgress>({});
@@ -315,8 +318,77 @@ export const TaskCenter: React.FC = () => {
     };
   }, [user?.id, calculateProgress]);
 
-  // Memoized task definitions
+  // Memoized task definitions - Reordered to prioritize social tasks
   const tasks: Task[] = useMemo(() => [
+    // Social Tasks First
+    {
+      id: 'follow_twitter',
+      title: 'Follow on Twitter',
+      description: 'Follow our official Twitter account',
+      reward: '30 Gems',
+      progress: completedTasks.includes('follow_twitter') ? 1 : (taskProgress.follow_twitter || 0),
+      max: 1,
+      completed: completedTasks.includes('follow_twitter'),
+      icon: <span className="text-blue-400">🐦</span>,
+      type: 'social'
+    },
+    {
+      id: 'join_telegram',
+      title: 'Join Telegram',
+      description: 'Join our Telegram community',
+      reward: '40 Gems',
+      progress: completedTasks.includes('join_telegram') ? 1 : (taskProgress.join_telegram || 0),
+      max: 1,
+      completed: completedTasks.includes('join_telegram'),
+      icon: <span className="text-blue-400">📱</span>,
+      type: 'social'
+    },
+    {
+      id: 'retweet_post',
+      title: 'Retweet Latest Post',
+      description: 'Retweet our latest announcement',
+      reward: '35 Gems',
+      progress: completedTasks.includes('retweet_post') ? 1 : (taskProgress.retweet_post || 0),
+      max: 1,
+      completed: completedTasks.includes('retweet_post'),
+      icon: <span className="text-blue-400">🔄</span>,
+      type: 'social'
+    },
+    {
+      id: 'like_post',
+      title: 'Like Latest Post',
+      description: 'Like our latest social media post',
+      reward: '20 Gems',
+      progress: completedTasks.includes('like_post') ? 1 : (taskProgress.like_post || 0),
+      max: 1,
+      completed: completedTasks.includes('like_post'),
+      icon: <span className="text-red-400">❤️</span>,
+      type: 'social'
+    },
+    {
+      id: 'invite_friend',
+      title: 'Invite a Friend',
+      description: 'Invite a friend to join the game',
+      reward: '50 Gems',
+      progress: completedTasks.includes('invite_friend') ? 1 : (taskProgress.invite_friend || 0),
+      max: 1,
+      completed: completedTasks.includes('invite_friend'),
+      icon: <span className="text-green-400">👥</span>,
+      type: 'social'
+    },
+    // Airdrop Tasks Second
+    {
+      id: 'submit_wallet',
+      title: 'Submit Wallet for Airdrop',
+      description: 'Submit your wallet address for airdrop',
+      reward: '100 Gems',
+      progress: completedTasks.includes('submit_wallet') ? 1 : (taskProgress.submit_wallet || 0),
+      max: 1,
+      completed: completedTasks.includes('submit_wallet'),
+      icon: <span className="text-purple-400">💎</span>,
+      type: 'airdrop'
+    },
+    // Mining Tasks Last
     {
       id: 'mine_1000',
       title: 'Mine 1,000 Points',
@@ -360,72 +432,6 @@ export const TaskCenter: React.FC = () => {
       completed: completedTasks.includes('buy_upgrade'),
       icon: <GiUpgrade className="text-blue-400" />,
       type: 'mining'
-    },
-    {
-      id: 'follow_twitter',
-      title: 'Follow on Twitter',
-      description: 'Follow our official Twitter account',
-      reward: '30 Gems',
-      progress: completedTasks.includes('follow_twitter') ? 1 : (taskProgress.follow_twitter || 0),
-      max: 1,
-      completed: completedTasks.includes('follow_twitter'),
-      icon: <span className="text-blue-400">🐦</span>,
-      type: 'social'
-    },
-    {
-      id: 'join_telegram',
-      title: 'Join Telegram',
-      description: 'Join our Telegram community',
-      reward: '40 Gems',
-      progress: completedTasks.includes('join_telegram') ? 1 : (taskProgress.join_telegram || 0),
-      max: 1,
-      completed: completedTasks.includes('join_telegram'),
-      icon: <span className="text-blue-400">📱</span>,
-      type: 'social'
-    },
-    {
-      id: 'retweet_post',
-      title: 'Retweet Latest Post',
-      description: 'Retweet our latest announcement',
-      reward: '35 Gems',
-      progress: completedTasks.includes('retweet_post') ? 1 : (taskProgress.retweet_post || 0),
-      max: 1,
-      completed: completedTasks.includes('retweet_post'),
-      icon: <span className="text-blue-400">🔄</span>,
-      type: 'social'
-    },
-    {
-      id: 'submit_wallet',
-      title: 'Submit Wallet for Airdrop',
-      description: 'Submit your wallet address for airdrop',
-      reward: '100 Gems',
-      progress: completedTasks.includes('submit_wallet') ? 1 : (taskProgress.submit_wallet || 0),
-      max: 1,
-      completed: completedTasks.includes('submit_wallet'),
-      icon: <span className="text-purple-400">💎</span>,
-      type: 'airdrop'
-    },
-    {
-      id: 'invite_friend',
-      title: 'Invite a Friend',
-      description: 'Invite a friend to join the game',
-      reward: '50 Gems',
-      progress: completedTasks.includes('invite_friend') ? 1 : (taskProgress.invite_friend || 0),
-      max: 1,
-      completed: completedTasks.includes('invite_friend'),
-      icon: <span className="text-green-400">👥</span>,
-      type: 'social'
-    },
-    {
-      id: 'like_post',
-      title: 'Like Latest Post',
-      description: 'Like our latest social media post',
-      reward: '20 Gems',
-      progress: completedTasks.includes('like_post') ? 1 : (taskProgress.like_post || 0),
-      max: 1,
-      completed: completedTasks.includes('like_post'),
-      icon: <span className="text-red-400">❤️</span>,
-      type: 'social'
     }
   ], [completedTasks, taskProgress]);
 
@@ -543,13 +549,22 @@ export const TaskCenter: React.FC = () => {
   const [activeTab, setActiveTab] = useState<'all' | 'mining' | 'social' | 'airdrop'>('all');
 
   const getCurrentTasks = useCallback(() => {
+    let filteredTasks = tasks;
+    
+    // Filter by tab
     switch (activeTab) {
-      case 'mining': return miningTasks;
-      case 'social': return socialTasks;
-      case 'airdrop': return airdropTasks;
-      default: return tasks;
+      case 'mining': filteredTasks = miningTasks; break;
+      case 'social': filteredTasks = socialTasks; break;
+      case 'airdrop': filteredTasks = airdropTasks; break;
     }
-  }, [activeTab, miningTasks, socialTasks, airdropTasks, tasks]);
+    
+    // Hide completed tasks if enabled
+    if (hideCompleted) {
+      filteredTasks = filteredTasks.filter(task => !task.completed);
+    }
+    
+    return filteredTasks;
+  }, [activeTab, miningTasks, socialTasks, airdropTasks, tasks, hideCompleted]);
 
   // Debug function for development
   const resetMiningTimeTracking = useCallback(() => {
@@ -647,26 +662,43 @@ export const TaskCenter: React.FC = () => {
         </div>
       </div>
 
-      {/* Task Type Tabs */}
-      <div className="flex gap-1">
-        {[
-          { id: 'all', name: 'All', count: tasks.length },
-          { id: 'mining', name: 'Mining', count: miningTasks.length },
-          { id: 'social', name: 'Social', count: socialTasks.length },
-          { id: 'airdrop', name: 'Airdrop', count: airdropTasks.length }
-        ].map(({ id, name, count }) => (
+      {/* Task Controls */}
+      <div className="flex flex-col gap-2">
+        {/* Show/Hide Completed Toggle */}
+        <div className="flex justify-end">
           <button
-            key={id}
-            onClick={() => setActiveTab(id as any)}
-            className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
-              activeTab === id
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(0,255,255,0.3)]'
-                : 'bg-black/40 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'
+            onClick={() => setHideCompleted(!hideCompleted)}
+            className={`px-3 py-1 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
+              hideCompleted
+                ? 'bg-gray-600 text-gray-300'
+                : 'bg-cyan-600 text-white'
             }`}
           >
-            {name} ({count})
+            {hideCompleted ? '👁️ Show Completed' : '🚫 Hide Completed'}
           </button>
-        ))}
+        </div>
+
+        {/* Task Type Tabs */}
+        <div className="flex gap-1">
+          {[
+            { id: 'all', name: 'All', count: hideCompleted ? tasks.filter(t => !t.completed).length : tasks.length },
+            { id: 'social', name: 'Social', count: hideCompleted ? socialTasks.filter(t => !t.completed).length : socialTasks.length },
+            { id: 'mining', name: 'Mining', count: hideCompleted ? miningTasks.filter(t => !t.completed).length : miningTasks.length },
+            { id: 'airdrop', name: 'Airdrop', count: hideCompleted ? airdropTasks.filter(t => !t.completed).length : airdropTasks.length }
+          ].map(({ id, name, count }) => (
+            <button
+              key={id}
+              onClick={() => setActiveTab(id as any)}
+              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
+                activeTab === id
+                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(0,255,255,0.3)]'
+                  : 'bg-black/40 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'
+              }`}
+            >
+              {name} ({count})
+            </button>
+          ))}
+        </div>
       </div>
 
       {/* Task List */}

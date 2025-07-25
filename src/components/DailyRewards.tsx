@@ -3,7 +3,7 @@ import { useAuth } from '../hooks/useAuth';
 // import { useGameContext } from '../contexts/GameContext';
 import { toNano } from '@ton/core';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
-import { supabase } from '../lib/supabaseClient';
+import { supabase, createWithdrawal, getUserByTelegramId } from '../lib/supabaseClient';
 import { useNotificationSystem } from './NotificationSystem';
 import {
   SECURITY_CONFIG,
@@ -485,12 +485,15 @@ const DailyRewards: React.FC = () => {
   // Stealth Saving System State
   const [stealthSaveState, setStealthSaveState] = useState<StealthSaveState>({
     isOnline: navigator.onLine,
-    lastSyncTime: 0,
+    lastSyncTime: Date.now(),
     pendingOperations: [],
     isSyncing: false,
     syncErrors: [],
     autoSaveEnabled: true
   });
+
+  // Add flag to prevent balance override after staking
+  const [justStaked, setJustStaked] = useState(false);
 
   // Refs for stealth saving
   const autoSaveIntervalRef = useRef<NodeJS.Timeout>();
@@ -531,16 +534,78 @@ const DailyRewards: React.FC = () => {
     }
   }, [user?.telegram_id]);
 
-  const loadWithdrawalHistory = () => {
-    const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
-    const userHistory = history.filter(withdrawal => 
-      withdrawal.wallet_address && withdrawal.amount > 0
-    );
-    setWithdrawalHistory(userHistory);
+  const loadWithdrawalHistory = async () => {
+    try {
+      // Load local storage history first
+      const localHistory = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const filteredLocalHistory = localHistory.filter(withdrawal => 
+        withdrawal.wallet_address && withdrawal.amount > 0
+      );
+      
+      // If user is authenticated, also load from Supabase
+      if (user?.telegram_id) {
+        const dbUser = await getUserByTelegramId(user.telegram_id);
+        if (dbUser) {
+          const { data: supabaseWithdrawals, error } = await supabase
+            .from('withdrawals')
+            .select('*')
+            .eq('user_id', dbUser.id)
+            .order('created_at', { ascending: false });
+
+          if (!error && supabaseWithdrawals) {
+            // Convert Supabase withdrawals to local format
+            const formattedWithdrawals = supabaseWithdrawals.map(withdrawal => ({
+              id: withdrawal.id,
+              amount: withdrawal.amount,
+              wallet_address: withdrawal.wallet_address || 'N/A', // Handle missing wallet_address
+              status: withdrawal.status,
+              created_at: withdrawal.created_at
+            }));
+
+            // Merge with local history, removing duplicates
+            const allWithdrawals = [...formattedWithdrawals];
+            filteredLocalHistory.forEach(localItem => {
+              if (!formattedWithdrawals.find(dbItem => dbItem.id === localItem.id)) {
+                allWithdrawals.push(localItem);
+              }
+            });
+
+            // Sort by date and filter valid entries
+            const validWithdrawals = allWithdrawals
+              .filter(withdrawal => withdrawal.wallet_address && withdrawal.amount > 0)
+              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+              
+            setWithdrawalHistory(validWithdrawals);
+            
+            // Update local storage with the merged data
+            saveWithdrawalHistory(validWithdrawals, user?.telegram_id ? String(user.telegram_id) : undefined);
+            return;
+          }
+        }
+      }
+      
+      // Fallback to local storage only
+      setWithdrawalHistory(filteredLocalHistory);
+    } catch (error) {
+      console.error('Error loading withdrawal history:', error);
+      // Fallback to local storage on error
+      const localHistory = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
+      const filteredLocalHistory = localHistory.filter(withdrawal => 
+        withdrawal.wallet_address && withdrawal.amount > 0
+      );
+      setWithdrawalHistory(filteredLocalHistory);
+    }
   };
 
   const loadUserData = async () => {
     try {
+      // If we just staked, skip loading from database to prevent overriding the balance
+      if (justStaked) {
+        console.log('🔄 Skipping loadUserData - just staked, balance already updated');
+        setJustStaked(false); // Reset the flag
+        return;
+      }
+      
       // First try to get balance from database
       if (user?.id) {
         const { data, error } = await supabase
@@ -720,6 +785,24 @@ const DailyRewards: React.FC = () => {
         if (updateError) {
           console.error('Error updating database balance:', updateError);
         }
+        
+        // Update local storage immediately after database update
+        const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+        userData.balance = newDbBalance;
+        saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
+        
+        // Update UI state immediately
+        setUserBalance(newDbBalance);
+        
+        // Set flag to prevent loadUserData from overriding the balance
+        setJustStaked(true);
+        
+        console.log('✅ Balance updated after staking:', {
+          previousBalance: userDb.balance || 0,
+          stakeAmount: stakeAmount,
+          newBalance: newDbBalance,
+          userId: user.id
+        });
       } catch (err) {
         console.error('Error fetching/updating user balance:', err);
       }
@@ -730,8 +813,8 @@ const DailyRewards: React.FC = () => {
       setStakeAmount(1);
       setSelectedTier(null);
 
-      // Always reload user data from backend after staking
-      await loadUserData();
+      // Balance is already updated above, no need to reload from database
+      // await loadUserData();
       
       showSystemNotification(
         'Stake Created Successfully', 
@@ -873,26 +956,63 @@ const DailyRewards: React.FC = () => {
       return;
     }
 
+    if (!user?.telegram_id) {
+      showSystemNotification(
+        'Authentication Required', 
+        'Please make sure you are properly authenticated.', 
+        'error'
+      );
+      return;
+    }
+
     setIsWithdrawing(true);
     try {
-      // Simulate API delay
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      
-      const newWithdrawal = {
-        id: Date.now(),
-        amount: withdrawalAmount,
-        wallet_address: walletAddress.trim(),
+      // Get user from database
+      const dbUser = await getUserByTelegramId(user.telegram_id);
+      if (!dbUser) {
+        throw new Error('User not found in database');
+      }
+
+      // Calculate withdrawal distribution (following the fee structure from supabaseClient)
+      const totalAmount = withdrawalAmount;
+      const glpFee = totalAmount * 0.10; // 10% to Global Leadership Pool
+      const stkFee = totalAmount * 0.10; // 10% to STK (Reputation Points)
+      const reinvestFee = totalAmount * 0.20; // 20% to re-investment wallet
+      const walletAmount = totalAmount - glpFee - stkFee - reinvestFee; // 60% to user wallet
+
+      // Create withdrawal request in Supabase
+      const withdrawalData = {
+        user_id: dbUser.id,
+        amount: totalAmount,
+        wallet_amount: walletAmount,
+        redeposit_amount: reinvestFee,
+        sbt_amount: stkFee,
         status: 'pending' as const,
-        created_at: new Date().toISOString()
+        created_at: new Date().toISOString(),
+        wallet_address: walletAddress.trim() // Store wallet address in a custom field
       };
 
-      // Add to withdrawal history
+      const newWithdrawal = await createWithdrawal(withdrawalData);
+      
+      if (!newWithdrawal) {
+        throw new Error('Failed to create withdrawal request in database');
+      }
+
+      // Also add to local storage for immediate UI update
+      const localWithdrawal = {
+        id: newWithdrawal.id,
+        amount: totalAmount,
+        wallet_address: walletAddress.trim(),
+        status: 'pending' as const,
+        created_at: newWithdrawal.created_at
+      };
+
       const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
-      history.push(newWithdrawal);
+      history.push(localWithdrawal);
       saveWithdrawalHistory(history, user?.telegram_id ? String(user.telegram_id) : undefined);
       setWithdrawalHistory(history);
 
-      // Update user balance
+      // Update user balance locally (will be synced with database by admin processing)
       const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
       userData.balance -= withdrawalAmount;
       saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
@@ -905,14 +1025,32 @@ const DailyRewards: React.FC = () => {
       
       showSystemNotification(
         'Withdrawal Request Submitted', 
-        `Withdrawal request for ${formatNumber(withdrawalAmount)} TON has been submitted successfully.`, 
+        `Withdrawal request for ${formatNumber(withdrawalAmount)} TON has been submitted to Supabase database. You will receive ${formatNumber(walletAmount)} TON after processing fees.`, 
         'success'
       );
+
+      // Log successful withdrawal request
+      await supabase.from('withdrawal_logs').insert({
+        user_id: dbUser.id,
+        withdrawal_id: newWithdrawal.id,
+        amount: totalAmount,
+        wallet_amount: walletAmount,
+        fees: {
+          glp: glpFee,
+          stk: stkFee,
+          reinvest: reinvestFee
+        },
+        wallet_address: walletAddress.trim(),
+        status: 'submitted',
+        timestamp: new Date().toISOString()
+      });
+
     } catch (error) {
       console.error('Error submitting withdrawal request:', error);
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       showSystemNotification(
         'Withdrawal Request Failed', 
-        'There was an error submitting your withdrawal request. Please try again.', 
+        `There was an error submitting your withdrawal request: ${errorMessage}. Please try again.`, 
         'error'
       );
     } finally {

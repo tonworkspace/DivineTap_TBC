@@ -680,6 +680,26 @@ useEffect(() => {
             </div>
           </div>
 
+          {/* TBC Coins Info */}
+          <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
+            <div className="text-center">
+              <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider mb-2">🪙 TBC COINS INFO</div>
+              <p className="text-yellow-300 font-mono text-xs tracking-wider mb-2">
+                Your friends earn TBC coins through Divine Mining! 
+              </p>
+              <div className="grid grid-cols-2 gap-2 text-xs">
+                <div className="bg-gray-800/50 rounded-lg p-2">
+                  <div className="text-yellow-400 font-bold">🪙 TBC Mining</div>
+                  <div className="text-gray-400">From Mining Game</div>
+                </div>
+                <div className="bg-gray-800/50 rounded-lg p-2">
+                  <div className="text-purple-400 font-bold">💎 Staking</div>
+                  <div className="text-gray-400">From TON Staking</div>
+                </div>
+              </div>
+            </div>
+          </div>
+
           {/* Add Manual Entry Button if user has no referrer */}
           {!referralData.referrals.length && (
             <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,146,60,0.1)]">
@@ -911,11 +931,77 @@ useEffect(() => {
                         <div className="text-gray-500 font-mono text-xs tracking-wider">
                           {Math.floor((Date.now() - referral.joinedAt) / (1000 * 60 * 60 * 24))} days ago
                         </div>
+                        {/* Points source indicator */}
+                        <div className="text-gray-500 font-mono text-xs tracking-wider">
+                          {(() => {
+                            const pointSource = (referral as any).pointSource;
+                            switch (pointSource) {
+                              case 'tbc_current':
+                              case 'tbc_total':
+                                return '🪙 TBC Mining';
+                              case 'staking':
+                                return '💎 Staking';
+                              case 'stake_potential':
+                                return '💰 Stake Potential';
+                              case 'sbt':
+                                return '🎯 SBT Tokens';
+                              case 'activity':
+                                return '🎯 Activity';
+                              case 'new':
+                              default:
+                                return '🆕 New User';
+                            }
+                          })()}
+                        </div>
                       </div>
                     </div>
                     <div className="text-right">
-                      <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider">{referral.pointsEarned.toLocaleString()}</div>
-                      <div className="text-gray-400 font-mono text-xs tracking-wider">Points</div>
+                      <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider">
+                        {(() => {
+                          const pointSource = (referral as any).pointSource;
+                          const tbcCoins = (referral as any).tbcCoins || 0;
+                          const totalTbcEarned = (referral as any).totalTbcEarned || 0;
+                          
+                          if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
+                            // Show TBC Coins specifically
+                            return (
+                              <>
+                                {referral.pointsEarned.toLocaleString()}
+                                <span className="text-yellow-300 text-xs ml-1">TBC</span>
+                                {tbcCoins !== totalTbcEarned && totalTbcEarned > 0 && (
+                                  <div className="text-xs text-gray-400">
+                                    Total: {totalTbcEarned.toLocaleString()} TBC
+                                  </div>
+                                )}
+                              </>
+                            );
+                          } else {
+                            // Show regular points
+                            return (
+                              <>
+                                {referral.pointsEarned.toLocaleString()}
+                                {referral.pointsEarned === 0 && (
+                                  <span className="text-gray-500 text-xs ml-1">(New)</span>
+                                )}
+                              </>
+                            );
+                          }
+                        })()}
+                      </div>
+                      <div className="text-gray-400 font-mono text-xs tracking-wider">
+                        {(() => {
+                          const pointSource = (referral as any).pointSource;
+                          if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
+                            return 'TBC Coins';
+                          } else if (pointSource === 'staking') {
+                            return 'Staking Points';
+                          } else if (pointSource === 'new') {
+                            return 'Getting Started';
+                          } else {
+                            return 'Total Points';
+                          }
+                        })()}
+                      </div>
                       <div className="flex items-center gap-1 mt-1">
                         <div className={`w-1.5 h-1.5 rounded-full ${referral.isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
                         <span className={`text-xs font-mono tracking-wider ${referral.isActive ? 'text-green-400' : 'text-red-400'}`}>
@@ -927,16 +1013,67 @@ useEffect(() => {
                   
                   {/* Progress Bar for Points */}
                   <div className="mt-2">
-                    <div className="flex justify-between text-xs text-gray-400 font-mono mb-1">
-                      <span>Progress</span>
-                      <span>{Math.floor((referral.pointsEarned / 10000) * 100)}%</span>
-                    </div>
-                    <div className="w-full bg-gray-700 rounded-full h-1.5">
-                      <div 
-                        className="h-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-300"
-                        style={{ width: `${Math.min((referral.pointsEarned / 10000) * 100, 100)}%` }}
-                      ></div>
-                    </div>
+                                         {(() => {
+                       const pointSource = (referral as any).pointSource;
+                       const gameData = (referral as any).gameData;
+                      
+                      if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
+                        // TBC-specific progress (different milestones)
+                        let target = 1000; // Default target for TBC
+                        if (referral.pointsEarned >= 100000) target = 1000000;
+                        else if (referral.pointsEarned >= 10000) target = 100000;
+                        else if (referral.pointsEarned >= 1000) target = 10000;
+                        
+                        const progressPercent = Math.min((referral.pointsEarned / target) * 100, 100);
+                        
+                        return (
+                          <>
+                            <div className="flex justify-between text-xs text-gray-400 font-mono mb-1">
+                              <span>TBC Progress</span>
+                              <span>{Math.floor(progressPercent)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-700 rounded-full h-1.5">
+                              <div 
+                                className="h-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                              ></div>
+                            </div>
+                                                         {gameData?.miningLevel && (
+                               <div className="text-xs text-gray-500 mt-1">
+                                 Mining Level: {gameData.miningLevel}
+                                 {gameData?.pointsPerSecond > 0 && (
+                                   <span className="ml-2">
+                                     +{gameData.pointsPerSecond.toFixed(1)}/sec
+                                   </span>
+                                 )}
+                               </div>
+                             )}
+                             {(referral as any).balance > 0 && (
+                               <div className="text-xs text-blue-400 mt-1">
+                                 TON Balance: {((referral as any).balance || 0).toFixed(2)} TON
+                               </div>
+                             )}
+                          </>
+                        );
+                      } else {
+                        // Regular progress bar for other point types
+                        const progressPercent = Math.min((referral.pointsEarned / 10000) * 100, 100);
+                        return (
+                          <>
+                            <div className="flex justify-between text-xs text-gray-400 font-mono mb-1">
+                              <span>Progress</span>
+                              <span>{Math.floor(progressPercent)}%</span>
+                            </div>
+                            <div className="w-full bg-gray-700 rounded-full h-1.5">
+                              <div 
+                                className="h-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-300"
+                                style={{ width: `${progressPercent}%` }}
+                              ></div>
+                            </div>
+                          </>
+                        );
+                      }
+                    })()}
                   </div>
                 </div>
               ))
