@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { OnboardingScreen } from './OnboardingScreen';
@@ -10,6 +10,7 @@ import { useTonAddress, TonConnectButton, useTonConnectUI } from '@tonconnect/ui
 import { useReferralIntegration } from '@/hooks/useReferralIntegration';
 import { GameProvider, useGameContext } from '@/contexts/GameContext';
 import { ErrorBoundary } from '@/components/ErrorBoundary';
+import { UpgradeModal } from '@/components/UpgradeModal';
 import { 
   GiCrystalBall, 
   GiCrystalCluster,
@@ -140,6 +141,347 @@ const GameHeader: FC<{
   );
 };
 
+// Upgrade Shop Modal Wrapper Component
+const UpgradeShopModal: FC<{
+  showUpgradeShop: boolean;
+  setShowUpgradeShop: (show: boolean) => void;
+}> = ({ showUpgradeShop, setShowUpgradeShop }) => {
+  const [upgradeData, setUpgradeData] = useState<any>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [retryCount, setRetryCount] = useState(0);
+  
+  // FAST FILTER STATE - Moved from DivineMiningGame for better performance
+  const [upgradeFilter, setUpgradeFilter] = useState<'all' | 'affordable' | 'recommended' | 'hardware' | 'advanced' | 'software' | 'network' | 'infrastructure'>('all');
+  const [currentUpgradePage, setCurrentUpgradePage] = useState(1);
+  const upgradesPerPage = 9; // Show 9 upgrades per page
+
+  // FAST FILTER FUNCTIONS - Moved to IndexPage for instant performance
+  const getFilterDisplayName = useCallback((filter: string): string => {
+    switch (filter) {
+      case 'all': return 'ALL';
+      case 'affordable': return 'AFFORDABLE';
+      case 'recommended': return 'RECOMMENDED';
+      case 'hardware': return '🖥️ HARDWARE';
+      case 'advanced': return '⚡ ADVANCED';
+      case 'software': return '💻 SOFTWARE';
+      case 'network': return '🌐 NETWORK';
+      case 'infrastructure': return '🏗️ INFRASTRUCTURE';
+      default: return filter.toUpperCase();
+    }
+  }, []);
+
+  const getUpgradeCategoryName = useCallback((category: string): string => {
+    switch (category) {
+      case 'hardware': return '🖥️ HARDWARE';
+      case 'advanced': return '⚡ ADVANCED';
+      case 'software': return '💻 SOFTWARE';
+      case 'network': return '🌐 NETWORK';
+      case 'infrastructure': return '🏗️ INFRASTRUCTURE';
+      default: return category.toUpperCase();
+    }
+  }, []);
+
+  const getUpgradeCategoryColor = useCallback((category: string): string => {
+    switch (category) {
+      case 'hardware': return 'text-green-400 bg-green-900/20 border-green-500/30';
+      case 'advanced': return 'text-purple-400 bg-purple-900/20 border-purple-500/30';
+      case 'software': return 'text-blue-400 bg-blue-900/20 border-blue-500/30';
+      case 'network': return 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30';
+      case 'infrastructure': return 'text-orange-400 bg-orange-900/20 border-orange-500/30';
+      default: return 'text-gray-400 bg-gray-900/20 border-gray-500/30';
+    }
+  }, []);
+
+  // FAST FILTERING - Instant filtering without DivineMiningGame dependency
+  const getFilteredUpgrades = useCallback((): any[] => {
+    if (!upgradeData?.upgrades) return [];
+    
+    let filtered = [...upgradeData.upgrades];
+    
+    switch (upgradeFilter) {
+      case 'affordable':
+        filtered = filtered.filter(upgrade => {
+          const cost = Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
+          return upgradeData.divinePoints >= cost;
+        });
+        break;
+      case 'recommended':
+        filtered = filtered.filter(upgrade => {
+          // Simple efficiency check - upgrades with good value
+          const cost = Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
+          const efficiency = upgrade.effectValue / cost;
+          return efficiency > 0.001 && upgrade.level < upgrade.maxLevel;
+        });
+        break;
+      case 'hardware':
+        filtered = filtered.filter(upgrade => upgrade.category === 'hardware');
+        break;
+      case 'advanced':
+        filtered = filtered.filter(upgrade => upgrade.category === 'advanced');
+        break;
+      case 'software':
+        filtered = filtered.filter(upgrade => upgrade.category === 'software');
+        break;
+      case 'network':
+        filtered = filtered.filter(upgrade => upgrade.category === 'network');
+        break;
+      case 'infrastructure':
+        filtered = filtered.filter(upgrade => upgrade.category === 'infrastructure');
+        break;
+      case 'all':
+      default:
+        // Show all upgrades
+        break;
+    }
+    
+    return filtered;
+  }, [upgradeData, upgradeFilter]);
+
+  // FAST PAGINATION - Instant pagination calculation
+  const getTotalPages = useCallback((): number => {
+    return Math.ceil(getFilteredUpgrades().length / upgradesPerPage);
+  }, [getFilteredUpgrades]);
+
+  const getPaginatedUpgrades = useCallback((): any[] => {
+    const filtered = getFilteredUpgrades();
+    const startIndex = (currentUpgradePage - 1) * upgradesPerPage;
+    const endIndex = startIndex + upgradesPerPage;
+    return filtered.slice(startIndex, endIndex);
+  }, [getFilteredUpgrades, currentUpgradePage]);
+
+  // FAST HELPER FUNCTIONS
+  const getUpgradeCost = useCallback((upgrade: any): number => {
+    return Math.floor(upgrade.baseCost * Math.pow(upgrade.costMultiplier, upgrade.level));
+  }, []);
+
+  const isUpgradeMaxed = useCallback((upgrade: any): boolean => {
+    return upgrade.level >= upgrade.maxLevel;
+  }, []);
+
+  const isUpgradeAvailable = useCallback((upgrade: any): boolean => {
+    if (!upgrade.requires) return true;
+    const requiredUpgrade = upgradeData?.upgrades?.find((u: any) => u.id === upgrade.requires.upgrade);
+    return requiredUpgrade && requiredUpgrade.level >= upgrade.requires.level;
+  }, [upgradeData]);
+
+  const formatNumber = useCallback((num: number): string => {
+    if (num >= 1e12) return (num / 1e12).toFixed(1) + 'T';
+    if (num >= 1e9) return (num / 1e9).toFixed(1) + 'B';
+    if (num >= 1e6) return (num / 1e6).toFixed(1) + 'M';
+    if (num >= 1e3) return (num / 1e3).toFixed(1) + 'K';
+    return num.toFixed(0);
+  }, []);
+
+  // FAST PURCHASE HANDLER
+  const handlePurchaseUpgrade = useCallback((upgradeId: string) => {
+    console.log('🚀 Fast purchase request:', upgradeId);
+    // Dispatch purchase event to DivineMiningGame
+    window.dispatchEvent(new CustomEvent('purchaseUpgrade', { detail: upgradeId }));
+  }, []);
+
+  const requestUpgradeData = useCallback(() => {
+    setIsLoading(true);
+    setError(null);
+    
+    // Request upgrade data from DivineMiningGame
+    window.dispatchEvent(new CustomEvent('requestUpgradeData'));
+    
+    // Set a timeout to handle cases where no response is received
+    setTimeout(() => {
+      if (isLoading) {
+        setIsLoading(false);
+        setError('No response from game. Please try again.');
+        setRetryCount(prev => prev + 1);
+      }
+    }, 3000);
+  }, [isLoading]);
+
+  // Listen for upgrade data from DivineMiningGame
+  useEffect(() => {
+    const handleUpgradeData = (event: CustomEvent) => {
+      if (event.detail) {
+        setUpgradeData(event.detail);
+        setIsLoading(false);
+        setError(null);
+      }
+    };
+
+    const handleUpgradeDataError = () => {
+      setIsLoading(false);
+      setError('Failed to load upgrade data');
+    };
+
+    // Listen for purchase updates to refresh data
+    const handlePurchaseUpdate = () => {
+      console.log('🔄 Purchase update received, refreshing upgrade data...');
+      // Request fresh data after purchase
+      requestUpgradeData();
+    };
+
+    window.addEventListener('upgradeDataResponse', handleUpgradeData as EventListener);
+    window.addEventListener('upgradeDataError', handleUpgradeDataError);
+    window.addEventListener('purchaseUpdate', handlePurchaseUpdate);
+    
+    return () => {
+      window.removeEventListener('upgradeDataResponse', handleUpgradeData as EventListener);
+      window.removeEventListener('upgradeDataError', handleUpgradeDataError);
+      window.removeEventListener('purchaseUpdate', handlePurchaseUpdate);
+    };
+  }, [requestUpgradeData]);
+
+  const closeUpgradeShop = () => {
+    setShowUpgradeShop(false);
+    setError(null);
+    setRetryCount(0);
+  };
+
+  // Request upgrade data when modal opens - IMMEDIATE
+  useEffect(() => {
+    if (showUpgradeShop) {
+      // Immediate request for faster response
+      requestUpgradeData();
+    }
+  }, [showUpgradeShop, requestUpgradeData]);
+
+  // Listen for upgrade data changes - OPTIMIZED
+  useEffect(() => {
+    const handleUpgradeDataChange = () => {
+      console.log('🔄 Upgrade data changed in IndexPage, updating existing data...');
+      // Don't request fresh data for filter changes - just update existing data
+      if (showUpgradeShop && upgradeData) {
+        // Update the existing data instead of making new requests
+        setUpgradeData((prevData: any) => ({
+          ...prevData,
+          timestamp: Date.now() // Force re-render
+        }));
+      }
+    };
+
+    window.addEventListener('upgradeDataChanged', handleUpgradeDataChange);
+    
+    return () => {
+      window.removeEventListener('upgradeDataChanged', handleUpgradeDataChange);
+    };
+  }, [showUpgradeShop, upgradeData]);
+
+  // If no upgrade data is available, show loading or error state
+  if (!upgradeData) {
+    return (
+      <div 
+        className={`fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm transition-opacity duration-300 ${showUpgradeShop ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+        onClick={(e) => {
+          if (e.target === e.currentTarget) {
+            closeUpgradeShop();
+          }
+        }}
+      >
+        <div className={`relative w-full h-full max-w-2xl max-h-[80vh] bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-cyan-500/30 shadow-[0_0_40px_rgba(0,255,255,0.3)] overflow-hidden transition-transform duration-300 ${showUpgradeShop ? 'scale-100' : 'scale-95'}`}>
+          {/* Header */}
+          <div className="flex items-center justify-between p-6 border-b border-cyan-500/20 bg-gradient-to-r from-cyan-900/20 to-blue-900/20">
+            <div className="flex items-center space-x-4">
+              <div className="w-12 h-12 rounded-full bg-gradient-to-br from-cyan-700 to-blue-800 border-2 border-cyan-400 flex items-center justify-center shadow-lg">
+                <div className="text-cyan-200 text-2xl">🤖</div>
+              </div>
+              <div className="flex flex-col">
+                <span className="text-sm font-mono text-cyan-400">Divine Points</span>
+                <span className="flex items-center text-2xl font-mono font-bold text-yellow-300">
+                  <span className="mr-2 text-yellow-400">💰</span>
+                  <span className="tabular-nums">
+                    {isLoading ? 'Loading...' : '---'}
+                  </span>
+                </span>
+              </div>
+            </div>
+            <button
+              onClick={closeUpgradeShop}
+              className="w-10 h-10 flex items-center justify-center rounded-lg bg-red-900/50 text-red-400 border border-red-500/30 hover:bg-red-800/50 hover:border-red-400/50 transition-all duration-200 hover:scale-110"
+              title="Close shop"
+            >
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
+                <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+              </svg>
+            </button>
+          </div>
+
+          {/* Content */}
+          <div className="p-6 overflow-y-auto h-[calc(100%-80px)]">
+            {error ? (
+              <div className="text-center py-12">
+                <div className="text-red-400 font-mono text-lg mb-4">
+                  ⚠️ Connection Error
+                </div>
+                <div className="text-gray-500 font-mono text-sm mb-6">
+                  {error}
+                </div>
+                <div className="flex justify-center space-x-4">
+                  <button
+                    onClick={requestUpgradeData}
+                    className="px-6 py-3 bg-cyan-900/50 text-cyan-300 border border-cyan-500 rounded-lg hover:bg-cyan-800/50 transition-all duration-200"
+                  >
+                    Retry
+                  </button>
+                  <button
+                    onClick={closeUpgradeShop}
+                    className="px-6 py-3 bg-gray-700/50 text-gray-300 border border-gray-600 rounded-lg hover:bg-gray-600/50 transition-all duration-200"
+                  >
+                    Close
+                  </button>
+                </div>
+                {retryCount > 0 && (
+                  <div className="text-gray-600 font-mono text-xs mt-4">
+                    Retry attempts: {retryCount}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <div className="text-center py-12">
+                <div className="text-gray-400 font-mono text-lg mb-4">
+                  🔧 Loading Upgrade Shop...
+                </div>
+                <div className="text-gray-500 font-mono text-sm mb-4">
+                  Connecting to mining game data...
+                </div>
+                <div className="flex justify-center">
+                  <div className="w-8 h-8 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+                </div>
+                <div className="text-gray-600 font-mono text-xs mt-4">
+                  This may take a few seconds...
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    );
+  }
+
+  // Use the actual UpgradeModal with real data
+  return (
+    <UpgradeModal
+      isOpen={showUpgradeShop}
+      onClose={closeUpgradeShop}
+      upgrades={upgradeData.upgrades}
+      divinePoints={upgradeData.divinePoints}
+      onPurchaseUpgrade={handlePurchaseUpgrade}
+      purchasingUpgrade={upgradeData.purchasingUpgrade}
+      formatNumber={formatNumber}
+      getUpgradeCost={getUpgradeCost}
+      isUpgradeMaxed={isUpgradeMaxed}
+      isUpgradeAvailable={isUpgradeAvailable}
+      getFilterDisplayName={getFilterDisplayName}
+      getUpgradeCategoryColor={getUpgradeCategoryColor}
+      getUpgradeCategoryName={getUpgradeCategoryName}
+      getPaginatedUpgrades={getPaginatedUpgrades}
+      getTotalPages={getTotalPages}
+      upgradeFilter={upgradeFilter}
+      currentUpgradePage={currentUpgradePage}
+      setUpgradeFilter={setUpgradeFilter}
+      setCurrentUpgradePage={setCurrentUpgradePage}
+    />
+  );
+};
+
 export const IndexPage: FC = () => {
   const { user, isLoading, error } = useAuth();
   
@@ -156,6 +498,9 @@ export const IndexPage: FC = () => {
   const [walletBalance, setWalletBalance] = useState<string>('0');
   const [isLoadingBalance, setIsLoadingBalance] = useState(false);
   
+  // Upgrade Shop Modal State
+  const [showUpgradeShop, setShowUpgradeShop] = useState(false);
+  
   // TON Network Configuration
   const isMainnet = false; // You can toggle this for testing
   const NETWORK_NAME = isMainnet ? 'Mainnet' : 'Testnet';
@@ -165,6 +510,19 @@ export const IndexPage: FC = () => {
   // Add referral integration
   useReferralIntegration();
   
+  // Global event listener for opening upgrade shop
+  useEffect(() => {
+    const handleOpenUpgradeShop = () => {
+      setShowUpgradeShop(true);
+    };
+
+    window.addEventListener('openUpgradeShop', handleOpenUpgradeShop);
+    
+    return () => {
+      window.removeEventListener('openUpgradeShop', handleOpenUpgradeShop);
+    };
+  }, []);
+
   // Show wallet status when address changes or balance updates
   useEffect(() => {
     if (userFriendlyAddress) {
@@ -708,6 +1066,12 @@ export const IndexPage: FC = () => {
 
         </div>
 
+        {/* Upgrade Shop Modal */}
+        <UpgradeShopModal 
+          showUpgradeShop={showUpgradeShop}
+          setShowUpgradeShop={setShowUpgradeShop}
+        />
+
                  {/* Enhanced Cyberpunk Bottom Navigation */}
          <div className="fixed bottom-0 left-0 right-0 bg-gradient-to-t from-black/98 via-gray-900/95 to-black/98 backdrop-blur-2xl border-t border-cyan-500/40 safe-area-pb z-40 shadow-[0_-8px_32px_0_rgba(0,255,255,0.15)] transition-all duration-300 overflow-hidden">
            {/* Enhanced Top Border with Animation */}
@@ -845,9 +1209,11 @@ export const IndexPage: FC = () => {
          </div>
                </div>
       </div>
+      
         </GameProvider>
       </ErrorBoundary>
     );
   };
+
 
 

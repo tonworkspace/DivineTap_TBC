@@ -1,23 +1,10 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useAuth } from '../hooks/useAuth';
-// import { useGameContext } from '../contexts/GameContext';
+import { useGameContext } from '../contexts/GameContext';
 import { toNano } from '@ton/core';
 import { useTonConnectUI, useTonAddress } from '@tonconnect/ui-react';
-import { supabase, createWithdrawal, getUserByTelegramId } from '../lib/supabaseClient';
+import { supabase } from '../lib/supabaseClient';
 import { useNotificationSystem } from './NotificationSystem';
-import {
-  SECURITY_CONFIG,
-  rateLimiter,
-  generateDataHash,
-  validateDataIntegrity,
-  generateOperationSignature,
-  validateOperationSignature,
-  logSecurityEvent,
-  validateBalanceChange,
-  validateStakeData,
-  reconcileUserData,
-  detectSuspiciousActivity
-} from '../lib/security';
 // import * as TonWeb from 'tonweb';
 // import { calculateDailyRewards, STAKING_CONFIG } from '../lib/supabaseClient';
 
@@ -70,18 +57,13 @@ interface MiningStakingSynergy {
 
 // Stealth Saving System Configuration
 const STEALTH_SAVE_CONFIG = {
-  AUTO_SAVE_INTERVAL: 30000,
+  AUTO_SAVE_INTERVAL: 30000, // 30 seconds
   OFFLINE_QUEUE_KEY: 'divine_mining_offline_queue',
   LAST_SYNC_KEY: 'divine_mining_last_sync',
-  SYNC_RETRY_DELAY: 5000,
-  MAX_RETRY_ATTEMPTS: SECURITY_CONFIG.MAX_RETRY_ATTEMPTS,
-  BATCH_SIZE: 10,
-  MIN_SYNC_INTERVAL: 10000,
-  // Security settings
-  MAX_OFFLINE_QUEUE_SIZE: SECURITY_CONFIG.MAX_OFFLINE_QUEUE_SIZE,
-  DATA_INTEGRITY_CHECK: SECURITY_CONFIG.DATA_INTEGRITY_ENABLED,
-  RATE_LIMIT_OPERATIONS: SECURITY_CONFIG.RATE_LIMITING_ENABLED,
-  MAX_OPERATIONS_PER_MINUTE: SECURITY_CONFIG.MAX_OPERATIONS_PER_MINUTE
+  SYNC_RETRY_DELAY: 5000, // 5 seconds
+  MAX_RETRY_ATTEMPTS: 3,
+  BATCH_SIZE: 10, // Number of offline operations to process at once
+  MIN_SYNC_INTERVAL: 10000, // Minimum time between syncs (10 seconds)
 };
 
 // Offline operation types
@@ -92,7 +74,6 @@ interface OfflineOperation {
   timestamp: number;
   retryCount: number;
   userId: string;
-  signature?: string;
 }
 
 // Stealth saving state interface
@@ -149,23 +130,22 @@ const calculateEarningRate = (balance: number, roi: number): number => {
   return (balance * roi) / 100;
 };
 
-// ENHANCED: Fixed localStorage keys to prevent conflicts with DivineMiningGame
 // Legacy localStorage keys (for backward compatibility)
-const STAKES_STORAGE_KEY = 'daily_rewards_stakes';
-// const USER_DATA_STORAGE_KEY = 'daily_rewards_user_data';
-const WITHDRAWAL_HISTORY_KEY = 'daily_rewards_withdrawals';
-// New mining integration keys
-const MINING_SYNERGY_KEY = 'daily_rewards_synergy';
-const MINING_STAKING_BONUSES_KEY = 'daily_rewards_staking_bonuses';
+  const STAKES_STORAGE_KEY = 'divine_mining_stakes';
+  const USER_DATA_STORAGE_KEY = 'divine_mining_user_data';
+  const WITHDRAWAL_HISTORY_KEY = 'divine_mining_withdrawals';
+  // New mining integration keys
+  const MINING_SYNERGY_KEY = 'divine_mining_synergy';
+  const MINING_STAKING_BONUSES_KEY = 'divine_mining_staking_bonuses';
 
 // Helper functions for localStorage operations
 
-// Storage key helpers for user isolation - FIXED to prevent conflicts
-const getStakesStorageKey = (userId?: string) => `daily_rewards_stakes_${userId || 'anonymous'}`;
-const getUserDataStorageKey = (userId?: string) => `daily_rewards_user_data_${userId || 'anonymous'}`;
-const getWithdrawalHistoryStorageKey = (userId?: string) => `daily_rewards_withdrawals_${userId || 'anonymous'}`;
-const getMiningSynergyStorageKey = (userId?: string) => `daily_rewards_synergy_${userId || 'anonymous'}`;
-const getStakingBonusesStorageKey = (userId?: string) => `daily_rewards_staking_bonuses_${userId || 'anonymous'}`;
+// Storage key helpers for user isolation
+const getStakesStorageKey = (userId?: string) => `divine_mining_stakes_${userId || 'anonymous'}`;
+const getUserDataStorageKey = (userId?: string) => `divine_mining_user_data_${userId || 'anonymous'}`;
+const getWithdrawalHistoryStorageKey = (userId?: string) => `divine_mining_withdrawals_${userId || 'anonymous'}`;
+const getMiningSynergyStorageKey = (userId?: string) => `divine_mining_synergy_${userId || 'anonymous'}`;
+const getStakingBonusesStorageKey = (userId?: string) => `divine_mining_staking_bonuses_${userId || 'anonymous'}`;
 
 
 
@@ -204,81 +184,159 @@ const saveStakesToStorage = (stakes: UserStake[], userId?: string) => {
   }
 };
 
+// Balance validation and protection functions
+const validateBalance = (balance: number): number => {
+  // Ensure balance is never negative
+  if (balance < 0) {
+    console.warn('⚠️ Negative balance detected, setting to 0');
+    return 0;
+  }
+  
+  // Cap balance at reasonable maximum to prevent overflow
+  const MAX_BALANCE = 999999999;
+  if (balance > MAX_BALANCE) {
+    console.warn('⚠️ Balance too high, capping at maximum');
+    return MAX_BALANCE;
+  }
+  
+  return balance;
+};
+
+const validateBalanceOperation = (currentBalance: number, operation: 'add' | 'subtract', amount: number): { isValid: boolean; newBalance: number; error?: string } => {
+  const validCurrentBalance = validateBalance(currentBalance);
+  const validAmount = Math.max(0, amount);
+  
+  if (operation === 'subtract') {
+    if (validAmount > validCurrentBalance) {
+      return {
+        isValid: false,
+        newBalance: validCurrentBalance,
+        error: `Insufficient balance. Required: ${validAmount}, Available: ${validCurrentBalance}`
+      };
+    }
+    return {
+      isValid: true,
+      newBalance: validateBalance(validCurrentBalance - validAmount)
+    };
+  } else {
+    return {
+      isValid: true,
+      newBalance: validateBalance(validCurrentBalance + validAmount)
+    };
+  }
+};
+
+const safeUpdateBalance = (currentBalance: number, operation: 'add' | 'subtract', amount: number, userId?: string): { success: boolean; newBalance: number; error?: string } => {
+  const result = validateBalanceOperation(currentBalance, operation, amount);
+  
+  if (!result.isValid) {
+    return {
+      success: false,
+      newBalance: result.newBalance,
+      error: result.error
+    };
+  }
+  
+  // Update user data with validated balance
+  const userData = getUserData(userId);
+  userData.balance = result.newBalance;
+  saveUserData(userData, userId);
+  
+  return {
+    success: true,
+    newBalance: result.newBalance
+  };
+};
+
+// Balance recovery function to fix any existing negative balances
+const recoverBalance = (userId?: string): { success: boolean; oldBalance: number; newBalance: number; issues: string[] } => {
+  const issues: string[] = [];
+  const userData = getUserData(userId);
+  const oldBalance = userData.balance;
+  const oldEarnings = userData.totalEarnings;
+  
+  // Validate and fix balance
+  const validatedBalance = validateBalance(oldBalance);
+  const validatedEarnings = Math.max(0, oldEarnings);
+  
+  if (validatedBalance !== oldBalance) {
+    issues.push(`Fixed negative balance: ${oldBalance} → ${validatedBalance}`);
+  }
+  
+  if (validatedEarnings !== oldEarnings) {
+    issues.push(`Fixed negative earnings: ${oldEarnings} → ${validatedEarnings}`);
+  }
+  
+  // Save the fixed data
+  if (issues.length > 0) {
+    saveUserData({
+      balance: validatedBalance,
+      totalEarnings: validatedEarnings
+    }, userId);
+    
+    console.log('🔧 Balance recovery completed:', {
+      userId,
+      issues,
+      oldBalance,
+      newBalance: validatedBalance
+    });
+  }
+  
+  return {
+    success: issues.length > 0,
+    oldBalance,
+    newBalance: validatedBalance,
+    issues
+  };
+};
+
+// Enhanced getUserData with balance validation
 const getUserData = (userId?: string) => {
   try {
+    // Try user-specific key first
     const userKey = getUserDataStorageKey(userId);
     const stored = localStorage.getItem(userKey);
     if (stored) {
       const data = JSON.parse(stored);
-      
-      // Verify integrity for version 2.0+ data
-      if (data._version && data._version >= '2.0') {
-        const { _integrity, _timestamp, _version, ...actualData } = data;
-        
-        if (!validateDataIntegrity(actualData, _integrity)) {
-          console.error('Data integrity check failed - possible tampering');
-          
-          // Log security event
-          if (userId) {
-            logSecurityEvent({
-              userId: parseInt(userId),
-              eventType: 'data_integrity_violation',
-              severity: 'high',
-              details: { 
-                expected_hash: _integrity,
-                actual_hash: generateDataHash(actualData),
-                timestamp: _timestamp
-              }
-            });
-          }
-          
-          return { balance: 0, totalEarnings: 0 }; // Reset to safe defaults
-        }
-        
-        return actualData;
-      }
-      
-      // Legacy data (no integrity check)
+      // Validate balance when loading
+      data.balance = validateBalance(data.balance || 0);
+      data.totalEarnings = Math.max(0, data.totalEarnings || 0);
       return data;
     }
-    return { balance: 0, totalEarnings: 0 };
+    
+    // Fallback to legacy key for migration
+    const legacyStored = localStorage.getItem(USER_DATA_STORAGE_KEY);
+    if (legacyStored && userId) {
+      // Migrate legacy data to user-specific key
+      const legacyData = JSON.parse(legacyStored);
+      // Validate balance during migration
+      legacyData.balance = validateBalance(legacyData.balance || 0);
+      legacyData.totalEarnings = Math.max(0, legacyData.totalEarnings || 0);
+      localStorage.setItem(userKey, JSON.stringify(legacyData));
+      localStorage.removeItem(USER_DATA_STORAGE_KEY); // Clean up legacy key
+      return legacyData;
+    }
+    
+    return { balance: 1000, totalEarnings: 0 };
   } catch (error) {
     console.error('Error reading user data from localStorage:', error);
-    return { balance: 0, totalEarnings: 0 };
+    return { balance: 1000, totalEarnings: 0 };
   }
 };
 
+// Enhanced saveUserData with balance validation
 const saveUserData = (data: { balance: number; totalEarnings: number }, userId?: string) => {
   try {
-    // Rate limiting check
-    if (userId && !rateLimiter.canPerformOperation(userId, 'user_data_update')) {
-      console.warn('Rate limit exceeded for user data update');
-      return;
-    }
-
-    // Data integrity
-    const integrityHash = generateDataHash(data);
-    const secureData = {
-      ...data,
-      _integrity: integrityHash,
-      _timestamp: Date.now(),
-      _version: '2.0'
+    // Validate data before saving
+    const validatedData = {
+      balance: validateBalance(data.balance),
+      totalEarnings: Math.max(0, data.totalEarnings || 0)
     };
     
     const userKey = getUserDataStorageKey(userId);
-    localStorage.setItem(userKey, JSON.stringify(secureData));
-
-    // Log the operation
-    if (userId) {
-      logSecurityEvent({
-        userId: parseInt(userId),
-        eventType: 'user_data_update',
-        severity: 'low',
-        details: { balance: data.balance, totalEarnings: data.totalEarnings }
-      });
-    }
+    localStorage.setItem(userKey, JSON.stringify(validatedData));
   } catch (error) {
-    console.error('Error saving user data:', error);
+    console.error('Error saving user data to localStorage:', error);
   }
 };
 
@@ -418,15 +476,12 @@ const STAKING_TIERS: StakingTier[] = [
 
 const DailyRewards: React.FC = () => {
   const { user } = useAuth();
+  const { points: miningPoints, addGems } = useGameContext();
   const { 
     showSystemNotification, 
     showRewardNotification, 
     showAchievementNotification
   } = useNotificationSystem();
-  
-  // Add miningPoints state here, at the top with other state declarations
-  const [miningPoints, setMiningPoints] = useState(0);
-  
   const [userStakes, setUserStakes] = useState<UserStake[]>([]);
   const [selectedTier, setSelectedTier] = useState<StakingTier | null>(null);
   const [stakeAmount, setStakeAmount] = useState<number>(1);
@@ -485,15 +540,12 @@ const DailyRewards: React.FC = () => {
   // Stealth Saving System State
   const [stealthSaveState, setStealthSaveState] = useState<StealthSaveState>({
     isOnline: navigator.onLine,
-    lastSyncTime: Date.now(),
+    lastSyncTime: 0,
     pendingOperations: [],
     isSyncing: false,
     syncErrors: [],
     autoSaveEnabled: true
   });
-
-  // Add flag to prevent balance override after staking
-  const [justStaked, setJustStaked] = useState(false);
 
   // Refs for stealth saving
   const autoSaveIntervalRef = useRef<NodeJS.Timeout>();
@@ -527,83 +579,26 @@ const DailyRewards: React.FC = () => {
     }
   }, [user?.id, miningPoints, userStakes]);
 
-  // Run migration on component mount to move old data to new keys
-  useEffect(() => {
-    if (user?.telegram_id) {
-      migrateOldData(String(user.telegram_id));
-    }
-  }, [user?.telegram_id]);
 
-  const loadWithdrawalHistory = async () => {
-    try {
-      // Load local storage history first
-      const localHistory = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
-      const filteredLocalHistory = localHistory.filter(withdrawal => 
-        withdrawal.wallet_address && withdrawal.amount > 0
-      );
-      
-      // If user is authenticated, also load from Supabase
-      if (user?.telegram_id) {
-        const dbUser = await getUserByTelegramId(user.telegram_id);
-        if (dbUser) {
-          const { data: supabaseWithdrawals, error } = await supabase
-            .from('withdrawals')
-            .select('*')
-            .eq('user_id', dbUser.id)
-            .order('created_at', { ascending: false });
 
-          if (!error && supabaseWithdrawals) {
-            // Convert Supabase withdrawals to local format
-            const formattedWithdrawals = supabaseWithdrawals.map(withdrawal => ({
-              id: withdrawal.id,
-              amount: withdrawal.amount,
-              wallet_address: withdrawal.wallet_address || 'N/A', // Handle missing wallet_address
-              status: withdrawal.status,
-              created_at: withdrawal.created_at
-            }));
 
-            // Merge with local history, removing duplicates
-            const allWithdrawals = [...formattedWithdrawals];
-            filteredLocalHistory.forEach(localItem => {
-              if (!formattedWithdrawals.find(dbItem => dbItem.id === localItem.id)) {
-                allWithdrawals.push(localItem);
-              }
-            });
 
-            // Sort by date and filter valid entries
-            const validWithdrawals = allWithdrawals
-              .filter(withdrawal => withdrawal.wallet_address && withdrawal.amount > 0)
-              .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
-              
-            setWithdrawalHistory(validWithdrawals);
-            
-            // Update local storage with the merged data
-            saveWithdrawalHistory(validWithdrawals, user?.telegram_id ? String(user.telegram_id) : undefined);
-            return;
-          }
-        }
-      }
-      
-      // Fallback to local storage only
-      setWithdrawalHistory(filteredLocalHistory);
-    } catch (error) {
-      console.error('Error loading withdrawal history:', error);
-      // Fallback to local storage on error
-      const localHistory = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
-      const filteredLocalHistory = localHistory.filter(withdrawal => 
-        withdrawal.wallet_address && withdrawal.amount > 0
-      );
-      setWithdrawalHistory(filteredLocalHistory);
-    }
+
+
+  const loadWithdrawalHistory = () => {
+    const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
+    const userHistory = history.filter(withdrawal => 
+      withdrawal.wallet_address && withdrawal.amount > 0
+    );
+    setWithdrawalHistory(userHistory);
   };
 
   const loadUserData = async () => {
     try {
-      // If we just staked, skip loading from database to prevent overriding the balance
-      if (justStaked) {
-        console.log('🔄 Skipping loadUserData - just staked, balance already updated');
-        setJustStaked(false); // Reset the flag
-        return;
+      // Run balance recovery first to fix any existing issues
+      const recoveryResult = recoverBalance(user?.telegram_id ? String(user.telegram_id) : undefined);
+      if (recoveryResult.success) {
+        console.log('🔧 Balance recovery during load:', recoveryResult.issues);
       }
       
       // First try to get balance from database
@@ -615,21 +610,33 @@ const DailyRewards: React.FC = () => {
           .single();
 
         if (!error && data) {
-          const newBalance = data.balance || 0;
+          // Validate database data
+          const validatedBalance = validateBalance(data.balance || 0);
+          const validatedEarnings = Math.max(0, data.total_earned || 0);
           const oldBalance = userBalance;
           
-          setUserBalance(newBalance);
-          setTotalEarnings(data.total_earned || 0);
+          // Check if data needed validation
+          if (validatedBalance !== (data.balance || 0) || validatedEarnings !== (data.total_earned || 0)) {
+            console.log('🔧 Fixed database data during load:', {
+              oldBalance: data.balance,
+              newBalance: validatedBalance,
+              oldEarnings: data.total_earned,
+              newEarnings: validatedEarnings
+            });
+          }
           
-          // Sync local storage with database
+          setUserBalance(validatedBalance);
+          setTotalEarnings(validatedEarnings);
+          
+          // Sync local storage with validated database data
           const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
-          userData.balance = newBalance;
-          userData.totalEarnings = data.total_earned || 0;
+          userData.balance = validatedBalance;
+          userData.totalEarnings = validatedEarnings;
           saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
           
           // Check for balance milestones
-          if (newBalance > oldBalance) {
-            const balanceIncrease = newBalance - oldBalance;
+          if (validatedBalance > oldBalance) {
+            const balanceIncrease = validatedBalance - oldBalance;
             if (balanceIncrease >= 10) {
               showAchievementNotification({
                 name: 'Big Spender',
@@ -639,17 +646,17 @@ const DailyRewards: React.FC = () => {
           }
           
           // Check for total balance milestones
-          if (newBalance >= 100 && oldBalance < 100) {
+          if (validatedBalance >= 100 && oldBalance < 100) {
             showAchievementNotification({
               name: 'Century Club',
               description: 'Reached 100 TON total balance!'
             });
-          } else if (newBalance >= 500 && oldBalance < 500) {
+          } else if (validatedBalance >= 500 && oldBalance < 500) {
             showAchievementNotification({
               name: 'Half Grand',
               description: 'Reached 500 TON total balance!'
             });
-          } else if (newBalance >= 1000 && oldBalance < 1000) {
+          } else if (validatedBalance >= 1000 && oldBalance < 1000) {
             showAchievementNotification({
               name: 'Grand Master',
               description: 'Reached 1000 TON total balance!'
@@ -660,16 +667,38 @@ const DailyRewards: React.FC = () => {
         }
       }
       
-      // Fallback to local storage
+      // Fallback to local storage with validation
       const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
-      setUserBalance(userData.balance);
-      setTotalEarnings(userData.totalEarnings);
+      const validatedBalance = validateBalance(userData.balance);
+      const validatedEarnings = Math.max(0, userData.totalEarnings);
+      
+      // Check if local data needed validation
+      if (validatedBalance !== userData.balance || validatedEarnings !== userData.totalEarnings) {
+        console.log('🔧 Fixed local data during load:', {
+          oldBalance: userData.balance,
+          newBalance: validatedBalance,
+          oldEarnings: userData.totalEarnings,
+          newEarnings: validatedEarnings
+        });
+        
+        // Save the fixed data back to localStorage
+        saveUserData({
+          balance: validatedBalance,
+          totalEarnings: validatedEarnings
+        }, user?.telegram_id ? String(user.telegram_id) : undefined);
+      }
+      
+      setUserBalance(validatedBalance);
+      setTotalEarnings(validatedEarnings);
     } catch (error) {
       console.error('Error loading user data:', error);
-      // Fallback to local storage
+      // Fallback to local storage with validation
       const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
-      setUserBalance(userData.balance);
-      setTotalEarnings(userData.totalEarnings);
+      const validatedBalance = validateBalance(userData.balance);
+      const validatedEarnings = Math.max(0, userData.totalEarnings);
+      
+      setUserBalance(validatedBalance);
+      setTotalEarnings(validatedEarnings);
     }
   };
 
@@ -711,9 +740,15 @@ const DailyRewards: React.FC = () => {
   const handleStake = async () => {
     if (!user || !selectedTier || stakeAmount < selectedTier.minAmount) return;
     
-    // Check if user has enough balance
-    if (userBalance < stakeAmount) {
-      alert('Insufficient balance!');
+    // Use safe balance validation
+    const balanceResult = safeUpdateBalance(userBalance, 'subtract', stakeAmount, user?.telegram_id ? String(user.telegram_id) : undefined);
+    
+    if (!balanceResult.success) {
+      showSystemNotification(
+        'Insufficient Balance', 
+        balanceResult.error || 'You don\'t have enough balance to create this stake.', 
+        'error'
+      );
       return;
     }
 
@@ -763,48 +798,20 @@ const DailyRewards: React.FC = () => {
       allStakes.push(newStake);
       saveStakesToStorage(allStakes, user?.telegram_id ? String(user.telegram_id) : undefined);
 
-      // Update database balance
-      // Supabase does not support .raw, so fetch current balance, subtract, and update
-      let newDbBalance = null;
-      try {
-        const { data: userDb, error: fetchDbError } = await supabase
-          .from('users')
-          .select('balance')
-          .eq('id', user.id)
-          .single();
-        if (fetchDbError) throw fetchDbError;
-        newDbBalance = (userDb.balance || 0) - stakeAmount;
-        if (newDbBalance < 0) newDbBalance = 0;
-        const { error: updateError } = await supabase
-          .from('users')
-          .update({ 
-            balance: newDbBalance,
-            updated_at: new Date().toISOString()
-          })
-          .eq('id', user.id);
-        if (updateError) {
-          console.error('Error updating database balance:', updateError);
-        }
-        
-        // Update local storage immediately after database update
-        const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
-        userData.balance = newDbBalance;
-        saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
-        
-        // Update UI state immediately
-        setUserBalance(newDbBalance);
-        
-        // Set flag to prevent loadUserData from overriding the balance
-        setJustStaked(true);
-        
-        console.log('✅ Balance updated after staking:', {
-          previousBalance: userDb.balance || 0,
-          stakeAmount: stakeAmount,
-          newBalance: newDbBalance,
-          userId: user.id
-        });
-      } catch (err) {
-        console.error('Error fetching/updating user balance:', err);
+      // Update state with validated balance
+      setUserBalance(balanceResult.newBalance);
+
+      // Update database balance with validated amount
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ 
+          balance: balanceResult.newBalance,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (updateError) {
+        console.error('Error updating database balance:', updateError);
       }
 
       // Refresh stakes
@@ -812,9 +819,6 @@ const DailyRewards: React.FC = () => {
       setShowStakeModal(false);
       setStakeAmount(1);
       setSelectedTier(null);
-
-      // Balance is already updated above, no need to reload from database
-      // await loadUserData();
       
       showSystemNotification(
         'Stake Created Successfully', 
@@ -831,9 +835,16 @@ const DailyRewards: React.FC = () => {
       }
     } catch (error) {
       console.error('Error creating stake:', error);
+      
+      // Rollback balance if stake creation failed
+      const rollbackResult = safeUpdateBalance(balanceResult.newBalance, 'add', stakeAmount, user?.telegram_id ? String(user.telegram_id) : undefined);
+      if (rollbackResult.success) {
+        setUserBalance(rollbackResult.newBalance);
+      }
+      
       showSystemNotification(
         'Stake Creation Failed', 
-        'There was an error creating your stake. Please try again.', 
+        'There was an error creating your stake. Your balance has been restored.', 
         'error'
       );
     } finally {
@@ -869,22 +880,28 @@ const DailyRewards: React.FC = () => {
 
       saveStakesToStorage(updatedStakes, user?.telegram_id ? String(user.telegram_id) : undefined);
 
-      // Update user balance and total earnings in both local storage and database
-      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      // Update user balance and total earnings using safe validation
       const netReward = totalClaimed * 0.6; // User gets 60%
-      userData.balance += netReward;
-      userData.totalEarnings += totalClaimed;
+      const balanceResult = safeUpdateBalance(userBalance, 'add', netReward, user?.telegram_id ? String(user.telegram_id) : undefined);
+      
+      if (!balanceResult.success) {
+        throw new Error('Failed to update balance after claiming rewards');
+      }
+
+      // Update total earnings
+      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
+      userData.totalEarnings = Math.max(0, userData.totalEarnings + totalClaimed);
       saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
 
-      setUserBalance(userData.balance);
+      setUserBalance(balanceResult.newBalance);
       setTotalEarnings(userData.totalEarnings);
 
-      // Also update database
+      // Also update database with validated balance
       try {
         const { error: updateError } = await supabase
           .from('users')
           .update({ 
-            balance: userData.balance,
+            balance: balanceResult.newBalance,
             total_earned: userData.totalEarnings,
             updated_at: new Date().toISOString()
           })
@@ -947,7 +964,7 @@ const DailyRewards: React.FC = () => {
   };
 
   const handleWithdrawalRequest = async () => {
-    if (!walletAddress.trim() || withdrawalAmount <= 0 || withdrawalAmount > userBalance) {
+    if (!walletAddress.trim() || withdrawalAmount <= 0) {
       showSystemNotification(
         'Invalid Withdrawal Request', 
         'Please enter a valid wallet address and withdrawal amount.', 
@@ -956,10 +973,13 @@ const DailyRewards: React.FC = () => {
       return;
     }
 
-    if (!user?.telegram_id) {
+    // Use safe balance validation
+    const balanceResult = safeUpdateBalance(userBalance, 'subtract', withdrawalAmount, user?.telegram_id ? String(user.telegram_id) : undefined);
+    
+    if (!balanceResult.success) {
       showSystemNotification(
-        'Authentication Required', 
-        'Please make sure you are properly authenticated.', 
+        'Insufficient Balance', 
+        balanceResult.error || 'You don\'t have enough balance for this withdrawal.', 
         'error'
       );
       return;
@@ -967,56 +987,25 @@ const DailyRewards: React.FC = () => {
 
     setIsWithdrawing(true);
     try {
-      // Get user from database
-      const dbUser = await getUserByTelegramId(user.telegram_id);
-      if (!dbUser) {
-        throw new Error('User not found in database');
-      }
-
-      // Calculate withdrawal distribution (following the fee structure from supabaseClient)
-      const totalAmount = withdrawalAmount;
-      const glpFee = totalAmount * 0.10; // 10% to Global Leadership Pool
-      const stkFee = totalAmount * 0.10; // 10% to STK (Reputation Points)
-      const reinvestFee = totalAmount * 0.20; // 20% to re-investment wallet
-      const walletAmount = totalAmount - glpFee - stkFee - reinvestFee; // 60% to user wallet
-
-      // Create withdrawal request in Supabase
-      const withdrawalData = {
-        user_id: dbUser.id,
-        amount: totalAmount,
-        wallet_amount: walletAmount,
-        redeposit_amount: reinvestFee,
-        sbt_amount: stkFee,
-        status: 'pending' as const,
-        created_at: new Date().toISOString(),
-        wallet_address: walletAddress.trim() // Store wallet address in a custom field
-      };
-
-      const newWithdrawal = await createWithdrawal(withdrawalData);
+      // Simulate API delay
+      await new Promise(resolve => setTimeout(resolve, 2000));
       
-      if (!newWithdrawal) {
-        throw new Error('Failed to create withdrawal request in database');
-      }
-
-      // Also add to local storage for immediate UI update
-      const localWithdrawal = {
-        id: newWithdrawal.id,
-        amount: totalAmount,
+      const newWithdrawal = {
+        id: Date.now(),
+        amount: withdrawalAmount,
         wallet_address: walletAddress.trim(),
         status: 'pending' as const,
-        created_at: newWithdrawal.created_at
+        created_at: new Date().toISOString()
       };
 
+      // Add to withdrawal history
       const history = getWithdrawalHistory(user?.telegram_id ? String(user.telegram_id) : undefined);
-      history.push(localWithdrawal);
+      history.push(newWithdrawal);
       saveWithdrawalHistory(history, user?.telegram_id ? String(user.telegram_id) : undefined);
       setWithdrawalHistory(history);
 
-      // Update user balance locally (will be synced with database by admin processing)
-      const userData = getUserData(user?.telegram_id ? String(user.telegram_id) : undefined);
-      userData.balance -= withdrawalAmount;
-      saveUserData(userData, user?.telegram_id ? String(user.telegram_id) : undefined);
-      setUserBalance(userData.balance);
+      // Update state with validated balance
+      setUserBalance(balanceResult.newBalance);
 
       // Reset form
       setWithdrawalAmount(0);
@@ -1025,32 +1014,21 @@ const DailyRewards: React.FC = () => {
       
       showSystemNotification(
         'Withdrawal Request Submitted', 
-        `Withdrawal request for ${formatNumber(withdrawalAmount)} TON has been submitted to Supabase database. You will receive ${formatNumber(walletAmount)} TON after processing fees.`, 
+        `Withdrawal request for ${formatNumber(withdrawalAmount)} TON has been submitted successfully.`, 
         'success'
       );
-
-      // Log successful withdrawal request
-      await supabase.from('withdrawal_logs').insert({
-        user_id: dbUser.id,
-        withdrawal_id: newWithdrawal.id,
-        amount: totalAmount,
-        wallet_amount: walletAmount,
-        fees: {
-          glp: glpFee,
-          stk: stkFee,
-          reinvest: reinvestFee
-        },
-        wallet_address: walletAddress.trim(),
-        status: 'submitted',
-        timestamp: new Date().toISOString()
-      });
-
     } catch (error) {
       console.error('Error submitting withdrawal request:', error);
-      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      
+      // Rollback balance if withdrawal request failed
+      const rollbackResult = safeUpdateBalance(balanceResult.newBalance, 'add', withdrawalAmount, user?.telegram_id ? String(user.telegram_id) : undefined);
+      if (rollbackResult.success) {
+        setUserBalance(rollbackResult.newBalance);
+      }
+      
       showSystemNotification(
         'Withdrawal Request Failed', 
-        `There was an error submitting your withdrawal request: ${errorMessage}. Please try again.`, 
+        'There was an error submitting your withdrawal request. Your balance has been restored.', 
         'error'
       );
     } finally {
@@ -1260,7 +1238,7 @@ const DailyRewards: React.FC = () => {
     
     // Add gems for high levels
     if (miningSynergy.synergyLevel >= 7) {
-      handleSynergyReward();
+      addGems(50, 'synergy_reward');
     }
     
     setShowSynergyModal(false);
@@ -1390,68 +1368,24 @@ const DailyRewards: React.FC = () => {
 
   // Add operation to offline queue
   const addToOfflineQueue = (operation: Omit<OfflineOperation, 'id' | 'timestamp' | 'retryCount'>) => {
-    try {
-      // Rate limiting check
-      if (!rateLimiter.canPerformOperation(operation.userId, operation.type)) {
-        console.warn('Rate limit exceeded for operation:', operation.type);
-        return null;
-      }
+    const newOperation: OfflineOperation = {
+      ...operation,
+      id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      timestamp: Date.now(),
+      retryCount: 0
+    };
 
-      // Validate operation data
-      if (operation.type === 'user_data_update') {
-        const currentData = getUserData(operation.userId);
-        if (!validateBalanceChange(currentData.balance, operation.data.balance)) {
-          console.error('Invalid balance change detected');
-          logSecurityEvent({
-            userId: parseInt(operation.userId),
-            eventType: 'invalid_balance_change',
-            severity: 'high',
-            details: {
-              current_balance: currentData.balance,
-              new_balance: operation.data.balance,
-              change: Math.abs(operation.data.balance - currentData.balance)
-            }
-          });
-          return null;
-        }
-      }
+    const currentQueue = getOfflineQueue();
+    const updatedQueue = [...currentQueue, newOperation];
+    saveOfflineQueue(updatedQueue);
 
-      if (operation.type === 'stake_create' && !validateStakeData(operation.data)) {
-        console.error('Invalid stake data detected');
-        logSecurityEvent({
-          userId: parseInt(operation.userId),
-          eventType: 'invalid_stake_data',
-          severity: 'medium',
-          details: { stake_data: operation.data }
-        });
-        return null;
-      }
+    setStealthSaveState(prev => ({
+      ...prev,
+      pendingOperations: updatedQueue
+    }));
 
-      // Generate operation signature
-      const signature = generateOperationSignature(operation, operation.userId);
-
-      const newOperation: OfflineOperation = {
-        ...operation,
-        id: `${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
-        timestamp: Date.now(),
-        retryCount: 0,
-        signature: signature
-      };
-
-      const currentQueue = getOfflineQueue();
-      const updatedQueue = [...currentQueue, newOperation];
-      
-      // Limit queue size
-      if (updatedQueue.length > STEALTH_SAVE_CONFIG.MAX_OFFLINE_QUEUE_SIZE) {
-        updatedQueue.splice(0, updatedQueue.length - STEALTH_SAVE_CONFIG.MAX_OFFLINE_QUEUE_SIZE);
-      }
-      
-      saveOfflineQueue(updatedQueue);
-      return newOperation.id;
-    } catch (error) {
-      console.error('Error adding to offline queue:', error);
-      return null;
-    }
+    console.log('📝 Added operation to offline queue:', newOperation.type);
+    return newOperation.id;
   };
 
   // Process offline operations
@@ -1522,45 +1456,24 @@ const DailyRewards: React.FC = () => {
 
   // Process individual operation
   const processOperation = async (operation: OfflineOperation) => {
-    try {
-      // Validate operation signature
-      if (!operation.signature || !validateOperationSignature(operation, operation.userId, operation.signature)) {
-        console.error('Invalid operation signature');
-        logSecurityEvent({
-          userId: parseInt(operation.userId),
-          eventType: 'invalid_operation_signature',
-          severity: 'high',
-          details: { operation_type: operation.type }
-        });
-        return false;
-      }
-
-      // Check for suspicious activity
-      const isSuspicious = await detectSuspiciousActivity(parseInt(operation.userId), operation);
-      if (isSuspicious) {
-        console.error('Suspicious activity detected, blocking operation');
-        return false;
-      }
-
-      // Process based on operation type
-      switch (operation.type) {
-        case 'stake_create':
-          return await processStakeCreate(operation.data);
-        case 'stake_update':
-          return await processStakeUpdate(operation.data);
-        case 'reward_claim':
-          return await processRewardClaim(operation.data);
-        case 'user_data_update':
-          return await processUserDataUpdate(operation.data);
-        case 'synergy_update':
-          return await processSynergyUpdate(operation.data);
-        default:
-          console.error('Unknown operation type:', operation.type);
-          return false;
-      }
-    } catch (error) {
-      console.error('Error processing operation:', error);
-      return false;
+    switch (operation.type) {
+      case 'stake_create':
+        await processStakeCreate(operation.data);
+        break;
+      case 'stake_update':
+        await processStakeUpdate(operation.data);
+        break;
+      case 'reward_claim':
+        await processRewardClaim(operation.data);
+        break;
+      case 'user_data_update':
+        await processUserDataUpdate(operation.data);
+        break;
+      case 'synergy_update':
+        await processSynergyUpdate(operation.data);
+        break;
+      default:
+        throw new Error(`Unknown operation type: ${operation.type}`);
     }
   };
 
@@ -1608,66 +1521,16 @@ const DailyRewards: React.FC = () => {
 
   // Process user data update
   const processUserDataUpdate = async (data: any) => {
-    try {
-      // Get current server data for validation
-      const { data: currentUser, error: fetchError } = await supabase
-        .from('users')
-        .select('balance, total_earned')
-        .eq('id', data.userId)
-        .single();
+    const { error } = await supabase
+      .from('users')
+      .update({
+        balance: data.balance,
+        total_earned: data.totalEarned,
+        last_active: new Date().toISOString()
+      })
+      .eq('id', data.userId);
 
-      if (fetchError) {
-        console.error('Failed to fetch current user data:', fetchError);
-        return false;
-      }
-
-      // Validate balance change
-      if (!validateBalanceChange(currentUser.balance, data.balance)) {
-        console.error('Suspicious balance change detected');
-        logSecurityEvent({
-          userId: data.userId,
-          eventType: 'suspicious_balance_change',
-          severity: 'high',
-          details: {
-            server_balance: currentUser.balance,
-            client_balance: data.balance,
-            change: Math.abs(data.balance - currentUser.balance)
-          }
-        });
-        return false;
-      }
-
-      // Update user data
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({
-          balance: data.balance,
-          total_earned: data.totalEarnings,
-          last_active: new Date().toISOString()
-        })
-        .eq('id', data.userId);
-
-      if (updateError) {
-        console.error('Failed to update user data:', updateError);
-        return false;
-      }
-
-      // Log successful update
-      logSecurityEvent({
-        userId: data.userId,
-        eventType: 'user_data_updated',
-        severity: 'low',
-        details: {
-          new_balance: data.balance,
-          new_earnings: data.totalEarnings
-        }
-      });
-
-      return true;
-    } catch (error) {
-      console.error('Error in processUserDataUpdate:', error);
-      return false;
-    }
+    if (error) throw error;
   };
 
   // Process synergy update
@@ -2087,99 +1950,6 @@ const DailyRewards: React.FC = () => {
     }
   }, [miningSynergy, user?.id, stealthSaveState.autoSaveEnabled, stealthSaveSynergy]);
 
-  // Add periodic reconciliation
-  useEffect(() => {
-    if (!user?.id) return;
-
-    const reconciliationInterval = setInterval(async () => {
-      try {
-        const reconciledData = await reconcileUserData(user.id);
-        if (reconciledData) {
-          setUserBalance(reconciledData.balance);
-          setTotalEarnings(reconciledData.total_earned);
-        }
-      } catch (error) {
-        console.error('Reconciliation failed:', error);
-      }
-    }, SECURITY_CONFIG.RECONCILIATION_INTERVAL);
-
-    return () => clearInterval(reconciliationInterval);
-  }, [user?.id]);
-
-  // Migration function to move old data to new keys
-  const migrateOldData = (userId?: string) => {
-    try {
-      const oldKeys = [
-        `divine_mining_stakes_${userId || 'anonymous'}`,
-        `divine_mining_user_data_${userId || 'anonymous'}`,
-        `divine_mining_withdrawals_${userId || 'anonymous'}`,
-        `divine_mining_synergy_${userId || 'anonymous'}`,
-        `divine_mining_staking_bonuses_${userId || 'anonymous'}`
-      ];
-      
-      const newKeys = [
-        getStakesStorageKey(userId),
-        getUserDataStorageKey(userId),
-        getWithdrawalHistoryStorageKey(userId),
-        getMiningSynergyStorageKey(userId),
-        getStakingBonusesStorageKey(userId)
-      ];
-      
-      oldKeys.forEach((oldKey, index) => {
-        const oldData = localStorage.getItem(oldKey);
-        if (oldData) {
-          localStorage.setItem(newKeys[index], oldData);
-          // localStorage.removeItem(oldKey); // Do NOT delete the old key!
-          console.log(`✅ Migrated data from ${oldKey} to ${newKeys[index]}`);
-        }
-      });
-    } catch (error) {
-      console.error('Error during data migration:', error);
-    }
-  };
-
-  // REPLACE with local state:
-
-  // Add useEffect to sync mining points from DivineMiningGame localStorage:
-  useEffect(() => {
-    const syncMiningPoints = () => {
-      if (user?.telegram_id) {
-        const userPointsKey = `spiritualEssencePoints_${user.telegram_id}`;
-        const savedPoints = localStorage.getItem(userPointsKey);
-        if (savedPoints) {
-          setMiningPoints(parseInt(savedPoints, 10));
-        }
-      }
-    };
-    
-    syncMiningPoints();
-    
-    // Listen for changes from DivineMiningGame
-    const handleStorageChange = (e: StorageEvent) => {
-      if (e.key === `spiritualEssencePoints_${user?.telegram_id}`) {
-        syncMiningPoints();
-      }
-    };
-    
-    window.addEventListener('storage', handleStorageChange);
-    return () => window.removeEventListener('storage', handleStorageChange);
-  }, [user?.telegram_id]);
-
-  // REPLACE with direct localStorage update:
-  const handleSynergyReward = () => {
-    if (user?.telegram_id) {
-      const userGemsKey = `divineMiningGems_${user.telegram_id}`;
-      const currentGems = parseInt(localStorage.getItem(userGemsKey) || '0', 10);
-      const newGems = currentGems + 50;
-      localStorage.setItem(userGemsKey, newGems.toString());
-      
-      // Dispatch event for GameContext to pick up
-      window.dispatchEvent(new CustomEvent('gemsUpdated', { 
-        detail: { gems: newGems, amount: 50, source: 'synergy_reward' } 
-      }));
-    }
-  };
-
   return (
     <div className="min-h-screen text-white p-1 sm:p-2">
       <div className="max-w-4xl mx-auto">
@@ -2258,7 +2028,7 @@ const DailyRewards: React.FC = () => {
                     </div>
                   </div>
                   <div className="text-lg font-bold text-white mb-0.5 font-mono">
-                    {formatNumber(Math.max(0, userBalance))}
+                    {formatNumber(userBalance)}
                   </div>
                   <div className="text-blue-300 text-xs font-medium">TON</div>
                   

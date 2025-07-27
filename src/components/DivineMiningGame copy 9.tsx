@@ -4,6 +4,9 @@
 // import { useAuth } from '@/hooks/useAuth';
 // import { supabase } from '@/lib/supabaseClient';
 // import { migrateToUserSpecificKeys, validateUserDataIsolation, checkForDataLeakage, clearUserData } from '@/utils/userDataIsolation';
+// import { UpgradesStatusSection } from './UpgradesStatusSection';
+// import { UpgradeModal } from './UpgradeModal';
+
 
 // interface Upgrade {
 //   id: string;
@@ -116,15 +119,15 @@
 
 // const GAME_VERSION = '1.1.0'; // Updated version
 // // All keys will be made user-specific using getUserSpecificKey()
-// const SAVE_KEY = 'tonersGame';
-// const BACKUP_KEY = 'tonersGame_backup';
-// const DIVINE_POINTS_KEY = 'tonersPoints';
-// const TOTAL_EARNED_KEY = 'tonersTotalEarned';
-// const SESSION_KEY = 'tonersSession';
-// const TUTORIAL_KEY = 'tonersTutorial';
-// const ACHIEVEMENTS_KEY = 'tonersAchievements';
-// const UPGRADES_KEY = 'tonersUpgrades';
-// const HIGH_SCORE_KEY = 'tonersHighScore';
+// const SAVE_KEY = 'divineMiningGame';
+// const BACKUP_KEY = 'divineMiningGame_backup';
+// const DIVINE_POINTS_KEY = 'divineMiningPoints';
+// const TOTAL_EARNED_KEY = 'divineMiningTotalEarned';
+// const SESSION_KEY = 'divineMiningSession';
+// const TUTORIAL_KEY = 'divineMiningTutorial';
+// const ACHIEVEMENTS_KEY = 'divineMiningAchievements';
+// const UPGRADES_KEY = 'divineMiningUpgrades';
+// const HIGH_SCORE_KEY = 'divineMiningHighScore';
 // const OFFLINE_EFFICIENCY_CAP = 14; // 14 days max offline earnings
 // const OFFLINE_EFFICIENCY_BONUS = 0.1; // 10% bonus per day offline (max 140%)
 
@@ -160,7 +163,7 @@
 //       name: 'MASTER', 
 //       symbol: '🌟', 
 //       color: 'yellow',
-//           description: 'Ultimate TONERS mining mastery and expertise',
+//           description: 'Ultimate TBC mining mastery and expertise',
 //     benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive advanced upgrades', 'Performance optimization bonus'],
 //       nextTier: null
 //     };
@@ -169,7 +172,7 @@
 //       name: 'EXPERT', 
 //       symbol: '💎', 
 //       color: 'purple',
-//               description: 'Advanced mining techniques and deep TONERS knowledge',
+//       description: 'Advanced mining techniques and deep TBC knowledge',
 //       benefits: ['+100% mining efficiency', '+75% energy regeneration', 'Quantum upgrades unlocked', 'Enhanced auto-mining'],
 //       nextTier: { name: 'MASTER', level: 50, symbol: '🌟' }
 //     };
@@ -178,7 +181,7 @@
 //       name: 'ADEPT', 
 //       symbol: '🔮', 
 //       color: 'blue',
-//               description: 'Intermediate mining practices and growing TONERS expertise',
+//       description: 'Intermediate mining practices and growing TBC expertise',
 //       benefits: ['+50% mining efficiency', '+40% energy regeneration', 'Advanced upgrades unlocked', 'Improved energy management'],
 //       nextTier: { name: 'EXPERT', level: 30, symbol: '💎' }
 //     };
@@ -187,7 +190,7 @@
 //       name: 'NOVICE', 
 //       symbol: '🌱', 
 //       color: 'green',
-//               description: 'Beginning the TONERS mining journey with basic operations',
+//       description: 'Beginning the TBC mining journey with basic operations',
 //       benefits: ['+25% mining efficiency', '+20% energy regeneration', 'Basic upgrades available', 'Energy conservation'],
 //       nextTier: { name: 'ADEPT', level: 15, symbol: '🔮' }
 //     };
@@ -264,7 +267,7 @@
 //   // Add reset confirmation state
 //   const [showResetConfirmation, setShowResetConfirmation] = useState(false);
 //   const [isResetting, setIsResetting] = useState(false);
-//   const [showResetButton, setShowResetButton] = useState(false);
+//   const [showResetButton] = useState(false);
   
 //   // Add tier info modal state
 //   const [showTierInfo, setShowTierInfo] = useState(false);
@@ -315,42 +318,42 @@
 //       console.log('Step 2: Manual aggressive clearing...');
 //       const allPossibleKeys = [
 //         // User-specific keys
-//         `tonersGame_${telegramId}`,
-//         `tonersGame_backup_${telegramId}`,
-//         `tonersPoints_${telegramId}`,
-//         `tonersTotalEarned_${telegramId}`,
-//         `tonersSession_${telegramId}`,
-//         `tonersTutorial_${telegramId}`,
-//         `tonersAchievements_${telegramId}`,
-//         `tonersUpgrades_${telegramId}`,
-//         `tonersHighScore_${telegramId}`,
-//         `tonersPrestigeMultiplier_${telegramId}`,
+//         `divineMiningGame_${telegramId}`,
+//         `divineMiningGame_backup_${telegramId}`,
+//         `divineMiningPoints_${telegramId}`,
+//         `divineMiningTotalEarned_${telegramId}`,
+//         `divineMiningSession_${telegramId}`,
+//         `divineMiningTutorial_${telegramId}`,
+//         `divineMiningAchievements_${telegramId}`,
+//         `divineMiningUpgrades_${telegramId}`,
+//         `divineMiningHighScore_${telegramId}`,
+//         `divineMiningPrestigeMultiplier_${telegramId}`,
 //         `spiritualEssencePoints_${telegramId}`,
-//         `tonersGems_${telegramId}`,
-//         `tonersBoosts_${telegramId}`,
-//         `tonersStreak_${telegramId}`,
-//         `tonersReferralData_${telegramId}`,
-//         `tonersCompletedTasks_${telegramId}`,
+//         `divineMiningGems_${telegramId}`,
+//         `divineMiningBoosts_${telegramId}`,
+//         `divineMiningStreak_${telegramId}`,
+//         `divineMiningReferralData_${telegramId}`,
+//         `divineMiningCompletedTasks_${telegramId}`,
 //         `mining_state_${telegramId}`,
 //         `frog_miner_data_${telegramId}`,
         
 //         // Non-user-specific keys (legacy)
-//         'tonersGame',
-//         'tonersGame_backup',
-//         'tonersPoints',
-//         'tonersTotalEarned',
-//         'tonersSession',
-//         'tonersTutorial',
-//         'tonersAchievements',
-//         'tonersUpgrades',
-//         'tonersHighScore',
-//         'tonersPrestigeMultiplier',
+//         'divineMiningGame',
+//         'divineMiningGame_backup',
+//         'divineMiningPoints',
+//         'divineMiningTotalEarned',
+//         'divineMiningSession',
+//         'divineMiningTutorial',
+//         'divineMiningAchievements',
+//         'divineMiningUpgrades',
+//         'divineMiningHighScore',
+//         'divineMiningPrestigeMultiplier',
 //         'spiritualEssencePoints',
-//         'tonersGems',
-//         'tonersBoosts',
-//         'tonersStreak',
-//         'tonersReferralData',
-//         'tonersCompletedTasks',
+//         'divineMiningGems',
+//         'divineMiningBoosts',
+//         'divineMiningStreak',
+//         'divineMiningReferralData',
+//         'divineMiningCompletedTasks',
 //         'mining_state',
 //         'frog_miner_data',
         
@@ -660,12 +663,12 @@
 //       setPoints(100);
       
 //       // Reset additional GameContext data
-//     const userGemsKey = `tonersGems_${telegramId}`;
-//     const userBoostsKey = `tonersBoosts_${telegramId}`;
-//     const userStreakKey = `tonersStreak_${telegramId}`;
-//     const userReferralKey = `tonersReferralData_${telegramId}`;
-//     const userTasksKey = `tonersCompletedTasks_${telegramId}`;
-//     const userPrestigeKey = `tonersPrestigeMultiplier_${telegramId}`;
+//       const userGemsKey = `divineMiningGems_${telegramId}`;
+//       const userBoostsKey = `divineMiningBoosts_${telegramId}`;
+//       const userStreakKey = `divineMiningStreak_${telegramId}`;
+//       const userReferralKey = `divineMiningReferralData_${telegramId}`;
+//       const userTasksKey = `divineMiningCompletedTasks_${telegramId}`;
+//       const userPrestigeKey = `divineMiningPrestigeMultiplier_${telegramId}`;
       
 //       // Save initial values for GameContext
 //       localStorage.setItem(userGemsKey, '10'); // Default gems
@@ -1063,7 +1066,7 @@
 //     }
     
 //     // Load prestige multiplier (user-specific)
-//     const userPrestigeKey = getUserSpecificKey('tonersPrestigeMultiplier');
+//     const userPrestigeKey = getUserSpecificKey('divineMiningPrestigeMultiplier');
 //     const prestigeMultiplier = parseFloat(localStorage.getItem(userPrestigeKey) || '1.0');
     
 //     const defaultState: GameState = {
@@ -1336,7 +1339,7 @@
 //     // Check for non-user-specific keys
 //     const allKeys = Object.keys(localStorage);
 //     const nonUserSpecificKeys = allKeys.filter(key => 
-//               key.startsWith('toners') && 
+//       key.startsWith('divineMining') && 
 //       !key.includes(`_${telegramId}`) &&
 //       localStorage.getItem(key)
 //     );
@@ -1446,27 +1449,27 @@
 //   const tutorialSteps: TutorialStep[] = [
 //     {
 //       id: 'welcome',
-//               title: 'Welcome to TONERS Miner!',
-//         description: 'This tutorial will guide you through the basics of mining TONERS. Let\'s start by understanding your main currency.',
-//         target: '.toners-display',
+//       title: 'Welcome to TBC Mining!',
+//       description: 'This tutorial will guide you through the basics of mining TBC coins. Let\'s start by understanding your main currency.',
+//       target: '.tbc-coins-display',
 //       position: 'center',
 //       action: 'info'
 //     },
 //     {
-//               id: 'toners',
-//         title: 'TONERS',
+//       id: 'tbc-coins',
+//       title: 'TBC Coins',
 //       description: 'These are your main currency. You earn them by mining, and spend them on hardware and software upgrades. Watch the number increase as you mine!',
-//               target: '.toners-display',
+//       target: '.tbc-coins-display',
 //       position: 'bottom',
 //       action: 'info'
 //     },
 //     {
 //       id: 'mining-station',
 //       title: 'Mining Station',
-//       description: 'This is where the TONERS mining happens! Click "ACTIVATE MINING" to start earning tokens. The core shows mining status.',
+//       description: 'This is where the TBC mining happens! Click "ACTIVATE MINING" to start earning coins. The core shows mining status.',
 //       target: '.mining-station',
 //       position: 'bottom',
-//       action: 'info'
+//       action: 'click'
 //     },
 //     {
 //       id: 'energy-system',
@@ -1479,18 +1482,20 @@
 //     {
 //       id: 'first-mine',
 //       title: 'Start Mining!',
-//       description: 'Click the "ACTIVATE MINING" button to start earning TONERS. Watch your balance increase!',
+//       description: 'Click the "ACTIVATE MINING" button to start earning TBC coins. Watch your balance increase!',
 //       target: '.mining-button',
 //       position: 'bottom',
-//       action: 'click'
+//       action: 'click',
+//       condition: (state) => !state.isMining
 //     },
 //     {
 //       id: 'mining-active',
 //       title: 'Mining Active!',
-//       description: 'Great! You\'re now mining TONERS. Notice how your tokens increase and energy decreases. The core glows when active.',
+//       description: 'Great! You\'re now mining TBC. Notice how your coins increase and energy decreases. The core glows when active.',
 //       target: '.mining-station',
 //       position: 'bottom',
-//       action: 'info'
+//       action: 'info',
+//       condition: (state) => state.isMining
 //     },
 //     {
 //       id: 'energy-management',
@@ -1504,7 +1509,7 @@
 //     {
 //       id: 'first-upgrade',
 //       title: 'Your First Upgrade!',
-//               description: 'You\'ve earned enough TONERS for an upgrade! Click the upgrade button to see available hardware and software improvements.',
+//       description: 'You\'ve earned enough TBC coins for an upgrade! Click the upgrade button to see available hardware and software improvements.',
 //       target: '.upgrade-button',
 //       position: 'top',
 //       action: 'click',
@@ -1513,7 +1518,7 @@
 //     {
 //       id: 'mining-rig',
 //       title: 'Mining Rig Upgrade',
-//               description: 'The Mining Rig is your foundation upgrade. It increases your hash rate (TONERS earned per second). Great choice for beginners!',
+//       description: 'The Mining Rig is your foundation upgrade. It increases your hash rate (TBC earned per second). Great choice for beginners!',
 //       target: '.upgrade-mining-rig',
 //       position: 'right',
 //       action: 'info',
@@ -1523,7 +1528,7 @@
 //     {
 //       id: 'upgrade-purchased',
 //       title: 'Upgrade Complete!',
-//               description: 'Excellent! Your mining rate has increased. Keep earning TONERS and buying more upgrades to build a mining empire!',
+//       description: 'Excellent! Your mining rate has increased. Keep earning TBC coins and buying more upgrades to build a mining empire!',
 //       target: '.mining-stats',
 //       position: 'bottom',
 //       action: 'info',
@@ -1541,7 +1546,7 @@
 //     {
 //       id: 'completion',
 //       title: 'Tutorial Complete!',
-//               description: 'You\'ve mastered the basics of TONERS mining! Continue upgrading your equipment, manage your energy wisely, and build the ultimate mining operation. Good luck, miner!',
+//       description: 'You\'ve mastered the basics of TBC mining! Continue upgrading your equipment, manage your energy wisely, and build the ultimate mining operation. Good luck, miner!',
 //       target: '.mining-station',
 //       position: 'center',
 //       action: 'info',
@@ -1589,18 +1594,18 @@
 //     });
 //   }, []);
 
-//   const skipTutorial = useCallback(() => {
-//     const completedState = {
-//       ...tutorialState,
-//       isActive: false,
-//       isCompleted: true,
-//       showTutorial: false,
-//       highlightElement: null
-//     };
-//     setTutorialState(completedState);
-//     const userTutorialKey = getUserSpecificKey(TUTORIAL_KEY);
-//     localStorage.setItem(userTutorialKey, JSON.stringify(completedState));
-//   }, [tutorialState, getUserSpecificKey]);
+//   // const skipTutorial = useCallback(() => {
+//   //   const completedState = {
+//   //     ...tutorialState,
+//   //     isActive: false,
+//   //     isCompleted: true,
+//   //     showTutorial: false,
+//   //     highlightElement: null
+//   //   };
+//   //   setTutorialState(completedState);
+//   //   const userTutorialKey = getUserSpecificKey(TUTORIAL_KEY);
+//   //   localStorage.setItem(userTutorialKey, JSON.stringify(completedState));
+//   // }, [tutorialState, getUserSpecificKey]);
 
 //   // const resetTutorial = useCallback(() => {
 //   //   const resetState = {
@@ -1617,26 +1622,13 @@
 
 //   // Check if tutorial should be shown
 //   useEffect(() => {
-//     const shouldShowTutorial = !tutorialState.isCompleted && 
-//                               gameState.divinePoints <= 100 && 
-//                               gameState.upgradesPurchased === 0;
-    
-//     console.log('Tutorial check:', {
-//       isCompleted: tutorialState.isCompleted,
-//       divinePoints: gameState.divinePoints,
-//       upgradesPurchased: gameState.upgradesPurchased,
-//       shouldShowTutorial,
-//       isActive: tutorialState.isActive
-//     });
-    
-//     if (shouldShowTutorial && !tutorialState.isActive) {
-//       // Auto-start tutorial for new players
-//       console.log('Auto-starting tutorial...');
+//     const shouldShowTutorial = !tutorialState.isCompleted && !tutorialState.isActive;
+//     if (shouldShowTutorial) {
 //       setTimeout(() => {
 //         startTutorial();
-//       }, 2000); // Wait 2 seconds for game to load
+//       }, 1000); // Show quickly for all new users
 //     }
-//   }, [gameState.divinePoints, gameState.upgradesPurchased, tutorialState.isCompleted, tutorialState.isActive, startTutorial]);
+//   }, [tutorialState.isCompleted, tutorialState.isActive, startTutorial]);
 
 //   // Tutorial step validation
 //   useEffect(() => {
@@ -1662,152 +1654,6 @@
 //     }
 //   }, [tutorialState.currentStep, tutorialState.isActive, gameState, nextTutorialStep]);
 
-//   // Tutorial Overlay Component
-//   const TutorialOverlay = () => {
-//     if (!tutorialState.showTutorial || !tutorialState.steps[tutorialState.currentStep]) {
-//       console.log('Tutorial overlay not showing:', {
-//         showTutorial: tutorialState.showTutorial,
-//         currentStep: tutorialState.currentStep,
-//         stepsLength: tutorialState.steps.length
-//       });
-//       return null;
-//     }
-
-//     const currentStep = tutorialState.steps[tutorialState.currentStep];
-//     const targetElement = document.querySelector(currentStep.target);
-
-//     if (!targetElement) {
-//       console.log('Target element not found:', currentStep.target);
-//       return null;
-//     }
-
-//     console.log('Tutorial overlay rendering for step:', currentStep.id, 'target:', currentStep.target);
-
-//     const rect = targetElement.getBoundingClientRect();
-//     const scrollTop = window.pageYOffset || document.documentElement.scrollTop;
-//     const scrollLeft = window.pageXOffset || document.documentElement.scrollLeft;
-
-//     const getTooltipPosition = () => {
-//       const baseTop = rect.top + scrollTop;
-//       const baseLeft = rect.left + scrollLeft;
-//       const elementWidth = rect.width;
-//       const elementHeight = rect.height;
-
-//       switch (currentStep.position) {
-//         case 'top':
-//           return {
-//             top: baseTop - 120,
-//             left: baseLeft + elementWidth / 2 - 150,
-//             transform: 'translateY(-10px)'
-//           };
-//         case 'bottom':
-//           return {
-//             top: baseTop + elementHeight + 10,
-//             left: baseLeft + elementWidth / 2 - 150,
-//             transform: 'translateY(10px)'
-//           };
-//         case 'left':
-//           return {
-//             top: baseTop + elementHeight / 2 - 60,
-//             left: baseLeft - 320,
-//             transform: 'translateX(-10px)'
-//           };
-//         case 'right':
-//           return {
-//             top: baseTop + elementHeight / 2 - 60,
-//             left: baseLeft + elementWidth + 10,
-//             transform: 'translateX(10px)'
-//           };
-//         case 'center':
-//         default:
-//           return {
-//             top: baseTop + elementHeight / 2 - 60,
-//             left: baseLeft + elementWidth / 2 - 150,
-//             transform: 'translateY(0)'
-//           };
-//       }
-//     };
-
-//     const position = getTooltipPosition();
-
-//     return (
-//       <>
-//         {/* Backdrop */}
-//         <div className="fixed inset-0 bg-black/50 z-40" onClick={nextTutorialStep} />
-        
-//         {/* Highlight */}
-//         <div 
-//           className="fixed z-50 pointer-events-none"
-//           style={{
-//             top: rect.top + scrollTop - 5,
-//             left: rect.left + scrollLeft - 5,
-//             width: rect.width + 10,
-//             height: rect.height + 10,
-//             border: '3px solid #00ffff',
-//             borderRadius: '8px',
-//             boxShadow: '0 0 20px rgba(0, 255, 255, 0.6)',
-//             animation: 'tutorial-pulse 2s ease-in-out infinite'
-//           }}
-//         />
-        
-//         {/* Tooltip */}
-//         <div 
-//           className="fixed z-50 bg-black/90 backdrop-blur-xl border border-cyan-400 rounded-xl p-4 shadow-[0_0_30px_rgba(0,255,255,0.3)] max-w-sm"
-//           style={position}
-//         >
-//           <div className="text-cyan-400 font-mono font-bold text-sm mb-2">
-//             {currentStep.title}
-//           </div>
-//           <div className="text-gray-300 font-mono text-xs mb-3">
-//             {currentStep.description}
-//           </div>
-//           <div className="flex justify-between items-center">
-//             <div className="text-cyan-500 font-mono text-xs">
-//               Step {tutorialState.currentStep + 1} of {tutorialState.steps.length}
-//             </div>
-//             <div className="flex gap-2">
-//               <button
-//                 onClick={skipTutorial}
-//                 className="text-xs text-gray-400 hover:text-red-400 font-mono px-2 py-1 rounded border border-gray-600 hover:border-red-400 transition-colors"
-//               >
-//                 Skip
-//               </button>
-//               <button
-//                 onClick={nextTutorialStep}
-//                 className="text-xs text-cyan-400 hover:text-cyan-300 font-mono px-3 py-1 rounded border border-cyan-400 hover:border-cyan-300 transition-colors"
-//               >
-//                 {tutorialState.currentStep === tutorialState.steps.length - 1 ? 'Finish' : 'Next'}
-//               </button>
-//             </div>
-//           </div>
-//         </div>
-//       </>
-//     );
-//   };
-
-//   // Tutorial CSS Animation
-//   useEffect(() => {
-//     const style = document.createElement('style');
-//     style.textContent = `
-//       @keyframes tutorial-pulse {
-//         0%, 100% {
-//           box-shadow: 0 0 20px rgba(0, 255, 255, 0.6);
-//           border-color: #00ffff;
-//         }
-//         50% {
-//           box-shadow: 0 0 30px rgba(0, 255, 255, 0.9);
-//           border-color: #00ccff;
-//         }
-//       }
-//     `;
-//     document.head.appendChild(style);
-//     return () => {
-//       if (document.head.contains(style)) {
-//         document.head.removeChild(style);
-//       }
-//     };
-//   }, []);
-  
 //   // Sync mining game points with shared context - SINGLE SOURCE OF TRUTH
 //   useEffect(() => {
 //     // Update the shared context with our points
@@ -1853,7 +1699,7 @@
 //   useEffect(() => {
 //     const handleGemUpdate = (event: CustomEvent) => {
 //       const { gems: newGems } = event.detail;
-//       console.log('🔄 TonersGame received gem update:', newGems);
+//       console.log('🔄 DivineMiningGame received gem update:', newGems);
 //       // The gems are already updated in GameContext, this is just for logging/debugging
 //     };
 
@@ -1887,7 +1733,7 @@
           
 //           showSystemNotification(
 //             '💎 Welcome Bonus!',
-//             '+1000 TONERS Points for joining through referral!',
+//             '+1000 Divine Points for joining through referral!',
 //             'success'
 //           );
 //         }, 2000);
@@ -1915,7 +1761,7 @@
 
 //   // Log gem value for debugging synchronization
 //   useEffect(() => {
-//           console.log('💎 TonersGame sees gem value:', gems);
+//     console.log('💎 DivineMiningGame sees gem value:', gems);
 //   }, [gems]);
 
 //   // Apply active boosts to mining rate (enhanced version moved after upgrades)
@@ -1991,7 +1837,7 @@
 //       console.error('Error loading upgrades from localStorage:', error);
 //     }
     
-//     // TONERS Mining progression upgrades - building professional mining infrastructure
+//     // TBC Mining progression upgrades - building comprehensive mining infrastructure
 //     return [
 //       // 🖥️ MINING RIG - Foundation & Setup
 //       {
@@ -2003,13 +1849,13 @@
 //         costMultiplier: 1.12,
 //         effectValue: 0.5,
 //         category: 'hardware',
-//         description: 'Set up your first TONERS mining rig - the foundation of your operation',
+//         description: 'Set up your first TBC mining rig - the foundation of your operation',
 //         maxLevel: 20,
 //         unlockReward: 'Unlock the ability to use power supply upgrades',
 //         benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive hardware upgrades', 'Performance optimization bonus'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//           detailedDescription: 'This upgrade establishes the foundation for your TONERS mining operation, providing the basic infrastructure needed for more advanced mining equipment. As you progress through the tiers, you\'ll gain access to more advanced features and bonuses. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade establishes the foundation for your TBC mining operation, providing the basic infrastructure needed for more advanced mining equipment. As you progress through the tiers, you\'ll gain access to more advanced features and bonuses. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       },
 //       {
 //         id: 'power-supply',
@@ -2057,7 +1903,7 @@
 //         costMultiplier: 2.0,
 //         effectValue: 1,
 //         category: 'software',
-//                   description: 'Deploy automated mining bot for continuous TONERS Token generation',
+//         description: 'Deploy automated mining bot for continuous TBC generation',
 //         requires: { upgrade: 'cpu-upgrade', level: 5 },
 //         maxLevel: 1,
 //         unlockReward: 'Unlock the ability to use energy mastery upgrades',
@@ -2211,14 +2057,14 @@
 //         costMultiplier: 1.4,
 //         effectValue: 100.0,
 //         category: 'hardware',
-//                   description: 'Industrial-grade ASIC miner for maximum TONERS Token generation',
+//         description: 'Industrial-grade ASIC miner for maximum TBC generation',
 //         requires: { upgrade: 'ssd-storage', level: 7 },
 //         maxLevel: 5,
 //         unlockReward: 'Unlock the ability to use monitoring system upgrades',
 //         benefits: ['+5% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//           detailedDescription: 'This upgrade provides industrial-grade ASIC mining capabilities with maximum TONERS Token generation efficiency, dramatically boosting your mining performance and energy management. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade provides industrial-grade ASIC mining capabilities with maximum TBC generation efficiency, dramatically boosting your mining performance and energy management. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       },
 //       {
 //         id: 'mining-pool',
@@ -2229,13 +2075,13 @@
 //         costMultiplier: 1.8,
 //         effectValue: 0.05,
 //         category: 'network',
-//         description: 'Join mining pool for continuous TONERS rewards even offline',
+//         description: 'Join mining pool for continuous TBC rewards even offline',
 //         maxLevel: 3,
 //         unlockReward: 'Unlock the ability to use advanced mining upgrades',
 //         benefits: ['+5% offline bonus', 'Increased energy regeneration', 'Enhanced auto-mining'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//                   detailedDescription: 'This upgrade connects you to a mining pool network, allowing continuous TONERS Token generation even when offline. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade connects you to a mining pool network, allowing continuous TBC generation even when offline. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       },
       
 //       // 🧘‍♀️ ADVANCED PRACTICES - Mastery
@@ -2377,7 +2223,7 @@
 //         benefits: ['+1000% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//         detailedDescription: 'This upgrade accelerates mining operations through advanced network optimization, dramatically boosting your TONERS Token generation rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade accelerates mining operations through advanced network optimization, dramatically boosting your TBC generation rate. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       },
 //       {
 //         id: 'latency-optimizer',
@@ -2835,7 +2681,7 @@
 //         benefits: ['+300% hash/sec', 'Increased energy regeneration', 'Enhanced auto-mining'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//         detailedDescription: 'This upgrade builds a dedicated mining facility for industrial-scale TONERS mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade builds a dedicated mining facility for industrial-scale TBC mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       },
 //       {
 //         id: 'server-farm',
@@ -2939,13 +2785,13 @@
 //         effectValue: 5000,
 //         category: 'advanced',
 //         requires: { upgrade: 'mining-mastery', level: 3 },
-//         description: 'Utilize quantum computing technology for ultimate TONERS mining',
+//         description: 'Utilize quantum computing technology for ultimate TBC mining',
 //         maxLevel: 1,
-//                   unlockReward: 'Complete mastery of TONERS mining operations',
+//         unlockReward: 'Complete mastery of TBC mining operations',
 //         benefits: ['+5000 max energy', 'Increased energy regeneration', 'Enhanced auto-mining'],
 //         tips: ['Higher tiers provide better bonuses and upgrades', 'Focus on energy efficiency for longer sessions', 'Auto-mining improves with tier level'],
 //         unlockProgress: 0,
-//         detailedDescription: 'This upgrade utilizes quantum computing technology to break through traditional mining limitations, providing massive energy capacity for ultimate TONERS mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
+//         detailedDescription: 'This upgrade utilizes quantum computing technology to break through traditional mining limitations, providing massive energy capacity for ultimate TBC mining operations. Higher tiers provide better bonuses and upgrades, and auto-mining improves with tier level. Focus on energy efficiency for longer sessions to maximize your earnings.'
 //       }
 //     ];
 //   };
@@ -3047,10 +2893,63 @@
 //   //   };
 //   // }, [getOfflineMiningRate, upgrades]);
 
+//   // Add upgrade categorization system
+//   const UPGRADE_CATEGORIES = {
+//     // Energy capacity upgrades (increase maxEnergy)
+//     ENERGY_CAPACITY: [
+//       'energy-capacity', 'energy-overflow', 'vibrational-harmony', 'ultimate-mining-setup',
+//       'bandwidth-expander', 'foundation-structure', 'power-supply', 'ram-upgrade',
+//       'bandwidth-boost', 'space-bending', 'transcendence'
+//     ],
+    
+//     // Energy efficiency upgrades (reduce energy consumption - negative effect values)
+//     ENERGY_EFFICIENCY: [
+//       'inner-strength', 'aura-purification', 'energy-mastery', 'air-element',
+//       'power-optimization', 'ventilation-system', 'efficiency-optimizer', 'code-optimization',
+//       'thermal-boost'
+//     ],
+    
+//     // Energy regeneration upgrades (increase energy regen rate)
+//     ENERGY_REGENERATION: [
+//       'psychic-awareness', 'divine-resonance', 'mindful-breathing', 'water-element',
+//       'mining-software', 'machine-learning'
+//     ],
+    
+//     // Offline bonus upgrades (increase offline mining efficiency)
+//     OFFLINE_BONUS: [
+//       'mining-acceleration', 'latency-optimizer', 'quantum-superposition', 'time-dilation'
+//     ],
+    
+//     // Global bonus upgrades (affect all bonuses)
+//     GLOBAL_BONUS: [
+//       'reality-shift', 'thermal-boost', 'gpu-boost'
+//     ],
+    
+//     // Auto-mining upgrades (enable automatic mining)
+//     AUTO_MINING: [
+//       'auto-miner', 'auto-mining'
+//     ]
+//   };
+
+//   // Helper function to categorize upgrades
+//   const getUpgradeCategory = (upgradeId: string): string => {
+//     for (const [category, ids] of Object.entries(UPGRADE_CATEGORIES)) {
+//       if (ids.includes(upgradeId)) {
+//         return category;
+//       }
+//     }
+//     return 'POINTS_PER_SECOND'; // Default category
+//   };
+
+//   // Helper function to check if upgrade is PPS (points per second)
+//   const isPPSUpgradeType = (upgradeId: string): boolean => {
+//     return !Object.values(UPGRADE_CATEGORIES).flat().includes(upgradeId);
+//   };
+
 //   // Enhanced mining rate calculation with divine resonance and staking bonuses
 //   const getEnhancedMiningRate = useCallback(() => {
 //     const miningBoosts = activeBoosts.filter(boost => boost.type === 'mining');
-//     const baseMultiplier = miningBoosts.reduce((sum, boost) => {
+//     const totalMultiplier = miningBoosts.reduce((sum, boost) => {
 //       const multiplier = Number(boost.multiplier);
 //       return sum + (isNaN(multiplier) ? 1 : multiplier);
 //     }, 1);
@@ -3062,7 +2961,7 @@
 //       const level = Number(u.level);
 //       return sum + ((isNaN(effectValue) ? 0 : effectValue) * (isNaN(level) ? 0 : level));
 //     }, 0);
-//     const enhancedMultiplier = baseMultiplier * (1 + (isNaN(resonanceBonus) ? 0 : resonanceBonus));
+//     const enhancedMultiplier = totalMultiplier * (1 + (isNaN(resonanceBonus) ? 0 : resonanceBonus));
     
 //     // Apply staking synergy bonuses
 //     const stakingBonuses = getStakingBonuses(user?.id?.toString());
@@ -3239,7 +3138,7 @@
       
 //       // Force save to ensure data persistence
 //       setTimeout(() => {
-//         saveTonersState();
+//         saveDivineMiningState();
 //       }, 1000);
 //     }
 //   }, [hasLoadedSavedData, gameState.divinePoints]);
@@ -3645,7 +3544,7 @@
 //   };
 
 //   // Update the save function to handle both localStorage and Supabase
-//   const saveTonersState = async () => {
+//   const saveDivineMiningState = async () => {
 //     // Save to localStorage first (fast)
 //     saveToLocalStorage();
     
@@ -3654,7 +3553,7 @@
 //   };
 
 //   // Update load function to handle both localStorage and Supabase with proper priority
-//   const loadTonersState = async () => {
+//   const loadDivineMiningState = async () => {
 //     console.log('🔄 Starting dual-save system load...');
     
 //     // Load from localStorage first (fast)
@@ -3760,7 +3659,7 @@
 //       }
       
 //       setLoadingMessage('Loading game data...');
-//       loadTonersState().then(() => {
+//       loadDivineMiningState().then(() => {
 //         setIsInitialLoadComplete(true);
 //         setIsLoading(false);
 //         setLoadingMessage('');
@@ -4005,7 +3904,7 @@
       
 //       // Save state to both localStorage and Supabase
 //       setTimeout(() => {
-//         saveTonersState();
+//         saveDivineMiningState();
 //         setPurchasingUpgrade(null); // Clear loading state after save
         
 //         // Dispatch custom event for TaskCenter to detect upgrade purchase
@@ -4027,7 +3926,7 @@
 //       setPurchasingUpgrade(null); // Clear loading state on insufficient points
 //       showSystemNotification('Insufficient Points', 'Not enough points for this upgrade!', 'warning');
 //     }
-//   }, [upgrades, gameState.divinePoints, isUpgradeAvailable, isUpgradeMaxed, showUpgradeNotification, showSystemNotification, saveTonersState]);
+//   }, [upgrades, gameState.divinePoints, isUpgradeAvailable, isUpgradeMaxed, showUpgradeNotification, showSystemNotification, saveDivineMiningState]);
 
 //   // Update toggle mining function to save to both systems
 //   const toggleMining = useCallback(() => {
@@ -4055,14 +3954,14 @@
       
 //       // Save immediately to both systems
 //       setTimeout(() => {
-//         saveTonersState();
+//         saveDivineMiningState();
 //       }, 100);
       
 //       return newState;
 //     });
     
 //     // Clear mining resumed flag when user manually toggles
-//   }, [showSystemNotification, saveTonersState]);
+//   }, [showSystemNotification, saveDivineMiningState]);
 
 //   // Mining interval effect - ACTUALLY HANDLES THE MINING PROCESS
 //   useEffect(() => {
@@ -4297,1280 +4196,497 @@
 //     setUpgradeFilter('all');
 //   }, []);
 
-//   // Function to test all upgrade effects
-//   const testUpgradeEffects = useCallback(() => {
-//     console.log('🧪 Testing all upgrade effects...');
-    
-//     // Test energy regeneration
-//     const energyRegen = getEnergyRegenerationRate();
-//     console.log(`Energy Regeneration: ${energyRegen}/sec`);
-    
-//     // Test energy efficiency
-//     const energyEfficiency = getEnergyEfficiencyBonus();
-//     console.log(`Energy Efficiency Bonus: ${(energyEfficiency * 100).toFixed(1)}%`);
-    
-//     // Test enhanced mining rate
-//     const enhancedRate = getEnhancedMiningRate();
-//     console.log(`Enhanced Mining Rate: ${enhancedRate}/sec`);
-    
-//     // Test upgrade categorization
-//     upgrades.forEach(upgrade => {
-//       const category = getUpgradeCategory(upgrade.id);
-//       const isPPS = isPPSUpgradeType(upgrade.id);
-//       console.log(`Upgrade ${upgrade.name} (${upgrade.id}): Category=${category}, PPS=${isPPS}, Level=${upgrade.level}, Effect=${upgrade.effectValue}`);
-//     });
-    
-//     // Test auto-mining
-//     const autoMiningUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.AUTO_MINING.includes(u.id));
-//     const hasAutoMining = autoMiningUpgrades.some(u => u.level > 0);
-//     console.log(`Auto-mining: ${hasAutoMining ? 'ENABLED' : 'DISABLED'}`);
-    
-//     // Test offline bonus
-//     const offlineUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.OFFLINE_BONUS.includes(u.id));
-//     const offlineBonus = offlineUpgrades.reduce((sum, u) => sum + (u.effectValue * u.level), 0);
-//     console.log(`Offline Bonus: ${(offlineBonus * 100).toFixed(1)}%`);
-    
-//     showSystemNotification('Upgrade Test Complete', 'Check console for detailed upgrade effect analysis', 'info');
-//   }, [upgrades, getEnergyRegenerationRate, getEnergyEfficiencyBonus, getEnhancedMiningRate, showSystemNotification]);
-
-//   // Function to force reload upgrades
-//   const forceReloadUpgrades = useCallback(() => {
-//     console.log('🔄 Force reloading upgrades...');
-//     setLoadingMessage('Reloading upgrades...');
-    
-//     // Clear current upgrades
-//     setUpgrades([]);
-    
-//     // Reload from localStorage first
-//     const userUpgradesKey = getUserSpecificKey(UPGRADES_KEY);
-//     const savedUpgrades = localStorage.getItem(userUpgradesKey);
-    
-//     if (savedUpgrades) {
-//       try {
-//         const parsed = JSON.parse(savedUpgrades);
-//         if (Array.isArray(parsed) && parsed.length > 0) {
-//           const validatedUpgrades = parsed.map(upgrade => ({
-//             id: upgrade.id || 'unknown',
-//             name: upgrade.name || 'Unknown Upgrade',
-//             level: Math.max(0, Math.min(upgrade.level || 0, upgrade.maxLevel || 50)),
-//             effect: upgrade.effect || '+0 effect',
-//             baseCost: Math.max(1, upgrade.baseCost || 25),
-//             costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
-//             effectValue: upgrade.effectValue || 0,
-//             category: upgrade.category || 'hardware',
-//             description: upgrade.description || 'An upgrade',
-//             requires: upgrade.requires || undefined,
-//             detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
-//             benefits: upgrade.benefits || ['No benefits listed'],
-//             tips: upgrade.tips || ['No tips available'],
-//             unlockProgress: Math.max(0, Math.min(100, upgrade.unlockProgress || 0)),
-//             maxLevel: Math.max(1, upgrade.maxLevel || 50),
-//             unlockReward: upgrade.unlockReward || 'No reward'
-//           }));
-          
-//           setUpgrades(validatedUpgrades);
-//           console.log('✅ Upgrades reloaded from localStorage:', validatedUpgrades);
-//           showSystemNotification('Upgrades Reloaded', 'Successfully reloaded upgrades from localStorage', 'success');
-//         } else {
-//           throw new Error('Invalid upgrade data format');
-//         }
-//       } catch (error) {
-//         console.error('Error reloading upgrades from localStorage:', error);
-//         // Fall back to default upgrades
-//         const defaultUpgrades = getInitialUpgrades();
-//         setUpgrades(defaultUpgrades);
-//         console.log('✅ Loaded default upgrades as fallback:', defaultUpgrades);
-//         showSystemNotification('Default Upgrades Loaded', 'Loaded default upgrades due to data corruption', 'warning');
-//       }
-//     } else {
-//       // No saved upgrades, load defaults
-//       const defaultUpgrades = getInitialUpgrades();
-//       setUpgrades(defaultUpgrades);
-//       console.log('✅ Loaded default upgrades (no saved data):', defaultUpgrades);
-//       showSystemNotification('Default Upgrades Loaded', 'No saved upgrades found, loaded defaults', 'info');
-//     }
-    
-//     setLoadingMessage('');
-//   }, [getUserSpecificKey, getInitialUpgrades, showSystemNotification]);
-
-//   // Debug function to verify upgrade system
-//   const debugUpgradeSystem = useCallback(() => {
-//     console.log('🔍 Upgrade System Debug Report:');
-//     console.log('Current Game State:', {
-//       divinePoints: gameState.divinePoints,
-//       pointsPerSecond: gameState.pointsPerSecond,
-//       upgradesPurchased: gameState.upgradesPurchased,
-//       currentEnergy: gameState.currentEnergy,
-//       maxEnergy: gameState.maxEnergy,
-//       offlineEfficiencyBonus: gameState.offlineEfficiencyBonus
-//     });
-    
-//     console.log('Upgrade Calculations:', {
-//       energyRegenRate: getEnergyRegenerationRate(),
-//       energyEfficiencyBonus: getEnergyEfficiencyBonus(),
-//       enhancedMiningRate: getEnhancedMiningRate(),
-//       totalUpgrades: upgrades.length,
-//       availableUpgrades: getFilteredUpgrades().filter(u => isUpgradeAvailable(u) && !isUpgradeMaxed(u)).length,
-//       maxedUpgrades: upgrades.filter(u => isUpgradeMaxed(u)).length
-//     });
-    
-//     console.log('Upgrade Details:', upgrades.map(u => ({
-//       id: u.id,
-//       name: u.name,
-//       level: u.level,
-//       maxLevel: u.maxLevel,
-//       effectValue: u.effectValue,
-//       isAvailable: isUpgradeAvailable(u),
-//       isMaxed: isUpgradeMaxed(u),
-//       cost: getUpgradeCost(u)
-//     })));
-    
-//     // Check for common loading issues
-//     const issues = [];
-//     if (upgrades.length === 0) issues.push('No upgrades loaded');
-//     if (gameState.pointsPerSecond <= 1.0) issues.push('No upgrade effects applied to PPS');
-//     if (gameState.offlineEfficiencyBonus <= 0) issues.push('No offline bonus upgrades detected');
-    
-//     if (issues.length > 0) {
-//       console.warn('⚠️ Potential loading issues detected:', issues);
-//       showSystemNotification('Loading Issues Found', `Issues: ${issues.join(', ')}`, 'warning');
-//     } else {
-//       console.log('✅ All upgrade systems appear to be working correctly');
-//       showSystemNotification('System Healthy', 'All upgrade systems working correctly', 'success');
-//     }
-    
-//     showSystemNotification('Debug Complete', 'Check console for upgrade system analysis', 'info');
-//   }, [gameState, upgrades, getEnergyRegenerationRate, getEnergyEfficiencyBonus, getEnhancedMiningRate, isUpgradeAvailable, isUpgradeMaxed, getUpgradeCost, getFilteredUpgrades, showSystemNotification]);
-
-//   // Add keyboard shortcut for reset button visibility
-//   useEffect(() => {
-//     const handleKeyDown = (event: KeyboardEvent) => {
-//       if (event.ctrlKey && event.shiftKey) {
-//         setShowResetButton(true);
-//       }
-      
-//       // Close upgrade shop with Escape key
-//       if (event.key === 'Escape' && showUpgradeShop) {
-//         closeUpgradeShop();
-//       }
-//     };
-
-//     const handleKeyUp = (event: KeyboardEvent) => {
-//       if (!event.ctrlKey || !event.shiftKey) {
-//         setShowResetButton(false);
-//       }
-//     };
-
-//     window.addEventListener('keydown', handleKeyDown);
-//     window.addEventListener('keyup', handleKeyUp);
-
-//     return () => {
-//       window.removeEventListener('keydown', handleKeyDown);
-//       window.removeEventListener('keyup', handleKeyUp);
-//     };
-//   }, [showUpgradeShop, closeUpgradeShop]);
-
-//   // Add upgrade categorization system after the interfaces
-//   const UPGRADE_CATEGORIES = {
-//     // Energy capacity upgrades (increase maxEnergy)
-//     ENERGY_CAPACITY: [
-//       'energy-capacity', 'energy-overflow', 'vibrational-harmony', 'ultimate-mining-setup',
-//       'bandwidth-expander', 'foundation-structure', 'power-supply', 'ram-upgrade',
-//       'bandwidth-boost', 'space-bending', 'transcendence'
-//     ],
-    
-//     // Energy efficiency upgrades (reduce energy consumption - negative effect values)
-//     ENERGY_EFFICIENCY: [
-//       'inner-strength', 'aura-purification', 'energy-mastery', 'air-element',
-//       'power-optimization', 'ventilation-system', 'efficiency-optimizer', 'code-optimization',
-//       'thermal-boost'
-//     ],
-    
-//     // Energy regeneration upgrades (increase energy regen rate)
-//     ENERGY_REGENERATION: [
-//       'psychic-awareness', 'divine-resonance', 'mindful-breathing', 'water-element',
-//       'mining-software', 'machine-learning'
-//     ],
-    
-//     // Offline bonus upgrades (increase offline mining efficiency)
-//     OFFLINE_BONUS: [
-//       'mining-acceleration', 'latency-optimizer', 'quantum-superposition', 'time-dilation'
-//     ],
-    
-//     // Global bonus upgrades (affect all bonuses)
-//     GLOBAL_BONUS: [
-//       'reality-shift', 'thermal-boost', 'gpu-boost'
-//     ],
-    
-//     // Auto-mining upgrades (enable automatic mining)
-//     AUTO_MINING: [
-//       'auto-miner', 'auto-mining'
-//     ]
-//   };
-
-//   // Helper function to categorize upgrades
-//   const getUpgradeCategory = (upgradeId: string): string => {
-//     for (const [category, ids] of Object.entries(UPGRADE_CATEGORIES)) {
-//       if (ids.includes(upgradeId)) {
-//         return category;
-//       }
-//     }
-//     return 'POINTS_PER_SECOND'; // Default category
-//   };
-
-//   // Helper function to check if upgrade is PPS (points per second)
-// const isPPSUpgradeType = (upgradeId: string): boolean => {
-//   return !Object.values(UPGRADE_CATEGORIES).flat().includes(upgradeId);
-// };
-
 //   return (
-//     <div className="flex-1 flex flex-col items-center justify-center space-y-4 overflow-y-auto game-scrollbar">
-//       {/* Loading Screen */}
-//       {isLoading && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
-//           <div className="bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl shadow-[0_0_40px_rgba(6,182,212,0.3)] p-8 max-w-md w-full mx-4">
-//             <div className="text-center space-y-4">
-//               <div className="w-16 h-16 mx-auto border-4 border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
-//               <div className="text-cyan-400 font-mono font-bold text-lg tracking-wider">
-//                 INITIALIZING TONERS MINING STATION
-//               </div>
-//               <div className="text-gray-300 font-mono text-sm">
-//                 {loadingMessage}
-//               </div>
-//               <div className="text-gray-500 font-mono text-xs">
-//                 Please wait while we initialize your mining setup...
+//     <>
+//       {/* Main Game UI */}
+//       <div className="flex-1 flex flex-col items-center justify-center space-y-4 overflow-y-auto game-scrollbar">
+//           {/* Show Tutorial Button */}
+          
+//           {/* Loading Screen */}
+//           {isLoading && (
+//             <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/80 backdrop-blur-sm">
+//               <div className="bg-gradient-to-br from-gray-900/90 to-black/90 backdrop-blur-xl border border-cyan-500/20 rounded px-3 py-2">
+//                 <div className="flex items-center space-x-2">
+//                   <div className="w-4 h-4 border border-cyan-500/30 border-t-cyan-400 rounded-full animate-spin"></div>
+//                   <div className="text-cyan-400 font-mono text-xs">{loadingMessage || 'Loading...'}</div>
+//                 </div>
 //               </div>
 //             </div>
-//           </div>
-//         </div>
-//       )}
-      
-//       {/* Compact Centered Divine Mining Card */}
-//       <div className="relative w-full max-w-xl overflow-hidden game-card-frame">
-//         {/* Professional Mining Dashboard Header */}
-//         <div className="relative z-10 rounded-xl mb-2">
-//           <div className="flex items-center justify-between">
-//             <div className="flex items-center space-x-3">
-//               {/* Compact Mining Status */}
-//               <div className="flex items-center space-x-2">
-//                 <div className={`w-3 h-3 rounded-full ${gameState.isMining 
-//                   ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]' 
-//                   : 'bg-gray-500'
-//                 }`}></div>
-//                 <div className="text-xs font-mono font-bold text-white tracking-wider">
-//                   TONERS MINER • <span className={gameState.isMining ? 'text-green-400' : 'text-gray-400'}>
-//                     {gameState.isMining ? 'ACTIVE' : 'STANDBY'}
+//           )}
+          
+//           {/* Compact Centered Divine Mining Card */}
+//           <div className="relative w-full max-w-xl overflow-hidden game-card-frame">
+//             {/* Professional Mining Dashboard Header */}
+//             {/* Unified Mining Status Bar */}
+//             <div className="relative z-10 mb-3">
+//               {(() => {
+//                 const currentTier = getCurrentTier(gameState.miningLevel);
+//                 const tierColors = {
+//                   green: 'bg-green-900/20 border-green-500/40',
+//                   blue: 'bg-blue-900/20 border-blue-500/40', 
+//                   purple: 'bg-purple-900/20 border-purple-500/40',
+//                   yellow: 'bg-yellow-900/20 border-yellow-500/40'
+//                 };
+//                 return (
+//                   <button
+//                     onClick={() => setShowTierInfo(true)}
+//                     className={`w-full px-3 py-2 rounded-lg border transition-all duration-200 hover:scale-[1.02] ${tierColors[currentTier.color as keyof typeof tierColors]}`}
+//                     title="Click for mining tier information"
+//                   >
+//                     <div className="flex items-center justify-between text-xs font-mono font-bold">
+//                       <div className="flex items-center space-x-3">
+//                         <div className={`w-3 h-3 rounded-full ${gameState.isMining 
+//                           ? 'bg-green-400 animate-pulse shadow-[0_0_8px_rgba(34,197,94,0.6)]' 
+//                           : 'bg-gray-500'
+//                         }`}></div>
+//                         <span className="text-white">
+//                           DIVINE TAPS
+//                           <span className={`ml-2 ${gameState.isMining ? 'text-green-400' : 'text-gray-400'}`}>
+//                             {gameState.isMining ? 'ACTIVE' : 'STANDBY'}
+//                           </span>
+//                         </span>
+//                         <span className="text-cyan-400">
+//                           RATE: <span className="text-white">{getBoostedMiningRate().toFixed(1)}/s</span>
+//                         </span>
+//                       </div>
+//                       <div className="flex items-center space-x-1">
+//                         <span className="text-sm">{currentTier.symbol}</span>
+//                         <span className={`${currentTier.color === 'green' ? 'text-green-400' : currentTier.color === 'blue' ? 'text-blue-400' : currentTier.color === 'purple' ? 'text-purple-400' : 'text-yellow-400'}`}>
+//                           {currentTier.name}
+//                         </span>
+//                       </div>
+//                     </div>
+//                   </button>
+//                 );
+//               })()}
+//             </div>
+              
+
+
+//             {/* Compact Main Points Display */}
+//             <div className="relative z-10 text-center mb-6">
+//               <div className={`text-6xl font-mono font-bold tracking-wider mb-1 transition-all duration-300 ${
+//                 gameState.divinePoints > 1000000 
+//                   ? 'text-purple-300 drop-shadow-[0_0_15px_rgba(147,51,234,0.6)]' 
+//                   : gameState.divinePoints > 100000 
+//                   ? 'text-yellow-300 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]' 
+//                   : gameState.divinePoints > 10000 
+//                   ? 'text-green-300 drop-shadow-[0_0_15px_rgba(34,197,94,0.6)]' 
+//                   : 'text-cyan-300 drop-shadow-[0_0_15px_rgba(0,255,255,0.6)]'
+//               }`}>
+//                 {formatNumber(gameState.divinePoints)}
+//               </div>
+//               <div className="text-sm font-mono text-cyan-400 tracking-wider mb-1">THE BILLION COIN</div>
+//               <div className="text-sm font-mono text-cyan-300">
+//                 +{getBoostedMiningRate().toFixed(1)} TBC/sec
+//                 {gameState.miningCombo > 1.1 && (
+//                   <span className="ml-2 text-yellow-400 font-bold text-base">
+//                     {gameState.miningCombo.toFixed(1)}x boost
+//                   </span>
+//                 )}
+//               </div>
+//             </div>
+
+//             {/* Professional Mining Control Panel */}
+//             <div className="relative z-10 flex justify-center items-center mb-8">
+//               <div className="relative">
+//                 {/* Mining Status Ring */}
+//                 <div className={`absolute inset-0 w-52 h-52 rounded-full ${gameState.isMining ? 'animate-spin' : ''}`} style={{ animationDuration: '8s' }}>
+//                   <div className="w-full h-full rounded-full border-4 border-transparent" style={{
+//                     background: `conic-gradient(${gameState.isMining ? '#00ff88, #0088ff, #8800ff, #ff0088, #00ff88' : '#404040, #404040'})`,
+//                     padding: '2px'
+//                   }}>
+//                     <div className="w-full h-full rounded-full bg-gray-900"></div>
+//                   </div>
+//                 </div>
+                
+//                 {/* Main Mining Button */}
+//                 <button 
+//                   onClick={toggleMining}
+//                   disabled={!gameState.isMining && gameState.currentEnergy < 1}
+//                   className={`
+//                     relative w-52 h-52 rounded-full transition-all duration-300 font-mono font-bold z-10
+//                     ${gameState.isMining 
+//                       ? 'bg-gradient-to-br from-red-500 via-red-600 to-red-700 hover:from-red-400 hover:via-red-500 hover:to-red-600 text-white shadow-[0_0_50px_rgba(239,68,68,0.8)] border-2 border-red-300' 
+//                       : gameState.currentEnergy < 1
+//                       ? 'bg-gradient-to-br from-gray-700 to-gray-800 text-gray-400 cursor-not-allowed border-2 border-gray-500'
+//                       : 'bg-gradient-to-br from-green-500 via-cyan-500 to-blue-500 hover:from-green-400 hover:via-cyan-400 hover:to-blue-400 text-white shadow-[0_0_50px_rgba(0,255,255,0.8)] border-2 border-cyan-300'
+//                     }
+//                     hover:scale-105 active:scale-95
+//                     backdrop-blur-sm
+//                   `}
+//                 >
+//                   <div className="flex flex-col items-center justify-center h-full">
+//                     {/* Mining Icon */}
+//                     <div className="text-5xl mb-2">
+//                       {gameState.isMining ? '⏹️' : gameState.currentEnergy < 1 ? '⚡' : '⛏️'}
+//                     </div>
+//                     {/* Mining Status */}
+//                     <div className="text-lg font-mono font-bold tracking-wider mb-1">
+//                       {gameState.isMining ? 'STOP MINING' : gameState.currentEnergy < 1 ? 'LOW POWER' : 'START MINING'}
+//                     </div>
+//                     {/* Hash Rate Display */}
+//                     <div className="text-xs font-mono text-white/80">
+//                       {gameState.isMining ? `${getBoostedMiningRate().toFixed(1)} TBC/s` : 'Ready to Mine'}
+//                     </div>
+//                     {/* Mining Streak Badge */}
+//                     {gameState.miningStreak > 0 && (
+//                       <div className="absolute -top-3 -right-3 bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-sm font-mono font-bold px-3 py-1 rounded-full border-2 border-yellow-300 shadow-[0_0_15px_rgba(251,191,36,0.6)]">
+//                         🔥 {gameState.miningStreak}
+//                       </div>
+//                     )}
+//                   </div>
+//                 </button>
+//               </div>
+//             </div>
+
+//             <UpgradesStatusSection
+//               gameState={gameState}
+//               setShowUpgradeShop={setShowUpgradeShop}
+//               formatNumber={formatNumber}
+//               getEnergyRegenerationRate={getEnergyRegenerationRate}
+//             />
+            
+//             {/* Compact Status */}
+//             <div className="relative z-10 flex justify-between items-center text-xs font-mono text-gray-400 bg-gray-900/20 rounded-lg p-3 border border-gray-600/30">
+//               <div>
+//                 <span className="text-cyan-400 font-bold">SESSION:</span> {getSessionDuration()}
+//               </div>
+//               <div>
+//                 <span className="text-cyan-400 font-bold">TOTAL:</span> {formatNumber(gameState.totalPointsEarned)}
+//               </div>
+//             </div>
+
+//             {/* Hidden Reset Button - Only visible when holding Ctrl+Shift */}
+//             <div className="relative hidden z-10">
+//               <button
+//                 onClick={() => setShowResetConfirmation(true)}
+//                 disabled={isResetting}
+//                 className={`w-full flex items-center justify-center p-1.5 rounded-lg transition-all duration-300 font-mono font-bold border ${
+//                   showResetButton 
+//                     ? 'opacity-100 bg-gradient-to-r from-red-900/50 to-red-800/50 border-red-500/50 text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.3)]' 
+//                     : 'opacity-30 hover:opacity-60 bg-gradient-to-r from-gray-800/30 to-gray-700/30 border-gray-600/30 text-gray-400 hover:text-gray-300'
+//                 } group disabled:opacity-50 disabled:cursor-not-allowed text-xs`}
+//                 title={showResetButton ? "Click to reset game data" : "Hold Ctrl+Shift to reveal reset button"}
+//               >
+//                 <div className="flex items-center space-x-1">
+//                   <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+//                     showResetButton ? 'bg-red-400 animate-pulse' : 'bg-gray-400'
+//                   }`}></div>
+//                   <span className="tracking-wider">
+//                     {isResetting ? '🔄 RESETTING...' : showResetButton ? '🗑️ RESET GAME DATA' : '⚙️ ADVANCED'}
 //                   </span>
 //                 </div>
-//               </div>
-              
-//               {/* Inline Hash Rate */}
-//               <div className="flex items-center space-x-1 ml-4">
-//                 <span className="text-xs font-mono font-bold text-cyan-400">HASH:</span>
-//                 <span className="text-sm font-mono font-bold text-white">
-//                   {getBoostedMiningRate().toFixed(1)}/s
-//                 </span>
-//               </div>
+//               </button>
 //             </div>
-            
-//             {/* Compact Tier Badge */}
+
+           
+//             {/* Compact Offline Rewards */}
+//             {showOfflineRewards && gameState.unclaimedOfflineRewards > 0 && (
+//               <div className="relative z-10 mt-3 bg-gradient-to-r from-purple-900/40 to-blue-900/40 backdrop-blur-xl border border-purple-500/30 rounded-lg p-3 animate-pulse hover:scale-[1.01] transition-all duration-300">
+//                 <div className="text-center">
+//                   <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-1">
+//                     🎁 OFFLINE REWARDS
+//                   </div>
+//                   <div className="text-lg font-mono font-bold text-purple-300 mb-2 tracking-wider">
+//                     {formatNumber(gameState.unclaimedOfflineRewards)}
+//                   </div>
+//                   <button 
+//                     onClick={claimOfflineRewards}
+//                     className="font-mono font-bold px-4 py-2 rounded-lg text-xs transition-all duration-300 border tracking-wider bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white border-purple-400 hover:scale-105 active:scale-95 shadow-sm"
+//                   >
+//                     CLAIM
+//                   </button>
+//                 </div>
+//               </div>
+//             )}
+
+//             {/* Compact Status Messages */}
+//             {gameState.currentEnergy < 100 && gameState.isMining && (
+//               <div className="relative z-10 mt-3 bg-gradient-to-r from-red-900/40 to-red-800/40 backdrop-blur-sm border border-red-500/50 rounded-lg p-2 animate-pulse">
+//                 <div className="text-center text-red-400 font-mono font-bold text-xs tracking-wider">
+//                   ⚠️ LOW ENERGY
+//                 </div>
+//               </div>
+//             )}
+
 //             {(() => {
-//               const currentTier = getCurrentTier(gameState.miningLevel);
-//               const tierColors = {
-//                 green: 'text-green-400 bg-green-900/30 border-green-500/30 hover:bg-green-800/40 hover:border-green-400/50',
-//                 blue: 'text-blue-400 bg-blue-900/30 border-blue-500/30 hover:bg-blue-800/40 hover:border-blue-400/50',
-//                 purple: 'text-purple-400 bg-purple-900/30 border-purple-500/30 hover:bg-purple-800/40 hover:border-purple-400/50',
-//                 yellow: 'text-yellow-400 bg-yellow-900/30 border-yellow-500/30 hover:bg-yellow-800/40 hover:border-yellow-400/50'
-//               };
-//               return (
-//                 <button
-//                   onClick={() => setShowTierInfo(true)}
-//                   className={`text-xs font-mono font-bold px-3 py-1 rounded-lg border flex items-center space-x-1 transition-all duration-300 hover:scale-105 active:scale-95 cursor-pointer shadow-lg ${tierColors[currentTier.color as keyof typeof tierColors]}`}
-//                   title="Click for mining tier information"
-//                 >
-//                   <span className="text-sm">{currentTier.symbol}</span>
-//                   <span>{currentTier.name}</span>
-//                 </button>
-//               );
+//               const flowStateUpgrades = upgrades.filter(u => u.id === 'flow-state');
+//               const hasAutoMining = flowStateUpgrades.some(u => u.level > 0);
+              
+//               if (hasAutoMining) {
+//                 return (
+//                   <div className="relative z-10 mt-3 bg-gradient-to-r from-blue-900/40 to-purple-900/40 backdrop-blur-sm border border-blue-500/50 rounded-lg p-2">
+//                     <div className="text-center text-blue-400 font-mono font-bold text-xs tracking-wider">
+//                       🌊 FLOW STATE {gameState.isMining ? 'ACTIVE' : 'ENABLED'}
+//                     </div>
+//                   </div>
+//                 );
+//               }
+//               return null;
 //             })()}
 //           </div>
-//         </div>
-          
 
+//           {/* Full-Screen Upgrade Shop Modal */}
+//           <UpgradeModal
+//             isOpen={showUpgradeShop}
+//             onClose={closeUpgradeShop}
+//             upgrades={upgrades}
+//             divinePoints={gameState.divinePoints}
+//             onPurchaseUpgrade={purchaseUpgrade}
+//             purchasingUpgrade={purchasingUpgrade}
+//             formatNumber={formatNumber}
+//             getUpgradeCost={getUpgradeCost}
+//             isUpgradeMaxed={isUpgradeMaxed}
+//             isUpgradeAvailable={isUpgradeAvailable}
+//             getFilterDisplayName={getFilterDisplayName}
+//             getUpgradeCategoryColor={getUpgradeCategoryColor}
+//             getUpgradeCategoryName={getUpgradeCategoryName}
+//             getPaginatedUpgrades={getPaginatedUpgrades}
+//             getTotalPages={getTotalPages}
+//             upgradeFilter={upgradeFilter}
+//             currentUpgradePage={currentUpgradePage}
+//             setUpgradeFilter={setUpgradeFilter}
+//             setCurrentUpgradePage={setCurrentUpgradePage}
+//           />
 
-//         {/* Compact Main Points Display */}
-//         <div className="relative z-10 text-center mb-6">
-//           <div className={`text-6xl font-mono font-bold tracking-wider mb-1 transition-all duration-300 ${
-//             gameState.divinePoints > 1000000 
-//               ? 'text-purple-300 drop-shadow-[0_0_15px_rgba(147,51,234,0.6)]' 
-//               : gameState.divinePoints > 100000 
-//               ? 'text-yellow-300 drop-shadow-[0_0_15px_rgba(251,191,36,0.6)]' 
-//               : gameState.divinePoints > 10000 
-//               ? 'text-green-300 drop-shadow-[0_0_15px_rgba(34,197,94,0.6)]' 
-//               : 'text-cyan-300 drop-shadow-[0_0_15px_rgba(0,255,255,0.6)]'
-//           }`}>
-//             {formatNumber(gameState.divinePoints)}
-//           </div>
-//                           <div className="text-sm font-mono text-cyan-400 tracking-wider mb-1 stakers-tokens-display">TONERS TOKENS</div>
-//           <div className="text-sm font-mono text-cyan-300">
-//             +{getBoostedMiningRate().toFixed(1)} TKN/sec
-//             {gameState.miningCombo > 1.1 && (
-//               <span className="ml-2 text-yellow-400 font-bold text-base">
-//                 {gameState.miningCombo.toFixed(1)}x boost
-//               </span>
-//             )}
-//           </div>
-//         </div>
-
-//         {/* Professional Mining Control Panel */}
-//         <div className="relative z-10 flex justify-center items-center mb-8">
-//           <div className="relative">
-//             {/* Mining Status Ring */}
-//             <div className={`absolute inset-0 w-52 h-52 rounded-full ${gameState.isMining ? 'animate-spin' : ''}`} style={{ animationDuration: '8s' }}>
-//               <div className="w-full h-full rounded-full border-4 border-transparent" style={{
-//                 background: `conic-gradient(${gameState.isMining ? '#00ff88, #0088ff, #8800ff, #ff0088, #00ff88' : '#404040, #404040'})`,
-//                 padding: '2px'
-//               }}>
-//                 <div className="w-full h-full rounded-full bg-gray-900"></div>
-//               </div>
-//             </div>
-            
-//             {/* Main Mining Button */}
-//             <div className="relative group">
-//               {/* Outer glow ring */}
-//               <div className={`
-//                 absolute inset-0 rounded-full transition-all duration-300 blur-sm
-//                 ${gameState.isMining 
-//                   ? 'bg-gradient-to-r from-red-400 via-orange-500 to-red-600 animate-pulse' 
-//                   : gameState.currentEnergy < 1
-//                   ? 'bg-gray-600/50'
-//                   : 'bg-gradient-to-r from-emerald-400 via-cyan-400 to-blue-500'
-//                 }
-//               `} />
-              
-//               {/* Energy progress ring */}
-//               <div className="absolute inset-0 rounded-full">
-//                 <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-//                   <circle
-//                     cx="50"
-//                     cy="50"
-//                     r="46"
-//                     fill="none"
-//                     stroke="rgba(255,255,255,0.1)"
-//                     strokeWidth="1.5"
-//                   />
-//                   <circle
-//                     cx="50"
-//                     cy="50"
-//                     r="46"
-//                     fill="none"
-//                     stroke={gameState.currentEnergy < 20 ? "#ef4444" : "#10b981"}
-//                     strokeWidth="2"
-//                     strokeLinecap="round"
-//                     strokeDasharray={`${(gameState.currentEnergy / gameState.maxEnergy) * 289} 289`}
-//                     className="transition-all duration-700 drop-shadow-[0_0_4px_currentColor]"
-//                   />
-//                 </svg>
-//               </div>
-
-//               <button 
-//                 onClick={toggleMining}
-//                 disabled={!gameState.isMining && gameState.currentEnergy < 1}
-//                 className={`
-//                   relative w-52 h-52 rounded-full transition-all duration-300 font-mono font-bold z-10
-//                   ${gameState.isMining 
-//                     ? 'bg-gradient-to-br from-red-500 via-orange-500 to-red-700 hover:from-red-400 hover:via-orange-400 hover:to-red-600 text-white shadow-[0_0_40px_rgba(239,68,68,0.8)] border-2 border-red-300/60' 
-//                     : gameState.currentEnergy < 1
-//                     ? 'bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 text-gray-400 cursor-not-allowed border-2 border-gray-600/40 shadow-[0_0_15px_rgba(107,114,128,0.3)]'
-//                     : 'bg-gradient-to-br from-emerald-500 via-cyan-500 to-blue-600 hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500 text-white shadow-[0_0_40px_rgba(6,182,212,0.8)] border-2 border-cyan-300/60'
-//                   }
-//                   ${!gameState.isMining && gameState.currentEnergy >= 1 ? 'hover:scale-105' : gameState.isMining ? 'hover:scale-102' : ''}
-//                   active:scale-95
-//                   backdrop-blur-xl
-//                 `}
-//               >
-//                 {/* Inner content container */}
-//                 <div className="relative flex flex-col items-center justify-center h-full overflow-hidden">
-//                   {/* Animated particles for mining state */}
-//                   {gameState.isMining && (
-//                     <div className="absolute inset-0 overflow-hidden rounded-full">
-//                       {[...Array(4)].map((_, i) => (
-//                         <div
-//                           key={i}
-//                           className="absolute w-0.5 h-0.5 bg-yellow-300 rounded-full animate-bounce"
-//                           style={{
-//                             left: `${25 + i * 15}%`,
-//                             top: `${35 + (i % 2) * 30}%`,
-//                             animationDelay: `${i * 0.3}s`,
-//                             animationDuration: '1.2s'
-//                           }}
-//                         />
-//                       ))}
-//                     </div>
-//                   )}
-
-//                   {/* Mining Icon */}
-//                   <div className={`
-//                     text-3xl mb-1 transition-all duration-300
-//                     ${gameState.isMining ? 'animate-pulse' : ''}
-//                     ${!gameState.isMining && gameState.currentEnergy >= 1 ? 'group-hover:scale-110' : ''}
-//                   `}>
-//                     {gameState.isMining ? '⏹️' : gameState.currentEnergy < 1 ? '⚡' : '⛏️'}
-//                   </div>
-
-//                   {/* Mining Status */}
-//                   <div className={`
-//                     text-xs font-mono font-bold tracking-wider mb-1 uppercase
-//                     ${gameState.isMining ? 'animate-pulse' : ''}
-//                     bg-gradient-to-r bg-clip-text text-transparent
-//                     ${gameState.isMining 
-//                       ? 'from-white via-yellow-200 to-white' 
-//                       : gameState.currentEnergy < 1 
-//                       ? 'from-gray-400 to-gray-500'
-//                       : 'from-white via-cyan-200 to-white'
-//                     }
-//                   `}>
-//                     {gameState.isMining ? 'STOP' : gameState.currentEnergy < 1 ? 'LOW PWR' : 'START'}
-//                   </div>
-
-//                   {/* Hash Rate Display */}
-//                   <div className={`
-//                     text-xs font-mono font-bold px-2 py-0.5 rounded-full backdrop-blur-sm
-//                     ${gameState.isMining 
-//                       ? 'bg-white/20 text-yellow-200' 
-//                       : gameState.currentEnergy < 1
-//                       ? 'bg-gray-800/60 text-gray-400'
-//                       : 'bg-white/20 text-cyan-200'
-//                     }
-//                     border border-white/30
-//                   `}>
-//                     {gameState.isMining ? `${getBoostedMiningRate().toFixed(1)} TKN/s` : 'Ready'}
-//                   </div>
-
-//                   {/* Energy indicator */}
-//                   {/* <div className={`
-//                     absolute bottom-2 left-1/2 transform -translate-x-1/2
-//                     text-xs font-mono font-bold px-1.5 py-0.5 rounded-full
-//                     ${gameState.currentEnergy < 20 
-//                       ? 'bg-red-500/80 text-white animate-pulse' 
-//                       : gameState.currentEnergy < 50 
-//                       ? 'bg-yellow-500/80 text-black' 
-//                       : 'bg-green-500/80 text-white'
-//                     }
-//                     border border-white/40 backdrop-blur-sm
-//                   `}>
-//                     ⚡{gameState.currentEnergy}
-//                   </div> */}
-//                 </div>
-
-//                 {/* Compact Mining Streak Badge */}
-//                 {gameState.miningStreak > 0 && (
-//                   <div className="absolute -top-2 -right-2">
-//                     <div className="relative bg-gradient-to-r from-yellow-400 to-orange-500 text-black text-xs font-mono font-black px-2 py-1 rounded-full border border-yellow-300 shadow-[0_0_10px_rgba(251,191,36,0.6)]">
-//                       🔥{gameState.miningStreak}
+//           {/* Reset Confirmation Modal */}
+//           {showResetConfirmation && (
+//             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
+//               <div className="relative w-full max-w-md bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-red-500/30 rounded-xl shadow-[0_0_40px_rgba(239,68,68,0.3)] overflow-hidden">
+//                 {/* Modal Header */}
+//                 <div className="flex items-center justify-between p-4 border-b border-red-500/20 bg-gradient-to-r from-red-900/20 to-red-800/20">
+//                   <div className="flex items-center space-x-2">
+//                     <div className="w-3 h-3 rounded-full bg-red-400 animate-pulse"></div>
+//                     <div>
+//                       <h2 className="text-lg font-mono font-bold text-red-300 tracking-wider">⚠️ RESET CONFIRMATION</h2>
+//                       <p className="text-xs font-mono text-red-400">This action cannot be undone</p>
 //                     </div>
 //                   </div>
-//                 )}
+//                 </div>
 
-//                 {/* Compact Level indicator */}
-//                 {gameState.miningLevel > 1 && (
-//                   <div className="absolute -top-2 -left-2">
-//                     <div className="bg-gradient-to-r from-purple-500 to-blue-600 text-white text-xs font-mono font-bold px-2 py-1 rounded-full border border-purple-300 shadow-[0_0_8px_rgba(168,85,247,0.5)]">
-//                       L{gameState.miningLevel}
+//                 {/* Modal Content */}
+//                 <div className="p-6 text-center">
+//                   <div className="mb-6">
+//                     <div className="text-6xl mb-4">🗑️</div>
+//                     <h3 className="text-xl font-mono font-bold text-red-300 mb-2 tracking-wider">
+//                       RESET GAME DATA
+//                     </h3>
+//                     <p className="text-sm font-mono text-gray-400 leading-relaxed">
+//                       This will permanently delete all your progress including:
+//                     </p>
+//                     <div className="mt-4 space-y-2 text-left">
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>All TBC coins ({formatNumber(gameState.divinePoints)})</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>All upgrades ({gameState.upgradesPurchased} purchased)</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>All achievements and progress</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>Mining level and experience</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>All game statistics</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>Daily streaks and rewards</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>Referral data and progress</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>Completed tasks and TBC coins</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>Active boosts and multipliers</span>
+//                       </div>
+//                       <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
+//                         <span className="text-red-400">•</span>
+//                         <span>All localStorage and database data</span>
+//                       </div>
 //                     </div>
 //                   </div>
-//                 )}
-//               </button>
-//             </div>
-//           </div>
-//         </div>
 
-//         <div className="relative z-10 mb-4">
-//           <button
-//             onClick={() => setShowUpgradeShop(true)}
-//             className="w-full flex items-center justify-between p-3 rounded-lg transition-all duration-300 font-mono font-bold border hover:scale-[1.01] active:scale-[0.99] bg-gradient-to-r from-slate-900/80 to-gray-900/80 backdrop-blur-xl border border-yellow-500/30 group"
-//           >
-//             <div className="flex items-center space-x-2">
-//               <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-//               <span className="text-sm tracking-wider">⚡UPGRADES</span>
-//               {gameState.upgradesPurchased > 0 && (
-//                 <div className="text-xs px-2 py-1 rounded border border-cyan-400/30 bg-cyan-400/10">
-//                   {gameState.upgradesPurchased}
-//                 </div>
-//               )}
-//             </div>
-//             <div className="flex items-center space-x-2">
-//               <div className="text-xs font-mono text-cyan-400">
-//                 {formatNumber(gameState.divinePoints)} TONERS TOKENS
-//               </div>
-//               <div className="text-cyan-300">
-//                 <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-//                   <path d="M7 10l5 5 5-5z"/>
-//                 </svg>
-//               </div>
-//             </div>
-//           </button>
-//         </div>
-        
-//         {/* Professional Energy Progress Bar */}
-//                  {/* Enhanced Dual Progress Display */}
-//          <div className="relative z-10 mb-4 group">
-//            {/* Background glow effect */}
-//            <div className="absolute inset-0 bg-gradient-to-r from-cyan-500/20 via-purple-500/20 to-cyan-500/20 rounded-xl blur-sm opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
-           
-//            <div className="relative bg-gradient-to-r from-slate-900/90 to-gray-900/90 backdrop-blur-xl border border-cyan-500/40 rounded-xl p-4 shadow-[0_0_25px_rgba(6,182,212,0.15)] hover:shadow-[0_0_35px_rgba(6,182,212,0.25)] transition-all duration-300">
-             
-//              {/* Enhanced Header Row */}
-//              <div className="flex items-center justify-between mb-4">
-//                <div className="flex items-center space-x-4">
-//                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-yellow-500/20 to-orange-500/20 rounded-full border border-yellow-500/30">
-//                    <span className="text-lg animate-pulse">⚡</span>
-//                    <span className="text-sm font-mono font-black text-yellow-400 tracking-wider">POWER</span>
-//                  </div>
-//                  <div className="w-px h-6 bg-gradient-to-b from-transparent via-gray-500 to-transparent"></div>
-//                  <div className="flex items-center space-x-2 px-3 py-1.5 bg-gradient-to-r from-purple-500/20 to-indigo-500/20 rounded-full border border-purple-500/30">
-//                    <span className="text-lg">🎯</span>
-//                    <span className="text-sm font-mono font-black text-purple-400 tracking-wider">EXP</span>
-//                  </div>
-//                </div>
-//                <div className="px-3 py-1.5 bg-gradient-to-r from-blue-500/20 to-cyan-500/20 rounded-full border border-blue-500/30">
-//                  <span className="text-sm font-mono font-black text-blue-400">LVL {gameState.miningLevel}</span>
-//                </div>
-//              </div>
-
-//              {/* Enhanced Dual Progress Rings */}
-//              <div className="relative flex items-center justify-center mb-4">
-//                <div className="relative w-24 h-24 group">
-//                  {/* Outer glow ring for energy */}
-//                  <div className={`absolute inset-0 rounded-full transition-all duration-500 blur-sm ${
-//                    gameState.currentEnergy < 20 ? 'bg-red-400/40' : 
-//                    gameState.currentEnergy < 50 ? 'bg-yellow-400/40' : 'bg-green-400/40'
-//                  }`}></div>
-                 
-//                  {/* Energy Ring (Outer) */}
-//                  <svg className="absolute inset-0 w-full h-full transform -rotate-90 z-10">
-//                    <circle
-//                      cx="48"
-//                      cy="48"
-//                      r="44"
-//                      fill="none"
-//                      stroke="rgba(255,255,255,0.1)"
-//                      strokeWidth="4"
-//                    />
-//                    <circle
-//                      cx="48"
-//                      cy="48"
-//                      r="44"
-//                      fill="none"
-//                      stroke={gameState.currentEnergy < 20 ? "#ef4444" : gameState.currentEnergy < 50 ? "#f59e0b" : "#10b981"}
-//                      strokeWidth="4"
-//                      strokeLinecap="round"
-//                      strokeDasharray={`${(gameState.currentEnergy / gameState.maxEnergy) * 276} 276`}
-//                      className="transition-all duration-1000 drop-shadow-[0_0_8px_currentColor]"
-//                    />
-//                  </svg>
-                 
-//                  {/* Experience Ring (Inner) */}
-//                  <svg className="absolute inset-0 w-full h-full transform -rotate-90 z-10">
-//                    <circle
-//                      cx="48"
-//                      cy="48"
-//                      r="34"
-//                      fill="none"
-//                      stroke="rgba(255,255,255,0.1)"
-//                      strokeWidth="3"
-//                    />
-//                    <circle
-//                      cx="48"
-//                      cy="48"
-//                      r="34"
-//                      fill="none"
-//                      stroke="#8b5cf6"
-//                      strokeWidth="3"
-//                      strokeLinecap="round"
-//                      strokeDasharray={`${(gameState.miningExperience / gameState.miningExperienceToNext) * 214} 214`}
-//                      className="transition-all duration-1000 drop-shadow-[0_0_6px_currentColor]"
-//                    />
-//                  </svg>
-
-//                  {/* Enhanced Center Content */}
-//                  <div className="absolute inset-0 flex flex-col items-center justify-center z-20">
-//                    <div className="text-lg font-mono font-black text-white drop-shadow-lg">
-//                      {Math.round(gameState.currentEnergy)}
-//                    </div>
-//                    <div className="text-xs font-mono font-bold text-purple-400">
-//                      {((gameState.miningExperience / gameState.miningExperienceToNext) * 100).toFixed(0)}%
-//                    </div>
-//                  </div>
-
-//                  {/* Animated particles for low energy */}
-//                  {gameState.currentEnergy < 20 && (
-//                    <div className="absolute inset-0 overflow-hidden rounded-full z-10">
-//                      {[...Array(3)].map((_, i) => (
-//                        <div
-//                          key={i}
-//                          className="absolute w-1 h-1 bg-red-400 rounded-full animate-bounce"
-//                          style={{
-//                            left: `${40 + i * 8}%`,
-//                            top: `${40 + (i % 2) * 20}%`,
-//                            animationDelay: `${i * 0.4}s`,
-//                            animationDuration: '1.5s'
-//                          }}
-//                        />
-//                      ))}
-//                    </div>
-//                  )}
-//                </div>
-
-//                {/* Enhanced Status Indicators */}
-//                <div className="ml-6 space-y-3 text-sm font-mono">
-//                  <div className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
-//                    <div className={`w-3 h-3 rounded-full shadow-lg transition-all duration-300 ${
-//                      gameState.currentEnergy > gameState.maxEnergy * 0.7 ? 'bg-green-400 shadow-green-400/50' : 
-//                      gameState.currentEnergy > gameState.maxEnergy * 0.3 ? 'bg-yellow-400 shadow-yellow-400/50 animate-pulse' : 'bg-red-400 shadow-red-400/50 animate-pulse'
-//                    }`}></div>
-//                    <span className="text-gray-200 font-bold">
-//                      {Math.round(gameState.currentEnergy)}<span className="text-gray-500">/{gameState.maxEnergy}</span>
-//                    </span>
-//                  </div>
-//                  <div className="flex items-center space-x-3 p-2 bg-gray-800/50 rounded-lg border border-gray-700/50">
-//                    <div className="w-3 h-3 rounded-full bg-purple-400 shadow-lg shadow-purple-400/50"></div>
-//                    <span className="text-gray-200 font-bold">
-//                      {gameState.miningExperience.toLocaleString()}<span className="text-gray-500">/{gameState.miningExperienceToNext.toLocaleString()}</span>
-//                    </span>
-//                  </div>
-//                </div>
-//              </div>
-
-//              {/* Enhanced Bottom Status Row */}
-//              <div className="flex items-center justify-between p-3 bg-gradient-to-r from-gray-800/60 to-gray-900/60 rounded-lg border border-gray-700/50">
-//                <div className="flex items-center space-x-4">
-//                  <div className="flex items-center space-x-2 px-3 py-1 bg-green-500/20 rounded-full border border-green-500/30">
-//                    <span className="text-xs font-mono text-green-400">⚡</span>
-//                    <span className="text-xs font-mono font-bold text-green-400">+{getEnergyRegenerationRate().toFixed(1)}/s</span>
-//                  </div>
-//                  <div className="w-1 h-1 rounded-full bg-gray-500"></div>
-//                  <div className={`px-3 py-1 rounded-full border font-bold text-xs font-mono tracking-wider ${
-//                    gameState.currentEnergy > gameState.maxEnergy * 0.7 
-//                      ? 'bg-green-500/20 border-green-500/30 text-green-400' 
-//                      : gameState.currentEnergy > gameState.maxEnergy * 0.3 
-//                      ? 'bg-yellow-500/20 border-yellow-500/30 text-yellow-400' 
-//                      : 'bg-red-500/20 border-red-500/30 text-red-400'
-//                  }`}>
-//                    {gameState.currentEnergy > gameState.maxEnergy * 0.7 ? '🟢 OPTIMAL' : 
-//                     gameState.currentEnergy > gameState.maxEnergy * 0.3 ? '🟡 MODERATE' : '🔴 LOW PWR'}
-//                  </div>
-//                </div>
-//                {gameState.miningCombo > 1.1 && (
-//                  <div className="px-3 py-1 bg-purple-500/20 rounded-full border border-purple-500/30">
-//                    <span className="text-xs font-mono font-bold text-purple-400">🔥 {gameState.miningCombo.toFixed(1)}x</span>
-//                  </div>
-//                )}
-//              </div>
-//            </div>
-//          </div>
-
-
-//         {/* Compact Status */}
-//         <div className="relative z-10 flex justify-between items-center text-xs font-mono text-gray-400 bg-gray-900/20 rounded-lg p-3 border border-gray-600/30">
-//           <div>
-//             <span className="text-cyan-400 font-bold">SESSION:</span> {getSessionDuration()}
-//           </div>
-//           <div>
-//             <span className="text-cyan-400 font-bold">TOTAL:</span> {formatNumber(gameState.totalPointsEarned)}
-//           </div>
-//         </div>
-
-//         {/* Hidden Reset Button - Only visible when holding Ctrl+Shift */}
-//         <div className="relative z-10">
-//           <button
-//             onClick={() => setShowResetConfirmation(true)}
-//             disabled={isResetting}
-//             className={`w-full flex items-center justify-center p-1.5 rounded-lg transition-all duration-300 font-mono font-bold border ${
-//               showResetButton 
-//                 ? 'opacity-100 bg-gradient-to-r from-red-900/50 to-red-800/50 border-red-500/50 text-red-300 shadow-[0_0_20px_rgba(239,68,68,0.3)]' 
-//                 : 'opacity-30 hover:opacity-60 bg-gradient-to-r from-gray-800/30 to-gray-700/30 border-gray-600/30 text-gray-400 hover:text-gray-300'
-//             } group disabled:opacity-50 disabled:cursor-not-allowed text-xs`}
-//             title={showResetButton ? "Click to reset game data" : "Hold Ctrl+Shift to reveal reset button"}
-//           >
-//             <div className="flex items-center space-x-1">
-//               <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
-//                 showResetButton ? 'bg-red-400 animate-pulse' : 'bg-gray-400'
-//               }`}></div>
-//               <span className="tracking-wider">
-//                 {isResetting ? '🔄 RESETTING...' : showResetButton ? '🗑️ RESET GAME DATA' : '⚙️ ADVANCED'}
-//               </span>
-//             </div>
-//           </button>
-//         </div>
-
-       
-//         {/* Compact Offline Rewards */}
-//         {showOfflineRewards && gameState.unclaimedOfflineRewards > 0 && (
-//           <div className="relative z-10 mt-3 bg-gradient-to-r from-purple-900/40 to-blue-900/40 backdrop-blur-xl border border-purple-500/30 rounded-lg p-3 animate-pulse hover:scale-[1.01] transition-all duration-300">
-//             <div className="text-center">
-//               <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-1">
-//                 🎁 OFFLINE REWARDS
-//               </div>
-//               <div className="text-lg font-mono font-bold text-purple-300 mb-2 tracking-wider">
-//                 {formatNumber(gameState.unclaimedOfflineRewards)}
-//               </div>
-//               <button 
-//                 onClick={claimOfflineRewards}
-//                 className="font-mono font-bold px-4 py-2 rounded-lg text-xs transition-all duration-300 border tracking-wider bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-500 hover:to-blue-500 text-white border-purple-400 hover:scale-105 active:scale-95 shadow-sm"
-//               >
-//                 CLAIM
-//               </button>
-//             </div>
-//           </div>
-//         )}
-
-//         {/* Compact Status Messages */}
-//         {gameState.currentEnergy < 100 && gameState.isMining && (
-//           <div className="relative z-10 mt-3 bg-gradient-to-r from-red-900/40 to-red-800/40 backdrop-blur-sm border border-red-500/50 rounded-lg p-2 animate-pulse">
-//             <div className="text-center text-red-400 font-mono font-bold text-xs tracking-wider">
-//               ⚠️ LOW ENERGY
-//             </div>
-//           </div>
-//         )}
-
-//         {(() => {
-//           const flowStateUpgrades = upgrades.filter(u => u.id === 'flow-state');
-//           const hasAutoMining = flowStateUpgrades.some(u => u.level > 0);
-          
-//           if (hasAutoMining) {
-//             return (
-//               <div className="relative z-10 mt-3 bg-gradient-to-r from-blue-900/40 to-purple-900/40 backdrop-blur-sm border border-blue-500/50 rounded-lg p-2">
-//                 <div className="text-center text-blue-400 font-mono font-bold text-xs tracking-wider">
-//                   🌊 FLOW STATE {gameState.isMining ? 'ACTIVE' : 'ENABLED'}
-//                 </div>
-//               </div>
-//             );
-//           }
-//           return null;
-//         })()}
-//       </div>
-
-//       {/* Full-Screen Upgrade Shop Modal */}
-//       {showUpgradeShop && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm" onClick={(e) => {
-//           // Close modal when clicking outside
-//           if (e.target === e.currentTarget) {
-//             closeUpgradeShop();
-//           }
-//         }}>
-//           <div className="relative w-full max-w-2xl max-h-[80vh] bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl shadow-[0_0_40px_rgba(0,255,255,0.3)] overflow-hidden">
-//             {/* Modal Header */}
-//             <div className="flex items-center justify-between p-3 border-b border-cyan-500/20 bg-gradient-to-r from-cyan-900/20 to-blue-900/20">
-//               <div className="flex items-center space-x-2">
-//                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-//                 <div>
-//                   <h2 className="text-lg font-mono font-bold text-cyan-300 tracking-wider">🔧 TONERS MINING UPGRADES</h2>
-//                   <p className="text-xs font-mono text-cyan-400">Enhance your mining operation with advanced equipment</p>
-//                 </div>
-//               </div>
-//               <div className="flex items-center space-x-2">
-//                 <div className="text-right">
-//                   <div className="text-sm font-mono font-bold text-cyan-300">
-//                     {formatNumber(gameState.divinePoints)}
+//                   <div className="flex space-x-3">
+//                     <button
+//                       onClick={() => setShowResetConfirmation(false)}
+//                       disabled={isResetting}
+//                       className="flex-1 px-6 py-3 rounded-lg text-sm font-mono font-bold tracking-wider transition-all duration-300 bg-gradient-to-r from-gray-700/50 to-gray-600/50 text-gray-300 border border-gray-600 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
+//                     >
+//                       CANCEL
+//                     </button>
+//                     <button
+//                       onClick={resetUserData}
+//                       disabled={isResetting}
+//                       className="flex-1 px-6 py-3 rounded-lg text-sm font-mono font-bold tracking-wider transition-all duration-300 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white border border-red-400 shadow-sm hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
+//                     >
+//                       {isResetting ? '🔄 RESETTING...' : '🗑️ CONFIRM RESET'}
+//                     </button>
 //                   </div>
-//                   <div className="text-xs font-mono text-cyan-400">TONERS TOKENS</div>
 //                 </div>
-//                 <button
-//                   onClick={closeUpgradeShop}
-//                   className="w-6 h-6 flex items-center justify-center rounded-lg bg-red-900/50 text-red-400 border border-red-500/30 hover:bg-red-800/50 hover:border-red-400/50 transition-all duration-300 hover:scale-110"
-//                   title="Close shop"
-//                 >
-//                   <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-//                     <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-//                   </svg>
-//                 </button>
 //               </div>
 //             </div>
+//           )}
 
-//             {/* Modal Content */}
-//             <div className="p-4 overflow-y-auto max-h-[calc(80vh-80px)]">
-//               {/* Filter Tabs */}
-//               <div className="flex space-x-2 mb-4 overflow-x-auto pb-2">
-//                 {['all', 'affordable', 'recommended', 'hardware', 'advanced', 'software', 'network', 'infrastructure'].map((filter) => (
+//           {/* Tier Information Modal */}
+//           {showTierInfo && (
+//             <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/80 backdrop-blur-sm" onClick={() => setShowTierInfo(false)}>
+//               <div className="relative w-full max-w-md bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl shadow-[0_0_40px_rgba(0,255,255,0.3)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
+//                 {/* Modal Header */}
+//                 <div className="flex items-center justify-between p-3 border-b border-cyan-500/20 bg-gradient-to-r from-cyan-900/20 to-blue-900/20">
+//                   <div className="flex items-center space-x-2">
+//                     <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
+//                     <div>
+//                       <h2 className="text-base font-mono font-bold text-cyan-300 tracking-wider">🌟 TIERS</h2>
+//                       <p className="text-xs font-mono text-cyan-400">Mining journey</p>
+//                     </div>
+//                   </div>
 //                   <button
-//                     key={filter}
-//                     onClick={() => {
-//                       setUpgradeFilter(filter as typeof upgradeFilter);
-//                       setCurrentUpgradePage(1); // Reset to first page when changing filter
-//                     }}
-//                     className={`px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-300 whitespace-nowrap hover:scale-105 ${
-//                       upgradeFilter === filter
-//                         ? 'bg-gradient-to-r from-cyan-600 to-blue-600 text-white border border-cyan-400 shadow-[0_0_20px_rgba(0,255,255,0.3)]'
-//                         : 'bg-gray-800/50 text-gray-400 border border-gray-600 hover:border-cyan-400 hover:text-cyan-300'
-//                     }`}
+//                     onClick={() => setShowTierInfo(false)}
+//                     className="w-6 h-6 flex items-center justify-center rounded-lg bg-red-900/50 text-red-400 border border-red-500/30 hover:bg-red-800/50 hover:border-red-400/50 transition-all duration-300 hover:scale-110"
 //                   >
-//                     {getFilterDisplayName(filter)}
+//                     <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
+//                       <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
+//                     </svg>
 //                   </button>
-//                 ))}
-//               </div>
+//                 </div>
 
-//               {/* Upgrades Grid */}
-//               <div className="grid grid-cols-1 md:grid-cols-2 gap-3 mb-4">
-//                 {getPaginatedUpgrades().length > 0 ? (
-//                   getPaginatedUpgrades().map((upgrade) => {
-//                     const cost = getUpgradeCost(upgrade);
-//                     const canAfford = gameState.divinePoints >= cost;
-//                     const isMaxed = isUpgradeMaxed(upgrade);
-//                     const isAvailable = isUpgradeAvailable(upgrade);
-
+//                 {/* Modal Content */}
+//                 <div className="p-4 max-h-[70vh] overflow-y-auto">
+//                   {(() => {
+//                     const currentTier = getCurrentTier(gameState.miningLevel);
+//                     const tierColors = {
+//                       green: 'text-green-400 bg-green-900/20 border-green-500/30',
+//                       blue: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
+//                       purple: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
+//                       yellow: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30'
+//                     };
+                    
 //                     return (
-//                       <div
-//                         key={upgrade.id}
-//                         className={`relative bg-gradient-to-r backdrop-blur-sm border rounded-lg p-4 transition-all duration-300 hover:scale-[1.02] ${
-//                           !isAvailable
-//                             ? 'border-gray-500/30 bg-gradient-to-r from-gray-800/20 to-gray-700/20 opacity-50'
-//                             : isMaxed 
-//                             ? 'border-yellow-500/50 bg-gradient-to-r from-yellow-900/20 to-yellow-800/20' 
-//                             : canAfford 
-//                             ? 'border-green-500/50 hover:border-green-400 from-gray-800/40 to-gray-900/40' 
-//                             : 'border-gray-600/50 from-gray-800/40 to-gray-900/40'
-//                         }`}
-//                       >
-//                         <div className="flex flex-col h-full">
-//                           {/* Category Badge */}
-//                           {upgrade.category && (
-//                             <div className="flex items-center justify-between mb-2">
-//                               <span className={`text-xs font-mono font-bold px-2 py-1 rounded-full border ${getUpgradeCategoryColor(upgrade.category)}`}>
-//                                 {getUpgradeCategoryName(upgrade.category)}
-//                               </span>
-//                               {upgrade.level > 0 && (
-//                                 <span className="text-xs font-mono text-cyan-400 bg-cyan-900/30 px-2 py-1 rounded-full border border-cyan-500/30">
-//                                   LV.{upgrade.level}
-//                                 </span>
-//                               )}
+//                       <div className="space-y-4">
+//                         {/* Current Tier */}
+//                         <div className={`p-3 rounded-lg border ${tierColors[currentTier.color as keyof typeof tierColors]}`}>
+//                           <div className="flex items-center space-x-2 mb-2">
+//                             <span className="text-xl">{currentTier.symbol}</span>
+//                             <div>
+//                               <h3 className="text-sm font-mono font-bold tracking-wider">{currentTier.name}</h3>
+//                               <p className="text-xs font-mono opacity-80">Level {gameState.miningLevel}</p>
 //                             </div>
-//                           )}
-                          
-//                           {/* Upgrade Name */}
-//                           <h3 className="text-sm font-mono font-bold text-gray-200 tracking-wider mb-2">
-//                             {upgrade.name}
-//                           </h3>
-                          
-//                           {/* Effect */}
-//                           <div className="text-xs font-mono text-gray-400 mb-2">
-//                             {upgrade.effect}
 //                           </div>
+//                           <p className="text-xs font-mono mb-2">{currentTier.description}</p>
                           
-//                           {/* Description */}
-//                           {upgrade.description && (
-//                             <div className="text-xs font-mono text-gray-500 mb-3 flex-1 italic">
-//                               {upgrade.description}
+//                           {/* Benefits */}
+//                           <div className="space-y-1">
+//                             <h4 className="text-xs font-mono font-bold tracking-wider opacity-80">BENEFITS:</h4>
+//                             {currentTier.benefits.slice(0, 3).map((benefit, index) => (
+//                               <div key={index} className="flex items-center space-x-2 text-xs font-mono">
+//                                 <span className="text-xs">•</span>
+//                                 <span>{benefit}</span>
+//                               </div>
+//                             ))}
+//                             {currentTier.benefits.length > 3 && (
+//                               <div className="text-xs font-mono text-gray-400 italic">
+//                                 +{currentTier.benefits.length - 3} more benefits
+//                               </div>
+//                             )}
+//                           </div>
+//                         </div>
+
+//                         {/* Progress to Next Tier */}
+//                         {currentTier.nextTier && (
+//                           <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-3">
+//                             <div className="flex items-center justify-between mb-2">
+//                               <h4 className="text-xs font-mono font-bold tracking-wider text-gray-300">NEXT:</h4>
+//                               <div className="flex items-center space-x-1">
+//                                 <span className="text-sm">{currentTier.nextTier.symbol}</span>
+//                                 <span className="text-xs font-mono font-bold text-gray-300">{currentTier.nextTier.name}</span>
+//                               </div>
 //                             </div>
-//                           )}
-                          
-//                           {/* Requirements */}
-//                           {upgrade.requires && !isAvailable && (
-//                             <div className="text-xs font-mono text-red-400 mb-2">
-//                               Requires: {upgrade.requires.upgrade.replace('-', ' ').toUpperCase()} LV.{upgrade.requires.level}
+                            
+//                             <div className="mb-1">
+//                               <div className="flex justify-between text-xs font-mono text-gray-400 mb-1">
+//                                 <span>{gameState.miningLevel}/{currentTier.nextTier.level}</span>
+//                                 <span>{Math.round((gameState.miningLevel / currentTier.nextTier.level) * 100)}%</span>
+//                               </div>
+//                               <div className="w-full bg-gray-700/50 rounded-full h-1.5 border border-gray-600/30 overflow-hidden">
+//                                 <div 
+//                                   className="h-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
+//                                   style={{ width: `${Math.min((gameState.miningLevel / currentTier.nextTier.level) * 100, 100)}%` }}
+//                                 />
+//                               </div>
 //                             </div>
-//                           )}
-                          
-//                           {/* Cost and Buy Button */}
-//                           <div className="flex items-center justify-between">
-//                             <div className="text-xs font-mono text-gray-300">
-//                               Cost: <span className={canAfford ? 'text-green-400 font-bold' : 'text-red-400 font-bold'}>
-//                                 {formatNumber(cost)}
-//                               </span>
-//                             </div>
-//                             <button
-//                               onClick={() => {
-//                                 if (canAfford && !isMaxed && isAvailable && !purchasingUpgrade) {
-//                                   purchaseUpgrade(upgrade.id);
-//                                 }
-//                               }}
-//                               disabled={!canAfford || isMaxed || !isAvailable || purchasingUpgrade === upgrade.id}
-//                               className={`px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-300 hover:scale-105 active:scale-95 ${
-//                                 purchasingUpgrade === upgrade.id
-//                                   ? 'bg-gradient-to-r from-blue-600/50 to-blue-500/50 text-blue-300 border border-blue-500/50 cursor-not-allowed animate-pulse'
-//                                   : !isAvailable
-//                                   ? 'bg-gradient-to-r from-gray-600/50 to-gray-500/50 text-gray-400 border border-gray-500/50 cursor-not-allowed'
-//                                   : isMaxed
-//                                   ? 'bg-gradient-to-r from-yellow-600/50 to-yellow-500/50 text-yellow-300 border border-yellow-500/50 cursor-not-allowed'
-//                                   : canAfford
-//                                   ? 'bg-gradient-to-r from-green-600 to-green-500 hover:from-green-500 hover:to-green-400 text-white border border-green-400 shadow-sm'
-//                                   : 'bg-gradient-to-r from-gray-700/50 to-gray-600/50 text-gray-500 border border-gray-600 cursor-not-allowed'
-//                               }`}
-//                               title={
-//                                 purchasingUpgrade === upgrade.id
-//                                   ? 'Purchasing...'
-//                                   : !isAvailable 
-//                                   ? 'Requires previous upgrades' 
-//                                   : isMaxed 
-//                                   ? 'Maximum level reached' 
-//                                   : canAfford 
-//                                   ? 'Click to purchase' 
-//                                   : 'Not enough TONERS TOKENS'
-//                               }
-//                             >
-//                               {purchasingUpgrade === upgrade.id ? '⏳' : !isAvailable ? '🔒' : isMaxed ? 'MAX' : canAfford ? 'BUY' : '💰'}
-//                             </button>
+                            
+//                             <p className="text-xs font-mono text-gray-400">
+//                               {currentTier.nextTier.level - gameState.miningLevel} levels to {currentTier.nextTier.name}
+//                             </p>
+//                           </div>
+//                         )}
+
+//                         {/* All Tiers Overview */}
+//                         <div className="space-y-2">
+//                           <h4 className="text-xs font-mono font-bold tracking-wider text-gray-300">ALL TIERS:</h4>
+//                           <div className="grid grid-cols-4 gap-1">
+//                             {[
+//                               { name: 'NOVICE', symbol: '🌱', color: 'green', level: 1 },
+//                               { name: 'ADEPT', symbol: '🔮', color: 'blue', level: 15 },
+//                               { name: 'EXPERT', symbol: '💎', color: 'purple', level: 30 },
+//                               { name: 'MASTER', symbol: '🌟', color: 'yellow', level: 50 }
+//                             ].map((tier) => {
+//                               const isCurrent = tier.name === currentTier.name;
+//                               const isUnlocked = gameState.miningLevel >= tier.level;
+//                               const tierColorClasses = {
+//                                 green: isCurrent ? 'text-green-400 bg-green-900/30 border-green-400/50' : isUnlocked ? 'text-green-300 bg-green-900/20 border-green-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
+//                                 blue: isCurrent ? 'text-blue-400 bg-blue-900/30 border-blue-400/50' : isUnlocked ? 'text-blue-300 bg-blue-900/20 border-blue-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
+//                                 purple: isCurrent ? 'text-purple-400 bg-purple-900/30 border-purple-400/50' : isUnlocked ? 'text-purple-300 bg-purple-900/20 border-purple-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
+//                                 yellow: isCurrent ? 'text-yellow-400 bg-yellow-900/30 border-yellow-400/50' : isUnlocked ? 'text-yellow-300 bg-yellow-900/20 border-yellow-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30'
+//                               };
+                              
+//                               return (
+//                                 <div
+//                                   key={tier.name}
+//                                   className={`p-2 rounded-lg border text-center transition-all duration-300 ${tierColorClasses[tier.color as keyof typeof tierColorClasses]}`}
+//                                 >
+//                                   <div className="text-sm mb-1">{tier.symbol}</div>
+//                                   <div className="text-xs font-mono font-bold tracking-wider">{tier.name}</div>
+//                                   <div className="text-xs opacity-70">{tier.level}</div>
+//                                   {isCurrent && (
+//                                     <div className="text-xs text-cyan-400 font-bold">NOW</div>
+//                                   )}
+//                                 </div>
+//                               );
+//                             })}
+//                           </div>
+//                         </div>
+
+//                         {/* Compact Tips */}
+//                         <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30 rounded-lg p-3">
+//                           <h4 className="text-xs font-mono font-bold tracking-wider text-cyan-300 mb-2">💡 TIPS:</h4>
+//                           <div className="space-y-1 text-xs font-mono text-gray-300">
+//                             <div>• Higher tiers = better bonuses & upgrades</div>
+//                             <div>• Focus on energy efficiency for longer sessions</div>
+//                             <div>• Auto-mining improves with tier level</div>
 //                           </div>
 //                         </div>
 //                       </div>
 //                     );
-//                   })
-//                 ) : (
-//                   <div className="col-span-2 text-center py-8">
-//                     <div className="text-gray-400 font-mono text-sm mb-2">
-//                       {upgradeFilter === 'affordable' 
-//                         ? 'No affordable upgrades available' 
-//                         : upgradeFilter === 'recommended' 
-//                         ? 'No recommended upgrades available' 
-//                         : upgradeFilter === 'hardware' 
-//                         ? 'No hardware upgrades available' 
-//                         : upgradeFilter === 'advanced' 
-//                         ? 'No advanced upgrades available' 
-//                         : upgradeFilter === 'software' 
-//                         ? 'No software upgrades available' 
-//                         : upgradeFilter === 'network' 
-//                         ? 'No network upgrades available' 
-//                         : upgradeFilter === 'infrastructure' 
-//                         ? 'No infrastructure upgrades available' 
-//                         : 'No upgrades available'
-//                       }
-//                     </div>
-//                     <div className="text-gray-500 font-mono text-xs">
-//                       Try a different filter or earn more TONERS TOKENS
-//                     </div>
-//                   </div>
-//                 )}
-//               </div>
-
-//               {/* Pagination Controls */}
-//               {getTotalPages() > 1 && (
-//                 <div className="flex items-center justify-between pt-3 border-t border-gray-600/30">
-//                   <button
-//                     onClick={() => setCurrentUpgradePage(Math.max(1, currentUpgradePage - 1))}
-//                     disabled={currentUpgradePage === 1}
-//                     className={`px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-300 ${
-//                       currentUpgradePage === 1
-//                         ? 'bg-gray-700/50 text-gray-500 border border-gray-600 cursor-not-allowed'
-//                         : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50 hover:border-cyan-400/50'
-//                     }`}
-//                   >
-//                     ← Previous
-//                   </button>
-                  
-//                   <div className="text-xs font-mono text-gray-400">
-//                     Page {currentUpgradePage} of {getTotalPages()}
-//                   </div>
-                  
-//                   <button
-//                     onClick={() => setCurrentUpgradePage(Math.min(getTotalPages(), currentUpgradePage + 1))}
-//                     disabled={currentUpgradePage === getTotalPages()}
-//                     className={`px-4 py-2 rounded-lg text-xs font-mono font-bold tracking-wider transition-all duration-300 ${
-//                       currentUpgradePage === getTotalPages()
-//                         ? 'bg-gray-700/50 text-gray-500 border border-gray-600 cursor-not-allowed'
-//                         : 'bg-cyan-900/50 text-cyan-300 border border-cyan-500/30 hover:bg-cyan-800/50 hover:border-cyan-400/50'
-//                     }`}
-//                   >
-//                     Next →
-//                   </button>
-//                 </div>
-//               )}
-
-//               {/* Stats Summary */}
-//               <div className="mt-4 pt-3 border-t border-gray-600/30">
-//                 <div className="grid grid-cols-2 gap-4 text-xs font-mono">
-//                   <div className="text-center">
-//                     <div className="text-cyan-400 font-bold">TOTAL UPGRADES</div>
-//                     <div className="text-cyan-300">{gameState.upgradesPurchased}</div>
-//                   </div>
-//                   <div className="text-center">
-//                     <div className="text-purple-400 font-bold">AVAILABLE</div>
-//                     <div className="text-purple-300">{getFilteredUpgrades().filter(u => isUpgradeAvailable(u) && !isUpgradeMaxed(u)).length}</div>
-//                   </div>
-//                 </div>
-//                 <div className="mt-2 pt-2 border-t border-gray-600/20">
-//                   <div className="grid grid-cols-3 gap-2 text-xs font-mono">
-//                     <div className="text-center">
-//                       <div className="text-green-400 font-bold">PPS BONUS</div>
-//                       <div className="text-green-300">+{((gameState.pointsPerSecond - 1.0) * 100).toFixed(1)}%</div>
-//                     </div>
-//                     <div className="text-center">
-//                       <div className="text-blue-400 font-bold">ENERGY REGEN</div>
-//                       <div className="text-blue-300">+{getEnergyRegenerationRate().toFixed(1)}/s</div>
-//                     </div>
-//                     <div className="text-center">
-//                       <div className="text-yellow-400 font-bold">OFFLINE BONUS</div>
-//                       <div className="text-yellow-300">+{(gameState.offlineEfficiencyBonus * 100).toFixed(1)}%</div>
-//                     </div>
-//                   </div>
-//                 </div>
-//                 {/* Debug Buttons */}
-//                 <div className="mt-3 pt-2 border-t border-gray-600/20 text-center space-y-2">
-//                   <button
-//                     onClick={testUpgradeEffects}
-//                     className="px-3 py-1 rounded text-xs font-mono bg-green-700/50 text-green-300 border border-green-600 hover:bg-green-600/50 hover:text-green-200 transition-all duration-300"
-//                     title="Test all upgrade effects and check console for detailed analysis"
-//                   >
-//                     🧪 TEST EFFECTS
-//                   </button>
-//                   <button
-//                     onClick={debugUpgradeSystem}
-//                     className="px-3 py-1 rounded text-xs font-mono bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-600/50 hover:text-gray-200 transition-all duration-300"
-//                     title="Debug upgrade system and check console for detailed analysis"
-//                   >
-//                     🔍 DEBUG UPGRADES
-//                   </button>
-//                   <button
-//                     onClick={forceReloadUpgrades}
-//                     className="px-3 py-1 rounded text-xs font-mono bg-blue-700/50 text-blue-300 border border-blue-600 hover:bg-blue-600/50 hover:text-blue-200 transition-all duration-300"
-//                     title="Force reload upgrades from localStorage"
-//                   >
-//                     🔄 RELOAD UPGRADES
-//                   </button>
+//                   })()}
 //                 </div>
 //               </div>
 //             </div>
-//           </div>
+//           )}
 //         </div>
-//       )}
-
-//       {/* Reset Confirmation Modal */}
-//       {showResetConfirmation && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
-//           <div className="relative w-full max-w-md bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-red-500/30 rounded-xl shadow-[0_0_40px_rgba(239,68,68,0.3)] overflow-hidden">
-//             {/* Modal Header */}
-//             <div className="flex items-center justify-between p-4 border-b border-red-500/20 bg-gradient-to-r from-red-900/20 to-red-800/20">
-//               <div className="flex items-center space-x-2">
-//                 <div className="w-3 h-3 rounded-full bg-red-400 animate-pulse"></div>
-//                 <div>
-//                   <h2 className="text-lg font-mono font-bold text-red-300 tracking-wider">⚠️ RESET CONFIRMATION</h2>
-//                   <p className="text-xs font-mono text-red-400">This action cannot be undone</p>
-//                 </div>
-//               </div>
-//             </div>
-
-//             {/* Modal Content */}
-//             <div className="p-6 text-center">
-//               <div className="mb-6">
-//                 <div className="text-6xl mb-4">🗑️</div>
-//                 <h3 className="text-xl font-mono font-bold text-red-300 mb-2 tracking-wider">
-//                   RESET GAME DATA
-//                 </h3>
-//                 <p className="text-sm font-mono text-gray-400 leading-relaxed">
-//                   This will permanently delete all your progress including:
-//                 </p>
-//                 <div className="mt-4 space-y-2 text-left">
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>All TONERS TOKENS ({formatNumber(gameState.divinePoints)})</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>All upgrades ({gameState.upgradesPurchased} purchased)</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>All achievements and progress</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>Mining level and experience</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>All game statistics</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>Daily streaks and rewards</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>Referral data and progress</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>Completed tasks and TONERS TOKENS</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>Active boosts and multipliers</span>
-//                   </div>
-//                   <div className="flex items-center space-x-2 text-sm font-mono text-gray-300">
-//                     <span className="text-red-400">•</span>
-//                     <span>All localStorage and database data</span>
-//                   </div>
-//                 </div>
-//               </div>
-
-//               <div className="flex space-x-3">
-//                 <button
-//                   onClick={() => setShowResetConfirmation(false)}
-//                   disabled={isResetting}
-//                   className="flex-1 px-6 py-3 rounded-lg text-sm font-mono font-bold tracking-wider transition-all duration-300 bg-gradient-to-r from-gray-700/50 to-gray-600/50 text-gray-300 border border-gray-600 hover:border-gray-500 hover:text-gray-200 disabled:opacity-50 disabled:cursor-not-allowed"
-//                 >
-//                   CANCEL
-//                 </button>
-//                 <button
-//                   onClick={resetUserData}
-//                   disabled={isResetting}
-//                   className="flex-1 px-6 py-3 rounded-lg text-sm font-mono font-bold tracking-wider transition-all duration-300 bg-gradient-to-r from-red-600 to-red-500 hover:from-red-500 hover:to-red-400 text-white border border-red-400 shadow-sm hover:scale-105 active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed"
-//                 >
-//                   {isResetting ? '🔄 RESETTING...' : '🗑️ CONFIRM RESET'}
-//                 </button>
-//               </div>
-//             </div>
-//           </div>
-//         </div>
-//       )}
-
-//       {/* Tier Information Modal */}
-//       {showTierInfo && (
-//         <div className="fixed inset-0 z-50 flex items-center justify-center p-2 bg-black/80 backdrop-blur-sm" onClick={() => setShowTierInfo(false)}>
-//           <div className="relative w-full max-w-md bg-gradient-to-br from-gray-900/95 to-black/95 backdrop-blur-xl border border-cyan-500/30 rounded-xl shadow-[0_0_40px_rgba(0,255,255,0.3)] overflow-hidden" onClick={(e) => e.stopPropagation()}>
-//             {/* Modal Header */}
-//             <div className="flex items-center justify-between p-3 border-b border-cyan-500/20 bg-gradient-to-r from-cyan-900/20 to-blue-900/20">
-//               <div className="flex items-center space-x-2">
-//                 <div className="w-2 h-2 rounded-full bg-cyan-400 animate-pulse"></div>
-//                 <div>
-//                   <h2 className="text-base font-mono font-bold text-cyan-300 tracking-wider">🌟 TIERS</h2>
-//                   <p className="text-xs font-mono text-cyan-400">Mining journey</p>
-//                 </div>
-//               </div>
-//               <button
-//                 onClick={() => setShowTierInfo(false)}
-//                 className="w-6 h-6 flex items-center justify-center rounded-lg bg-red-900/50 text-red-400 border border-red-500/30 hover:bg-red-800/50 hover:border-red-400/50 transition-all duration-300 hover:scale-110"
-//               >
-//                 <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor">
-//                   <path d="M19 6.41L17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"/>
-//                 </svg>
-//               </button>
-//             </div>
-
-//             {/* Modal Content */}
-//             <div className="p-4 max-h-[70vh] overflow-y-auto">
-//               {(() => {
-//                 const currentTier = getCurrentTier(gameState.miningLevel);
-//                 const tierColors = {
-//                   green: 'text-green-400 bg-green-900/20 border-green-500/30',
-//                   blue: 'text-blue-400 bg-blue-900/20 border-blue-500/30',
-//                   purple: 'text-purple-400 bg-purple-900/20 border-purple-500/30',
-//                   yellow: 'text-yellow-400 bg-yellow-900/20 border-yellow-500/30'
-//                 };
-                
-//                 return (
-//                   <div className="space-y-4">
-//                     {/* Current Tier */}
-//                     <div className={`p-3 rounded-lg border ${tierColors[currentTier.color as keyof typeof tierColors]}`}>
-//                       <div className="flex items-center space-x-2 mb-2">
-//                         <span className="text-xl">{currentTier.symbol}</span>
-//                         <div>
-//                           <h3 className="text-sm font-mono font-bold tracking-wider">{currentTier.name}</h3>
-//                           <p className="text-xs font-mono opacity-80">Level {gameState.miningLevel}</p>
-//                         </div>
-//                       </div>
-//                       <p className="text-xs font-mono mb-2">{currentTier.description}</p>
-                      
-//                       {/* Benefits */}
-//                       <div className="space-y-1">
-//                         <h4 className="text-xs font-mono font-bold tracking-wider opacity-80">BENEFITS:</h4>
-//                         {currentTier.benefits.slice(0, 3).map((benefit, index) => (
-//                           <div key={index} className="flex items-center space-x-2 text-xs font-mono">
-//                             <span className="text-xs">•</span>
-//                             <span>{benefit}</span>
-//                           </div>
-//                         ))}
-//                         {currentTier.benefits.length > 3 && (
-//                           <div className="text-xs font-mono text-gray-400 italic">
-//                             +{currentTier.benefits.length - 3} more benefits
-//                           </div>
-//                         )}
-//                       </div>
-//                     </div>
-
-//                     {/* Progress to Next Tier */}
-//                     {currentTier.nextTier && (
-//                       <div className="bg-gray-800/30 border border-gray-600/30 rounded-lg p-3">
-//                         <div className="flex items-center justify-between mb-2">
-//                           <h4 className="text-xs font-mono font-bold tracking-wider text-gray-300">NEXT:</h4>
-//                           <div className="flex items-center space-x-1">
-//                             <span className="text-sm">{currentTier.nextTier.symbol}</span>
-//                             <span className="text-xs font-mono font-bold text-gray-300">{currentTier.nextTier.name}</span>
-//                           </div>
-//                         </div>
-                        
-//                         <div className="mb-1">
-//                           <div className="flex justify-between text-xs font-mono text-gray-400 mb-1">
-//                             <span>{gameState.miningLevel}/{currentTier.nextTier.level}</span>
-//                             <span>{Math.round((gameState.miningLevel / currentTier.nextTier.level) * 100)}%</span>
-//                           </div>
-//                           <div className="w-full bg-gray-700/50 rounded-full h-1.5 border border-gray-600/30 overflow-hidden">
-//                             <div 
-//                               className="h-1.5 bg-gradient-to-r from-cyan-500 to-blue-500 rounded-full transition-all duration-500"
-//                               style={{ width: `${Math.min((gameState.miningLevel / currentTier.nextTier.level) * 100, 100)}%` }}
-//                             />
-//                           </div>
-//                         </div>
-                        
-//                         <p className="text-xs font-mono text-gray-400">
-//                           {currentTier.nextTier.level - gameState.miningLevel} levels to {currentTier.nextTier.name}
-//                         </p>
-//                       </div>
-//                     )}
-
-//                     {/* All Tiers Overview */}
-//                     <div className="space-y-2">
-//                       <h4 className="text-xs font-mono font-bold tracking-wider text-gray-300">ALL TIERS:</h4>
-//                       <div className="grid grid-cols-4 gap-1">
-//                         {[
-//                           { name: 'NOVICE', symbol: '🌱', color: 'green', level: 1 },
-//                           { name: 'ADEPT', symbol: '🔮', color: 'blue', level: 15 },
-//                           { name: 'EXPERT', symbol: '💎', color: 'purple', level: 30 },
-//                           { name: 'MASTER', symbol: '🌟', color: 'yellow', level: 50 }
-//                         ].map((tier) => {
-//                           const isCurrent = tier.name === currentTier.name;
-//                           const isUnlocked = gameState.miningLevel >= tier.level;
-//                           const tierColorClasses = {
-//                             green: isCurrent ? 'text-green-400 bg-green-900/30 border-green-400/50' : isUnlocked ? 'text-green-300 bg-green-900/20 border-green-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
-//                             blue: isCurrent ? 'text-blue-400 bg-blue-900/30 border-blue-400/50' : isUnlocked ? 'text-blue-300 bg-blue-900/20 border-blue-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
-//                             purple: isCurrent ? 'text-purple-400 bg-purple-900/30 border-purple-400/50' : isUnlocked ? 'text-purple-300 bg-purple-900/20 border-purple-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30',
-//                             yellow: isCurrent ? 'text-yellow-400 bg-yellow-900/30 border-yellow-400/50' : isUnlocked ? 'text-yellow-300 bg-yellow-900/20 border-yellow-500/30' : 'text-gray-500 bg-gray-800/20 border-gray-600/30'
-//                           };
-                          
-//                           return (
-//                             <div
-//                               key={tier.name}
-//                               className={`p-2 rounded-lg border text-center transition-all duration-300 ${tierColorClasses[tier.color as keyof typeof tierColorClasses]}`}
-//                             >
-//                               <div className="text-sm mb-1">{tier.symbol}</div>
-//                               <div className="text-xs font-mono font-bold tracking-wider">{tier.name}</div>
-//                               <div className="text-xs opacity-70">{tier.level}</div>
-//                               {isCurrent && (
-//                                 <div className="text-xs text-cyan-400 font-bold">NOW</div>
-//                               )}
-//                             </div>
-//                           );
-//                         })}
-//                       </div>
-//                     </div>
-
-//                     {/* Compact Tips */}
-//                     <div className="bg-gradient-to-r from-cyan-900/20 to-blue-900/20 border border-cyan-500/30 rounded-lg p-3">
-//                       <h4 className="text-xs font-mono font-bold tracking-wider text-cyan-300 mb-2">💡 TIPS:</h4>
-//                       <div className="space-y-1 text-xs font-mono text-gray-300">
-//                         <div>• Higher tiers = better bonuses & upgrades</div>
-//                         <div>• Focus on energy efficiency for longer sessions</div>
-//                         <div>• Auto-mining improves with tier level</div>
-//                       </div>
-//                     </div>
-//                   </div>
-//                 );
-//               })()}
-//             </div>
-//           </div>
-//         </div>
-//       )}
-
-//       <TutorialOverlay />
-//     </div>
+//     </>
 //   );
 // };

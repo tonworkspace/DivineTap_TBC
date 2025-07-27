@@ -1163,29 +1163,307 @@ export const MiningSection = () => {
     },
     { 
       level: 7, 
-      requiredPoints: 7500000, 
-      reward: 4.0, 
+      requiredPoints: 750000, 
+      reward: 3.5, 
       color: 'text-red-400', 
       name: 'Legendary Miner',
       badge: '👑'
     },
     { 
       level: 8, 
-      requiredPoints: 25000000, 
-      reward: 5.0, 
+      requiredPoints: 1500000, 
+      reward: 4.0, 
       color: 'text-rose-500', 
       name: 'Mining Oracle',
       badge: '🔮'
     },
     { 
       level: 9, 
-      requiredPoints: 50000000, 
-      reward: 7.0, 
+      requiredPoints: 3000000, 
+      reward: 4.5, 
       color: 'text-fuchsia-400', 
       name: 'Mining Deity',
       badge: '⚜️'
+    },
+    { 
+      level: 10, 
+      requiredPoints: 7500000, 
+      reward: 5.0, 
+      color: 'text-cyan-400', 
+      name: 'Quantum Miner',
+      badge: '🌌'
+    },
+    { 
+      level: 11, 
+      requiredPoints: 15000000, 
+      reward: 5.5, 
+      color: 'text-emerald-400', 
+      name: 'Stellar Miner',
+      badge: '⭐'
+    },
+    { 
+      level: 12, 
+      requiredPoints: 30000000, 
+      reward: 6.0, 
+      color: 'text-violet-400', 
+      name: 'Galactic Miner',
+      badge: '🌠'
+    },
+    { 
+      level: 13, 
+      requiredPoints: 75000000, 
+      reward: 6.5, 
+      color: 'text-pink-400', 
+      name: 'Universal Miner',
+      badge: '🌍'
+    },
+    { 
+      level: 14, 
+      requiredPoints: 150000000, 
+      reward: 7.0, 
+      color: 'text-indigo-400', 
+      name: 'Multiverse Miner',
+      badge: '🌌'
+    },
+    { 
+      level: 15, 
+      requiredPoints: 300000000, 
+      reward: 7.5, 
+      color: 'text-amber-400', 
+      name: 'Omniverse Miner',
+      badge: '⚛️'
+    },
+    { 
+      level: 16, 
+      requiredPoints: 750000000, 
+      reward: 8.0, 
+      color: 'text-lime-400', 
+      name: 'Reality Miner',
+      badge: '🔮'
+    },
+    { 
+      level: 17, 
+      requiredPoints: 1500000000, 
+      reward: 8.5, 
+      color: 'text-teal-400', 
+      name: 'Cosmic Miner',
+      badge: '🌌'
+    },
+    { 
+      level: 18, 
+      requiredPoints: 3000000000, 
+      reward: 9.0, 
+      color: 'text-orange-400', 
+      name: 'Divine Miner',
+      badge: '👼'
+    },
+    { 
+      level: 19, 
+      requiredPoints: 7500000000, 
+      reward: 9.5, 
+      color: 'text-purple-400', 
+      name: 'Transcendent Miner',
+      badge: '✨'
+    },
+    { 
+      level: 20, 
+      requiredPoints: 15000000000, 
+      reward: 10.0, 
+      color: 'text-white', 
+      name: 'Ascended Miner',
+      badge: '👑'
+    },
+    { 
+      level: 21, 
+      requiredPoints: 30000000000, 
+      reward: 11.0, 
+      color: 'text-yellow-300', 
+      name: 'Eternal Miner',
+      badge: '♾️'
+    },
+    { 
+      level: 22, 
+      requiredPoints: 75000000000, 
+      reward: 12.0, 
+      color: 'text-cyan-300', 
+      name: 'Infinite Miner',
+      badge: '∞'
+    },
+    { 
+      level: 23, 
+      requiredPoints: 150000000000, 
+      reward: 13.0, 
+      color: 'text-green-300', 
+      name: 'Supreme Miner',
+      badge: '👑'
+    },
+    { 
+      level: 24, 
+      requiredPoints: 300000000000, 
+      reward: 14.0, 
+      color: 'text-blue-300', 
+      name: 'Ultimate Miner',
+      badge: '🏆'
+    },
+    { 
+      level: 25, 
+      requiredPoints: 750000000000, 
+      reward: 15.0, 
+      color: 'text-red-300', 
+      name: 'God Miner',
+      badge: '⚡'
     }
   ];
+
+  // PRESTIGE SYSTEM - Long-term gameplay enhancement
+  const PRESTIGE_LEVELS = [
+    { 
+      level: 0, 
+      name: 'Mortal', 
+      requiredPoints: 0, 
+      multiplier: 1.0, 
+      color: 'text-gray-400',
+      badge: '🌱'
+    },
+    { 
+      level: 1, 
+      name: 'Initiate', 
+      requiredPoints: 1000000000, // 1B points
+      multiplier: 2.0, 
+      color: 'text-green-400',
+      badge: '🌟'
+    },
+    { 
+      level: 2, 
+      name: 'Adept', 
+      requiredPoints: 10000000000, // 10B points
+      multiplier: 5.0, 
+      color: 'text-blue-400',
+      badge: '💎'
+    },
+    { 
+      level: 3, 
+      name: 'Master', 
+      requiredPoints: 100000000000, // 100B points
+      multiplier: 10.0, 
+      color: 'text-purple-400',
+      badge: '👑'
+    },
+    { 
+      level: 4, 
+      name: 'Grandmaster', 
+      requiredPoints: 1000000000000, // 1T points
+      multiplier: 25.0, 
+      color: 'text-yellow-400',
+      badge: '⚡'
+    },
+    { 
+      level: 5, 
+      name: 'Legend', 
+      requiredPoints: 10000000000000, // 10T points
+      multiplier: 50.0, 
+      color: 'text-orange-400',
+      badge: '🏆'
+    },
+    { 
+      level: 6, 
+      name: 'Mythic', 
+      requiredPoints: 100000000000000, // 100T points
+      multiplier: 100.0, 
+      color: 'text-red-400',
+      badge: '🔥'
+    },
+    { 
+      level: 7, 
+      name: 'Divine', 
+      requiredPoints: 1000000000000000, // 1Q points
+      multiplier: 250.0, 
+      color: 'text-cyan-400',
+      badge: '✨'
+    },
+    { 
+      level: 8, 
+      name: 'Transcendent', 
+      requiredPoints: 10000000000000000, // 10Q points
+      multiplier: 500.0, 
+      color: 'text-emerald-400',
+      badge: '🌌'
+    },
+    { 
+      level: 9, 
+      name: 'Eternal', 
+      requiredPoints: 100000000000000000, // 100Q points
+      multiplier: 1000.0, 
+      color: 'text-violet-400',
+      badge: '♾️'
+    },
+    { 
+      level: 10, 
+      name: 'Infinite', 
+      requiredPoints: 1000000000000000000, // 1Qi points
+      multiplier: 2500.0, 
+      color: 'text-white',
+      badge: '∞'
+    }
+  ];
+
+  // Calculate current prestige level
+  const getCurrentPrestigeLevel = () => {
+    return PRESTIGE_LEVELS.reduce((prev, curr) => {
+      return points >= curr.requiredPoints ? curr : prev;
+    }, PRESTIGE_LEVELS[0]);
+  };
+
+  // Calculate next prestige level
+  const getNextPrestigeLevel = () => {
+    const currentPrestige = getCurrentPrestigeLevel();
+    return PRESTIGE_LEVELS.find(p => p.level > currentPrestige.level);
+  };
+
+  // Calculate prestige progress
+  const getPrestigeProgress = () => {
+    const currentPrestige = getCurrentPrestigeLevel();
+    const nextPrestige = getNextPrestigeLevel();
+    
+    if (!nextPrestige) return 100;
+    
+    const progress = ((points - currentPrestige.requiredPoints) / 
+                     (nextPrestige.requiredPoints - currentPrestige.requiredPoints)) * 100;
+    return Math.min(100, Math.max(0, progress));
+  };
+
+  // Prestige rebirth function
+  const performPrestige = () => {
+    const currentPrestige = getCurrentPrestigeLevel();
+    const nextPrestige = getNextPrestigeLevel();
+    
+    if (!nextPrestige) {
+      showSnackbar({ 
+        message: 'Maximum Prestige Reached!', 
+        description: 'You have reached the highest prestige level!' 
+      });
+      return;
+    }
+    
+    // Calculate prestige bonus
+    const prestigeBonus = nextPrestige.multiplier - currentPrestige.multiplier;
+    
+    // Show confirmation dialog
+    if (window.confirm(`🎉 Prestige Rebirth Available!\n\n` +
+        `Current: ${currentPrestige.name} (${currentPrestige.multiplier}x)\n` +
+        `Next: ${nextPrestige.name} (${nextPrestige.multiplier}x)\n` +
+        `Bonus: +${prestigeBonus}x multiplier\n\n` +
+        `This will reset your progress but give you a permanent ${nextPrestige.multiplier}x multiplier!\n\n` +
+        `Continue with prestige rebirth?`)) {
+      
+      // Perform prestige
+      // Note: This would need to be integrated with the main game state
+      showSnackbar({ 
+        message: 'Prestige Rebirth Complete!', 
+        description: `You are now ${nextPrestige.name} with ${nextPrestige.multiplier}x multiplier!` 
+      });
+    }
+  };
 
   // Update the renderMiningLevel function
   const renderMiningLevel = () => {
@@ -1261,9 +1539,91 @@ export const MiningSection = () => {
           </>
         )}
         
-        {currentLevelInfo.level === 9 && (
-          <div className="mt-2 text-center text-xs text-fuchsia-400 font-medium">
+        {currentLevelInfo.level === 25 && (
+          <div className="mt-2 text-center text-xs text-white font-medium">
             Maximum Level Achieved! 🎉
+          </div>
+        )}
+      </div>
+    );
+  };
+
+  // Render prestige system
+  const renderPrestigeSystem = () => {
+    const currentPrestige = getCurrentPrestigeLevel();
+    const nextPrestige = getNextPrestigeLevel();
+    const prestigeProgress = getPrestigeProgress();
+    
+    return (
+      <div className="bg-white/5 backdrop-blur-xl rounded-lg p-4 border border-white/10 mt-4">
+        <div className="flex items-center justify-between mb-3">
+          <div className="flex items-center gap-3">
+            <div className="text-2xl">
+              {currentPrestige.badge}
+            </div>
+            <div>
+              <div className={`text-lg font-bold ${currentPrestige.color}`}>
+                {currentPrestige.name}
+              </div>
+              <div className="text-sm text-white/60">
+                Prestige Level {currentPrestige.level}
+              </div>
+            </div>
+          </div>
+          <div className="text-right">
+            <div className="text-sm font-medium text-white">
+              {currentPrestige.multiplier}x
+            </div>
+            <div className="text-xs text-white/60">
+              Multiplier
+            </div>
+          </div>
+        </div>
+
+        {nextPrestige && (
+          <>
+            <div className="h-2.5 bg-white/5 rounded-full overflow-hidden">
+              <div
+                className={`h-full transition-all duration-300 rounded-full
+                  ${currentPrestige.level >= 7 
+                    ? 'bg-gradient-to-r from-cyan-500 via-purple-500 to-pink-500' 
+                    : 'bg-gradient-to-r from-green-500 to-blue-500'}`}
+                style={{ width: `${prestigeProgress}%` }}
+              />
+            </div>
+            <div className="flex justify-between mt-2">
+              <div className="text-xs">
+                <span className="text-white/60">Progress: </span>
+                <span className="text-white font-medium">
+                  {Math.floor(prestigeProgress)}%
+                </span>
+              </div>
+              <div className="text-xs">
+                <span className="text-white/60">Next: </span>
+                <span className={nextPrestige.color}>
+                  {nextPrestige.name} {nextPrestige.badge}
+                </span>
+              </div>
+            </div>
+            <div className="flex justify-between mt-1 text-xs text-white/40">
+              <span>{formatNumber(points)} points</span>
+              <span>{formatNumber(nextPrestige.requiredPoints)} needed</span>
+            </div>
+            
+            {prestigeProgress >= 100 && (
+              <button
+                onClick={performPrestige}
+                className="w-full mt-3 bg-gradient-to-r from-purple-600 to-pink-600 text-white text-sm font-bold py-2 px-4 rounded-lg hover:from-purple-700 hover:to-pink-700 transition-all duration-200 transform hover:scale-105"
+              >
+                🎉 Prestige Rebirth Available!
+              </button>
+            )}
+          </>
+        )}
+        
+        {!nextPrestige && (
+          <div className="mt-2 text-center text-xs text-white font-medium">
+            Maximum Prestige Achieved! 🏆
           </div>
         )}
       </div>
@@ -1495,6 +1855,9 @@ export const MiningSection = () => {
 
             {/* Mining Level Display */}
             {renderMiningLevel()}
+
+            {/* Prestige System Display */}
+            {renderPrestigeSystem()}
 
             {/* Bottom Buttons - Made responsive */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">

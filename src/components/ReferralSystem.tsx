@@ -1,6 +1,5 @@
 import React, { useState, useCallback, useEffect, useRef } from 'react';
 import { GiPerson, GiPresent, GiShare } from 'react-icons/gi';
-import { BiLink } from 'react-icons/bi';
 import { useGameContext } from '@/contexts/GameContext';
 import { useAuth } from '@/hooks/useAuth';
 import { useReferralIntegration } from '@/hooks/useReferralIntegration';
@@ -28,7 +27,7 @@ interface UplineInfo {
   totalEarned: number;
   joinedAt: number;
   isActive: boolean;
-  level: number; // How many levels up (1 = direct referrer)
+  level: number;
 }
 
 interface DownlineInfo {
@@ -38,7 +37,7 @@ interface DownlineInfo {
   totalEarned: number;
   joinedAt: number;
   isActive: boolean;
-  level: number; // How many levels down (1 = direct referral)
+  level: number;
   directReferrals: number;
 }
 
@@ -93,17 +92,17 @@ export const ReferralSystem: React.FC = () => {
     referralData,
     loadReferralData,
     debugInfo,
-    clearReferralHistory,
-    testReferralCode
+    // clearReferralHistory,
+    // testReferralCode
   } = useReferralIntegration();
   
-  const [activeTab, setActiveTab] = useState<'overview' | 'referrals' | 'rewards' | 'share' | 'analytics' | 'network'>('overview');
+  const [activeTab, setActiveTab] = useState<'overview' | 'network' | 'rewards'>('overview');
   const [showRewardModal, setShowRewardModal] = useState(false);
   const [rewardMessage, setRewardMessage] = useState('');
   const [copied, setCopied] = useState(false);
   const [showDebug, setShowDebug] = useState(false);
   const [showQR, setShowQR] = useState(false);
-  const [testCode, setTestCode] = useState('');
+  // const [testCode, setTestCode] = useState('');
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
@@ -145,14 +144,131 @@ export const ReferralSystem: React.FC = () => {
     }
   }, []);
 
-  // Enhanced claimedRewards state management
+  // Enhanced claimedRewards state management with database persistence
   const [claimedRewards, setClaimedRewards] = useState<string[]>(() => {
     const userId = user?.id ? user.id.toString() : 'anonymous';
     const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
     return safeGetFromStorage(claimedKey, []);
   });
 
-  // Save claimed rewards to localStorage whenever it changes
+  // Load claimed rewards from database on component mount
+  const loadClaimedRewardsFromDatabase = useCallback(async () => {
+    if (!user?.id) return;
+
+    try {
+      console.log('🔄 Loading claimed rewards from database for user:', user.id);
+      
+      // Use the database function to get claimed rewards
+      const { data: dbRewards, error: dbError } = await supabase
+        .rpc('get_user_claimed_rewards', { p_user_id: user.id });
+
+      if (dbError) {
+        console.warn('⚠️ Database function failed, trying direct query:', dbError);
+        
+        // Fallback to direct query
+        const { data: fallbackRewards, error: fallbackError } = await supabase
+          .from('referral_claimed_rewards')
+          .select('reward_key, claimed_at')
+          .eq('user_id', user.id);
+
+        if (fallbackError) {
+          console.warn('⚠️ Fallback query also failed, using localStorage:', fallbackError);
+          return;
+        }
+
+        if (fallbackRewards && fallbackRewards.length > 0) {
+          const dbClaimedKeys = fallbackRewards.map((r: { reward_key: string }) => r.reward_key);
+          console.log('✅ Loaded claimed rewards from fallback query:', dbClaimedKeys);
+          
+          setClaimedRewards(dbClaimedKeys);
+          
+          const userId = user.id.toString();
+          const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
+          safeSetToStorage(claimedKey, dbClaimedKeys);
+        }
+      } else if (dbRewards && dbRewards.length > 0) {
+        const dbClaimedKeys = dbRewards.map((r: { reward_key: string }) => r.reward_key);
+        console.log('✅ Loaded claimed rewards from database function:', dbClaimedKeys);
+        
+        // Update state with database data
+        setClaimedRewards(dbClaimedKeys);
+        
+        // Also update localStorage for offline access
+        const userId = user.id.toString();
+        const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
+        safeSetToStorage(claimedKey, dbClaimedKeys);
+      } else {
+        console.log('ℹ️ No claimed rewards found in database');
+      }
+    } catch (error) {
+      console.error('❌ Error loading claimed rewards from database:', error);
+    }
+  }, [user?.id, getUserSpecificKey, safeSetToStorage]);
+
+  // Save claimed rewards to both localStorage and database
+  const saveClaimedReward = useCallback(async (rewardKey: string, reward: ReferralReward) => {
+    if (!user?.id) return;
+
+    try {
+      console.log('💾 Saving claimed reward to database:', rewardKey);
+      
+      // Parse reward key to get level and requirements
+      const [levelStr, requirementsStr] = rewardKey.split('_');
+      const level = parseInt(levelStr);
+      const requirements = parseInt(requirementsStr);
+      
+      // Try to use the database function first
+      const { error: functionError } = await supabase
+        .rpc('claim_referral_reward', {
+          p_user_id: user.id,
+          p_reward_level: level,
+          p_reward_requirements: requirements,
+          p_reward_name: reward.name,
+          p_points_awarded: reward.rewards.points,
+          p_gems_awarded: reward.rewards.gems,
+          p_special_reward: reward.rewards.special || null
+        });
+
+      if (functionError) {
+        console.warn('⚠️ Database function failed, trying direct insert:', functionError);
+        
+        // Fallback to direct insert
+        const { error: insertError } = await supabase
+          .from('referral_claimed_rewards')
+          .insert({
+            user_id: user.id,
+            reward_key: rewardKey,
+            reward_name: reward.name,
+            reward_level: level,
+            reward_requirements: requirements,
+            points_awarded: reward.rewards.points,
+            gems_awarded: reward.rewards.gems,
+            special_reward: reward.rewards.special || null,
+            claimed_at: new Date().toISOString()
+          });
+
+        if (insertError) {
+          console.error('❌ Direct insert also failed:', insertError);
+          throw insertError;
+        }
+      }
+
+      console.log('✅ Reward saved to database successfully');
+      
+      // Also update localStorage for offline access
+      const userId = user.id.toString();
+      const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
+      const currentClaimed = safeGetFromStorage(claimedKey, []);
+      const updatedClaimed = [...currentClaimed, rewardKey];
+      safeSetToStorage(claimedKey, updatedClaimed);
+      
+    } catch (error) {
+      console.error('❌ Error saving claimed reward:', error);
+      throw error;
+    }
+  }, [user?.id, getUserSpecificKey, safeGetFromStorage, safeSetToStorage]);
+
+  // Save claimed rewards to localStorage whenever it changes (fallback)
   useEffect(() => {
     if (!isMountedRef.current) return;
     
@@ -160,6 +276,13 @@ export const ReferralSystem: React.FC = () => {
     const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
     safeSetToStorage(claimedKey, claimedRewards);
   }, [claimedRewards, user?.id, getUserSpecificKey, safeSetToStorage]);
+
+  // Load claimed rewards from database on user change
+  useEffect(() => {
+    if (user?.id) {
+      loadClaimedRewardsFromDatabase();
+    }
+  }, [user?.id, loadClaimedRewardsFromDatabase]);
 
   // Enhanced data loading effect
   useEffect(() => {
@@ -253,7 +376,10 @@ export const ReferralSystem: React.FC = () => {
       addPoints(reward.rewards.points);
       addGems(reward.rewards.gems, `referral_level_${reward.level}`);
       
-      // Mark as claimed
+      // Mark as claimed in database and update state
+      await saveClaimedReward(rewardKey, reward);
+      
+      // Update local state
       setClaimedRewards(prev => {
         const newClaimed = [...prev, rewardKey];
         console.log('✅ Reward claimed successfully:', newClaimed);
@@ -277,7 +403,7 @@ export const ReferralSystem: React.FC = () => {
     } finally {
       setIsClaimingReward(false);
     }
-  }, [referralData.totalReferrals, addPoints, addGems, claimedRewards, isClaimingReward]);
+  }, [referralData.totalReferrals, addPoints, addGems, claimedRewards, isClaimingReward, saveClaimedReward]);
 
   // Load upline and downline data
   const loadNetworkData = useCallback(async () => {
@@ -380,7 +506,7 @@ export const ReferralSystem: React.FC = () => {
   } catch (error) {
     console.error('Error loading network data:', error);
   }
-}, [user?.id]); // Remove uplineData dependency
+}, [user?.id]);
 
 // Update the useEffect to depend on user and dataLoaded
 useEffect(() => {
@@ -453,10 +579,8 @@ useEffect(() => {
 
   const tabs = [
     { id: 'overview', name: 'Overview', icon: GiShare },
-    { id: 'network', name: 'Network', icon: GiPerson }, // New tab
-    { id: 'referrals', name: 'Referrals', icon: GiPerson },
-    { id: 'rewards', name: 'Rewards', icon: GiPresent },
-    { id: 'share', name: 'Share', icon: BiLink }
+    { id: 'network', name: 'Network', icon: GiPerson },
+    { id: 'rewards', name: 'Rewards', icon: GiPresent }
   ];
 
   const handleManualReferralEntry = useCallback(() => {
@@ -472,8 +596,6 @@ useEffect(() => {
 
   const handleReferralPromptSuccess = useCallback((referrerInfo: any) => {
     console.log('✅ Successfully joined network:', referrerInfo);
-    // You can add additional success handling here
-    // Maybe show a success notification
     setShowManualEntry(false);
     // Refresh data
     loadReferralData();
@@ -481,77 +603,71 @@ useEffect(() => {
   }, [loadReferralData, loadNetworkData]);
 
   return (
-    <div className="flex-1 p-custom space-y-1 overflow-y-auto game-scrollbar">
-      {/* Header */}
-      <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_30px_rgba(0,255,255,0.1)]">
-        <div className="absolute top-0 left-0 w-2 h-2 border-l-2 border-t-2 border-cyan-400"></div>
-        <div className="absolute top-0 right-0 w-2 h-2 border-r-2 border-t-2 border-cyan-400"></div>
-        <div className="absolute bottom-0 left-0 w-2 h-2 border-l-2 border-b-2 border-cyan-400"></div>
-        <div className="absolute bottom-0 right-0 w-2 h-2 border-r-2 border-b-2 border-cyan-400"></div>
-        
+    <div className="flex-1 p-2 space-y-1 overflow-y-auto game-scrollbar">
+      {/* Compact Header */}
+      <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-lg p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
         <div className="text-center">
-          <div className="flex items-center justify-center space-x-2 mb-1">
-            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
+          <div className="flex items-center justify-center space-x-1 mb-1">
+            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
             <span className="text-cyan-400 font-mono font-bold tracking-wider text-xs">REFERRAL SYSTEM</span>
-            <div className="w-1.5 h-1.5 bg-cyan-400 rounded-full animate-pulse"></div>
-          </div>
-          
-          <p className="text-cyan-300 font-mono text-xs tracking-wider">
-            Invite friends and earn rewards together
-          </p>
-        </div>
-      </div>
-
-      {/* Enhanced Stats Cards */}
-      <div className="grid grid-cols-2 gap-1">
-        <div className="relative bg-black/40 backdrop-blur-xl border border-green-400/30 rounded-xl p-2 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-          <div className="flex items-center gap-1.5">
-            <GiPerson className="text-green-400 text-xs" />
-            <div>
-              <div className="text-green-400 font-mono font-bold text-sm tracking-wider">
-                {dataLoaded ? referralData.totalReferrals : '...'}
-              </div>
-              <div className="text-green-300 text-xs font-mono uppercase tracking-wider">Total</div>
-            </div>
-          </div>
-        </div>
-
-        <div className="relative bg-black/40 backdrop-blur-xl border border-blue-400/30 rounded-xl p-2 shadow-[0_0_20px_rgba(59,130,246,0.1)]">
-          <div className="flex items-center gap-1.5">
-            <GiPresent className="text-blue-400 text-xs" />
-            <div>
-              <div className="text-blue-400 font-mono font-bold text-sm tracking-wider">
-                {dataLoaded ? referralData.activeReferrals : '...'}
-              </div>
-              <div className="text-blue-300 text-xs font-mono uppercase tracking-wider">Active</div>
-            </div>
+            <div className="w-1 h-1 bg-cyan-400 rounded-full animate-pulse"></div>
           </div>
         </div>
       </div>
 
-      {/* Enhanced Navigation Tabs */}
+      {/* Compact Stats Cards */}
+      <div className="grid grid-cols-3 gap-1">
+        <div className="relative bg-black/40 backdrop-blur-xl border border-green-400/30 rounded-lg p-1.5 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+          <div className="text-center">
+            <div className="text-green-400 font-mono font-bold text-xs tracking-wider">
+              {dataLoaded ? referralData.totalReferrals : '...'}
+            </div>
+            <div className="text-green-300 text-xs font-mono uppercase tracking-wider">Total</div>
+          </div>
+        </div>
+
+        <div className="relative bg-black/40 backdrop-blur-xl border border-blue-400/30 rounded-lg p-1.5 shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+          <div className="text-center">
+            <div className="text-blue-400 font-mono font-bold text-xs tracking-wider">
+              {dataLoaded ? referralData.activeReferrals : '...'}
+            </div>
+            <div className="text-blue-300 text-xs font-mono uppercase tracking-wider">Active</div>
+          </div>
+        </div>
+
+        <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-400/30 rounded-lg p-1.5 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+          <div className="text-center">
+            <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider">
+              {referralData.rewards.points.toLocaleString()}
+            </div>
+            <div className="text-yellow-300 text-xs font-mono uppercase tracking-wider">Earned</div>
+          </div>
+        </div>
+      </div>
+
+      {/* Compact Navigation Tabs */}
       <div className="flex gap-0.5">
         {tabs.map(({ id, name, icon: Icon }) => (
           <button
             key={id}
             onClick={() => setActiveTab(id as any)}
-            className={`flex-1 flex items-center justify-center gap-0.5 py-1.5 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
+            className={`flex-1 flex items-center justify-center gap-1 py-1.5 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
               activeTab === id
-                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(0,255,255,0.3)]'
+                ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_15px_rgba(0,255,255,0.3)]'
                 : 'bg-black/40 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'
             }`}
           >
-            <Icon size={10} />
+            <Icon size={12} />
             <span className="hidden sm:inline">{name}</span>
           </button>
         ))}
       </div>
 
-      {/* Enhanced Debug Section */}
+      {/* Enhanced Debug Section - Only in dev */}
       {import.meta.env.DEV && (
-        <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(251,146,60,0.1)]">
+        <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(251,146,60,0.1)]">
           <div className="flex items-center justify-between mb-1">
-            <div className="text-orange-400 font-mono font-bold text-xs tracking-wider">DEBUG INFO</div>
+            <div className="text-orange-400 font-mono font-bold text-xs tracking-wider">DEBUG</div>
             <div className="flex gap-1">
               <button
                 onClick={refreshData}
@@ -570,37 +686,10 @@ useEffect(() => {
           {showDebug && (
             <div className="space-y-1 text-xs font-mono tracking-wider">
               <div className="text-orange-300">
-                <span className="text-orange-400">Data Loaded:</span> {dataLoaded ? 'Yes' : 'No'}
+                <span className="text-orange-400">Data:</span> {dataLoaded ? 'Yes' : 'No'} | 
+                <span className="text-orange-400"> Total:</span> {referralData.totalReferrals} | 
+                <span className="text-orange-400"> Code:</span> {referralData.code}
               </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Total Referrals:</span> {referralData.totalReferrals}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Active Referrals:</span> {referralData.activeReferrals}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Referral Code:</span> {referralData.code}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">User ID:</span> {user?.id || 'None'}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Claimed Rewards:</span> {claimedRewards.join(', ') || 'None'}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">GameContext:</span> Available
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Start Parameter:</span> {debugInfo.startParam || 'None'}
-              </div>
-              <div className="text-orange-300">
-                <span className="text-orange-400">Referral Status:</span> {debugInfo.processed ? 'Processed' : 'Pending'}
-              </div>
-              {debugInfo.referredBy && (
-                <div className="text-green-300">
-                  <span className="text-green-400">Referred By:</span> {debugInfo.referredBy}
-                </div>
-              )}
               {debugInfo.error && (
                 <div className="text-red-300">
                   <span className="text-red-400">Error:</span> {debugInfo.error}
@@ -613,44 +702,44 @@ useEffect(() => {
 
       {/* Loading State */}
       {!dataLoaded && (
-        <div className="relative bg-black/40 backdrop-blur-xl border border-gray-600/30 rounded-xl p-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+        <div className="relative bg-black/40 backdrop-blur-xl border border-gray-600/30 rounded-lg p-3 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
           <div className="text-center">
-            <div className="text-2xl mb-2 animate-spin">⏳</div>
-            <div className="text-gray-400 font-mono font-bold text-xs tracking-wider">LOADING REFERRAL DATA...</div>
+            <div className="text-xl mb-1 animate-spin">⏳</div>
+            <div className="text-gray-400 font-mono font-bold text-xs tracking-wider">LOADING...</div>
           </div>
         </div>
       )}
 
       {/* Content based on active tab */}
       {dataLoaded && activeTab === 'overview' && (
-        <div className="space-y-2">
-          {/* Referral Code */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
+        <div className="space-y-1">
+          {/* Compact Referral Code */}
+          <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(147,51,234,0.1)]">
             <div className="text-center mb-2">
               <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-1">YOUR REFERRAL CODE</div>
-              <div className="text-lg font-mono font-bold text-purple-300 tracking-wider mb-1">{referralData.code}</div>
+              <div className="text-base font-mono font-bold text-purple-300 tracking-wider mb-1 break-all">{referralData.code}</div>
               <button
                 onClick={copyReferralCode}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-purple-400"
+                className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-purple-400"
               >
                 {copied ? '✓ COPIED' : 'COPY CODE'}
               </button>
             </div>
           </div>
 
-          {/* Current Level */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
+          {/* Compact Current Level */}
+          <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(251,191,36,0.1)]">
             <div className="text-center">
               <div className="text-lg mb-1">{currentLevel.icon}</div>
               <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider mb-1">{currentLevel.name}</div>
               <div className="text-yellow-300 font-mono text-xs tracking-wider mb-1">
-                Level {currentLevel.level} • {referralData.totalReferrals}/{currentLevel.requirements} referrals
+                {referralData.totalReferrals}/{currentLevel.requirements} referrals
               </div>
               
               {/* Progress Bar */}
-              <div className="w-full bg-gray-700 rounded-full h-1.5 mb-1">
+              <div className="w-full bg-gray-700 rounded-full h-1 mb-1">
                 <div 
-                  className="h-1.5 bg-yellow-500 rounded-full transition-all duration-300"
+                  className="h-1 bg-yellow-500 rounded-full transition-all duration-300"
                   style={{ width: `${Math.min((referralData.totalReferrals / currentLevel.requirements) * 100, 100)}%` }}
                 ></div>
               </div>
@@ -663,54 +752,71 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Total Earnings */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-            <div className="text-center">
-              <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-1">TOTAL EARNINGS</div>
-              <div className="flex justify-center gap-3">
-                <div>
-                  <div className="text-green-300 font-mono font-bold text-sm tracking-wider">{referralData.rewards.points.toLocaleString()}</div>
-                  <div className="text-green-400 text-xs font-mono uppercase tracking-wider">Points</div>
-                </div>
-                <div>
-                  <div className="text-green-300 font-mono font-bold text-sm tracking-wider">{referralData.rewards.gems}</div>
-                  <div className="text-green-400 text-xs font-mono uppercase tracking-wider">Gems</div>
-                </div>
+          {/* Compact Share Section */}
+          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+            <div className="text-center mb-2">
+              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-1">SHARE & EARN</div>
+              <div className="flex gap-1 justify-center">
+                <button
+                  onClick={shareReferral}
+                  className="px-2 py-1 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-cyan-400"
+                >
+                  {copied ? '✓ COPIED' : 'SHARE'}
+                </button>
+                <button
+                  onClick={() => setShowQR(!showQR)}
+                  className="px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-purple-400"
+                >
+                  QR
+                </button>
               </div>
+              {showQR && (
+                <div className="mt-2 p-2 bg-white rounded-lg">
+                  <img
+                    src={`https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(`https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`)}`}
+                    alt="Referral QR Code"
+                    className="w-32 h-32 mx-auto"
+                  />
+                </div>
+              )}
             </div>
           </div>
 
-          {/* TBC Coins Info */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
-            <div className="text-center">
-              <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider mb-2">🪙 TBC COINS INFO</div>
-              <p className="text-yellow-300 font-mono text-xs tracking-wider mb-2">
-                Your friends earn TBC coins through Divine Mining! 
-              </p>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-gray-800/50 rounded-lg p-2">
-                  <div className="text-yellow-400 font-bold">🪙 TBC Mining</div>
-                  <div className="text-gray-400">From Mining Game</div>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-2">
-                  <div className="text-purple-400 font-bold">💎 Staking</div>
-                  <div className="text-gray-400">From TON Staking</div>
+          {/* Compact Referral List Preview */}
+          {referralData.referrals.length > 0 && (
+            <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+              <div className="text-center mb-2">
+                <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-1">RECENT REFERRALS</div>
+                <div className="space-y-1 max-h-32 overflow-y-auto">
+                  {referralData.referrals.slice(0, 3).map((referral, index) => (
+                    <div key={referral.id} className="flex items-center justify-between bg-gray-800/50 rounded p-1">
+                      <div className="flex items-center gap-1">
+                        <div className="w-4 h-4 rounded bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                          <span className="text-white text-xs font-bold">{index + 1}</span>
+                        </div>
+                        <div className="text-green-300 font-mono text-xs">{referral.username}</div>
+                      </div>
+                      <div className="text-yellow-400 font-mono text-xs">{referral.pointsEarned.toLocaleString()}</div>
+                    </div>
+                  ))}
+                  {referralData.referrals.length > 3 && (
+                    <div className="text-gray-400 font-mono text-xs">
+                      +{referralData.referrals.length - 3} more...
+                    </div>
+                  )}
                 </div>
               </div>
             </div>
-          </div>
+          )}
 
           {/* Add Manual Entry Button if user has no referrer */}
           {!referralData.referrals.length && (
-            <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,146,60,0.1)]">
+            <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(251,146,60,0.1)]">
               <div className="text-center">
-                <div className="text-orange-400 font-mono font-bold text-xs tracking-wider mb-2">🔗 JOIN A NETWORK</div>
-                <p className="text-orange-300 font-mono text-xs tracking-wider mb-3">
-                  Have a referral code? Join someone's network to earn bonus rewards!
-                </p>
+                <div className="text-orange-400 font-mono font-bold text-xs tracking-wider mb-1">🔗 JOIN NETWORK</div>
                 <button
                   onClick={handleManualReferralEntry}
-                  className="px-4 py-2 bg-orange-600 hover:bg-orange-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-orange-400"
+                  className="px-3 py-1 bg-orange-600 hover:bg-orange-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-orange-400"
                 >
                   ENTER REFERRAL CODE
                 </button>
@@ -721,390 +827,92 @@ useEffect(() => {
       )}
 
       {dataLoaded && activeTab === 'network' && (
-        <div className="space-y-2">
-          {/* Network Overview */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-            <div className="text-center mb-3">
-              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-2">🌐 YOUR NETWORK</div>
-              <div className="grid grid-cols-2 gap-2 text-xs">
-                <div className="bg-gray-800/50 rounded-lg p-2">
+        <div className="space-y-1">
+          {/* Compact Network Overview */}
+          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
+            <div className="text-center mb-2">
+              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-1">🌐 NETWORK STATS</div>
+              <div className="grid grid-cols-2 gap-1 text-xs">
+                <div className="bg-gray-800/50 rounded p-1">
                   <div className="text-green-400 font-bold">{networkStats.totalNetworkSize}</div>
-                  <div className="text-gray-400">Total Members</div>
+                  <div className="text-gray-400">Members</div>
                 </div>
-                <div className="bg-gray-800/50 rounded-lg p-2">
+                <div className="bg-gray-800/50 rounded p-1">
                   <div className="text-blue-400 font-bold">{networkStats.totalNetworkEarnings.toLocaleString()}</div>
-                  <div className="text-gray-400">Network Earnings</div>
+                  <div className="text-gray-400">Earnings</div>
                 </div>
               </div>
             </div>
           </div>
 
-          {/* Upline Section */}
+          {/* Compact Upline Section */}
           {uplineData.length > 0 && (
-            <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
-              <div className="text-center mb-2">
-                <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-2">👆 YOUR UPLINE</div>
-                <div className="text-purple-300 font-mono text-xs tracking-wider">
-                  People who referred you
-                </div>
+            <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(147,51,234,0.1)]">
+              <div className="text-center mb-1">
+                <div className="text-purple-400 font-mono font-bold text-xs tracking-wider">👆 UPLINE</div>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1">
                 {uplineData.map((member) => (
-                  <div key={member.id} className="relative bg-gray-800/50 rounded-lg p-2 border border-purple-500/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">{member.level}</span>
-                        </div>
-                        <div>
-                          <div className="text-purple-300 font-mono font-bold text-xs">{member.username}</div>
-                          <div className="text-gray-400 font-mono text-xs">{member.rank}</div>
-                        </div>
+                  <div key={member.id} className="flex items-center justify-between bg-gray-800/50 rounded p-1">
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 rounded bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{member.level}</span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-purple-400 font-mono font-bold text-xs">{member.totalEarned.toLocaleString()}</div>
-                        <div className="text-gray-400 font-mono text-xs">Total Earned</div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <div className={`w-1.5 h-1.5 rounded-full ${member.isActive ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                          <span className="text-xs font-mono">{member.isActive ? 'Active' : 'Inactive'}</span>
-                        </div>
-                      </div>
+                      <div className="text-purple-300 font-mono text-xs">{member.username}</div>
                     </div>
+                    <div className="text-purple-400 font-mono text-xs">{member.totalEarned.toLocaleString()}</div>
                   </div>
                 ))}
               </div>
             </div>
           )}
 
-          {/* Downline Section */}
+          {/* Compact Downline Section */}
           {downlineData.length > 0 ? (
-            <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-              <div className="text-center mb-2">
-                <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-2">�� YOUR DOWNLINE</div>
-                <div className="text-green-300 font-mono text-xs tracking-wider">
-                  People you referred
-                </div>
+            <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(34,197,94,0.1)]">
+              <div className="text-center mb-1">
+                <div className="text-green-400 font-mono font-bold text-xs tracking-wider">👇 DOWNLINE</div>
               </div>
               
-              <div className="space-y-2">
+              <div className="space-y-1 max-h-48 overflow-y-auto">
                 {downlineData.map((member, index) => (
-                  <div key={member.id} className="relative bg-gray-800/50 rounded-lg p-2 border border-green-500/20">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
-                          <span className="text-white text-xs font-bold">{index + 1}</span>
-                        </div>
-                        <div>
-                          <div className="text-green-300 font-mono font-bold text-xs">{member.username}</div>
-                          <div className="text-gray-400 font-mono text-xs">{member.rank}</div>
-                          <div className="text-gray-500 font-mono text-xs">
-                            {Math.floor((Date.now() - member.joinedAt) / (1000 * 60 * 60 * 24))} days ago
-                          </div>
-                        </div>
+                  <div key={member.id} className="flex items-center justify-between bg-gray-800/50 rounded p-1">
+                    <div className="flex items-center gap-1">
+                      <div className="w-4 h-4 rounded bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center">
+                        <span className="text-white text-xs font-bold">{index + 1}</span>
                       </div>
-                      <div className="text-right">
-                        <div className="text-green-400 font-mono font-bold text-xs">{member.totalEarned.toLocaleString()}</div>
-                        <div className="text-gray-400 font-mono text-xs">Total Earned</div>
-                        <div className="text-gray-500 font-mono text-xs">{member.directReferrals} referrals</div>
-                        <div className="flex items-center gap-1 mt-1">
-                          <div className={`w-1.5 h-1.5 rounded-full ${member.isActive ? 'bg-green-400' : 'bg-red-400'}`}></div>
-                          <span className="text-xs font-mono">{member.isActive ? 'Active' : 'Inactive'}</span>
-                        </div>
+                      <div>
+                        <div className="text-green-300 font-mono text-xs">{member.username}</div>
+                        <div className="text-gray-500 font-mono text-xs">{member.directReferrals} refs</div>
                       </div>
                     </div>
+                    <div className="text-green-400 font-mono text-xs">{member.totalEarned.toLocaleString()}</div>
                   </div>
                 ))}
               </div>
             </div>
           ) : (
-            <div className="relative bg-black/40 backdrop-blur-xl border border-gray-600/30 rounded-xl p-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+            <div className="relative bg-black/40 backdrop-blur-xl border border-gray-600/30 rounded-lg p-3 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
               <div className="text-center">
-                <div className="text-2xl mb-2">👥</div>
-                <div className="text-gray-400 font-mono font-bold text-xs tracking-wider mb-2">NO REFERRALS YET</div>
-                <div className="text-gray-500 font-mono text-xs tracking-wider mb-3">
-                  Start building your network by sharing your referral code!
+                <div className="text-lg mb-1">👥</div>
+                <div className="text-gray-400 font-mono font-bold text-xs tracking-wider mb-1">NO REFERRALS</div>
+                <div className="text-gray-500 font-mono text-xs tracking-wider">
+                  Share your code to build network!
                 </div>
-                <button
-                  onClick={() => setActiveTab('share')}
-                  className="px-4 py-2 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-cyan-400"
-                >
-                  SHARE YOUR CODE
-                </button>
               </div>
             </div>
           )}
-
-          {/* Network Tree Visualization */}
-          {(uplineData.length > 0 || downlineData.length > 0) && (
-            <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-              <div className="text-center mb-2">
-                <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-2">🌳 NETWORK TREE</div>
-              </div>
-              
-              <div className="space-y-2">
-                {/* Upline visualization */}
-                {uplineData.map((member, index) => (
-                  <div key={`up-${member.id}`} className="flex items-center justify-center">
-                    <div className="text-center">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-purple-400 to-purple-600 flex items-center justify-center mb-1">
-                        <span className="text-white text-xs font-bold">{member.level}</span>
-                      </div>
-                      <div className="text-purple-300 font-mono text-xs">{member.username}</div>
-                    </div>
-                    {index < uplineData.length - 1 && (
-                      <div className="w-px h-4 bg-purple-400/50 mx-auto"></div>
-                    )}
-                  </div>
-                ))}
-                
-                {/* Current user */}
-                <div className="flex items-center justify-center">
-                  <div className="text-center">
-                    <div className="w-10 h-10 rounded-full bg-gradient-to-br from-cyan-400 to-cyan-600 flex items-center justify-center mb-1 border-2 border-cyan-300">
-                      <span className="text-white text-sm font-bold">YOU</span>
-                    </div>
-                    <div className="text-cyan-300 font-mono text-xs">{user?.username}</div>
-                  </div>
-                </div>
-                
-                {/* Downline visualization */}
-                {downlineData.slice(0, 5).map((member, index) => (
-                  <div key={`down-${member.id}`} className="flex items-center justify-center">
-                    {index === 0 && (
-                      <div className="w-px h-4 bg-green-400/50 mx-auto"></div>
-                    )}
-                    <div className="text-center">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-green-400 to-green-600 flex items-center justify-center mb-1">
-                        <span className="text-white text-xs font-bold">{index + 1}</span>
-                      </div>
-                      <div className="text-green-300 font-mono text-xs">{member.username}</div>
-                    </div>
-                  </div>
-                ))}
-                
-                {downlineData.length > 5 && (
-                  <div className="text-center text-gray-400 font-mono text-xs">
-                    +{downlineData.length - 5} more members
-                  </div>
-                )}
-              </div>
-            </div>
-          )}
-        </div>
-      )}
-
-      {dataLoaded && activeTab === 'referrals' && (
-        <div className="space-y-2">
-          {/* Referral List Header */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-            <div className="text-center">
-              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-1">YOUR REFERRALS</div>
-              <div className="text-gray-400 font-mono text-xs tracking-wider">
-                {referralData.totalReferrals} total • {referralData.activeReferrals} active
-              </div>
-            </div>
-          </div>
-
-          {/* Referral List */}
-          <div className="space-y-1">
-            {referralData.referrals.length > 0 ? (
-              referralData.referrals.map((referral, index) => (
-                <div key={referral.id} className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-                  {/* Rank Badge */}
-                  <div className="absolute top-1 right-1">
-                    <div className="w-5 h-5 bg-gradient-to-br from-yellow-400 to-orange-500 rounded-full flex items-center justify-center">
-                      <span className="text-white text-xs font-bold">#{index + 1}</span>
-                    </div>
-                  </div>
-                  
-                  <div className="flex items-center justify-between pr-6">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-cyan-400 to-blue-500 flex items-center justify-center">
-                        <span className="text-white text-xs font-bold">{referral.username.charAt(0)}</span>
-                      </div>
-                      <div>
-                        <div className="text-cyan-300 font-mono font-bold text-xs tracking-wider">{referral.username}</div>
-                        <div className="text-gray-400 font-mono text-xs tracking-wider">
-                          {new Date(referral.joinedAt).toLocaleDateString()}
-                        </div>
-                        <div className="text-gray-500 font-mono text-xs tracking-wider">
-                          {Math.floor((Date.now() - referral.joinedAt) / (1000 * 60 * 60 * 24))} days ago
-                        </div>
-                        {/* Points source indicator */}
-                        <div className="text-gray-500 font-mono text-xs tracking-wider">
-                          {(() => {
-                            const pointSource = (referral as any).pointSource;
-                            switch (pointSource) {
-                              case 'tbc_current':
-                              case 'tbc_total':
-                                return '🪙 TBC Mining';
-                              case 'staking':
-                                return '💎 Staking';
-                              case 'stake_potential':
-                                return '💰 Stake Potential';
-                              case 'sbt':
-                                return '🎯 SBT Tokens';
-                              case 'activity':
-                                return '🎯 Activity';
-                              case 'new':
-                              default:
-                                return '🆕 New User';
-                            }
-                          })()}
-                        </div>
-                      </div>
-                    </div>
-                    <div className="text-right">
-                      <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider">
-                        {(() => {
-                          const pointSource = (referral as any).pointSource;
-                          const tbcCoins = (referral as any).tbcCoins || 0;
-                          const totalTbcEarned = (referral as any).totalTbcEarned || 0;
-                          
-                          if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
-                            // Show TBC Coins specifically
-                            return (
-                              <>
-                                {referral.pointsEarned.toLocaleString()}
-                                <span className="text-yellow-300 text-xs ml-1">TBC</span>
-                                {tbcCoins !== totalTbcEarned && totalTbcEarned > 0 && (
-                                  <div className="text-xs text-gray-400">
-                                    Total: {totalTbcEarned.toLocaleString()} TBC
-                                  </div>
-                                )}
-                              </>
-                            );
-                          } else {
-                            // Show regular points
-                            return (
-                              <>
-                                {referral.pointsEarned.toLocaleString()}
-                                {referral.pointsEarned === 0 && (
-                                  <span className="text-gray-500 text-xs ml-1">(New)</span>
-                                )}
-                              </>
-                            );
-                          }
-                        })()}
-                      </div>
-                      <div className="text-gray-400 font-mono text-xs tracking-wider">
-                        {(() => {
-                          const pointSource = (referral as any).pointSource;
-                          if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
-                            return 'TBC Coins';
-                          } else if (pointSource === 'staking') {
-                            return 'Staking Points';
-                          } else if (pointSource === 'new') {
-                            return 'Getting Started';
-                          } else {
-                            return 'Total Points';
-                          }
-                        })()}
-                      </div>
-                      <div className="flex items-center gap-1 mt-1">
-                        <div className={`w-1.5 h-1.5 rounded-full ${referral.isActive ? 'bg-green-400 animate-pulse' : 'bg-red-400'}`}></div>
-                        <span className={`text-xs font-mono tracking-wider ${referral.isActive ? 'text-green-400' : 'text-red-400'}`}>
-                          {referral.isActive ? 'ACTIVE' : 'INACTIVE'}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                  
-                  {/* Progress Bar for Points */}
-                  <div className="mt-2">
-                                         {(() => {
-                       const pointSource = (referral as any).pointSource;
-                       const gameData = (referral as any).gameData;
-                      
-                      if (pointSource === 'tbc_current' || pointSource === 'tbc_total') {
-                        // TBC-specific progress (different milestones)
-                        let target = 1000; // Default target for TBC
-                        if (referral.pointsEarned >= 100000) target = 1000000;
-                        else if (referral.pointsEarned >= 10000) target = 100000;
-                        else if (referral.pointsEarned >= 1000) target = 10000;
-                        
-                        const progressPercent = Math.min((referral.pointsEarned / target) * 100, 100);
-                        
-                        return (
-                          <>
-                            <div className="flex justify-between text-xs text-gray-400 font-mono mb-1">
-                              <span>TBC Progress</span>
-                              <span>{Math.floor(progressPercent)}%</span>
-                            </div>
-                            <div className="w-full bg-gray-700 rounded-full h-1.5">
-                              <div 
-                                className="h-1.5 bg-gradient-to-r from-yellow-400 to-orange-500 rounded-full transition-all duration-300"
-                                style={{ width: `${progressPercent}%` }}
-                              ></div>
-                            </div>
-                                                         {gameData?.miningLevel && (
-                               <div className="text-xs text-gray-500 mt-1">
-                                 Mining Level: {gameData.miningLevel}
-                                 {gameData?.pointsPerSecond > 0 && (
-                                   <span className="ml-2">
-                                     +{gameData.pointsPerSecond.toFixed(1)}/sec
-                                   </span>
-                                 )}
-                               </div>
-                             )}
-                             {(referral as any).balance > 0 && (
-                               <div className="text-xs text-blue-400 mt-1">
-                                 TON Balance: {((referral as any).balance || 0).toFixed(2)} TON
-                               </div>
-                             )}
-                          </>
-                        );
-                      } else {
-                        // Regular progress bar for other point types
-                        const progressPercent = Math.min((referral.pointsEarned / 10000) * 100, 100);
-                        return (
-                          <>
-                            <div className="flex justify-between text-xs text-gray-400 font-mono mb-1">
-                              <span>Progress</span>
-                              <span>{Math.floor(progressPercent)}%</span>
-                            </div>
-                            <div className="w-full bg-gray-700 rounded-full h-1.5">
-                              <div 
-                                className="h-1.5 bg-gradient-to-r from-cyan-400 to-blue-500 rounded-full transition-all duration-300"
-                                style={{ width: `${progressPercent}%` }}
-                              ></div>
-                            </div>
-                          </>
-                        );
-                      }
-                    })()}
-                  </div>
-                </div>
-              ))
-            ) : (
-              <div className="relative bg-black/40 backdrop-blur-xl border border-gray-600/30 rounded-xl p-4 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-                <div className="text-center">
-                  <div className="text-2xl mb-2">👥</div>
-                  <div className="text-gray-400 font-mono font-bold text-xs tracking-wider mb-1">NO REFERRALS YET</div>
-                  <div className="text-gray-500 font-mono text-xs tracking-wider mb-2">
-                    Share your referral code to start earning rewards!
-                  </div>
-                  <button
-                    onClick={() => setActiveTab('share')}
-                    className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-cyan-400"
-                  >
-                    SHARE REFERRAL CODE
-                  </button>
-                </div>
-              </div>
-            )}
-          </div>
         </div>
       )}
 
       {dataLoaded && activeTab === 'rewards' && (
         <div className="space-y-1">
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-lg p-2 shadow-[0_0_15px_rgba(0,255,255,0.1)]">
             <div className="text-center">
               <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-1">REWARD STATUS</div>
               <div className="text-cyan-300 font-mono text-xs tracking-wider">
-                Total Referrals: {referralData.totalReferrals} | Claimed: {claimedRewards.length}
+                {referralData.totalReferrals} referrals • {claimedRewards.length} claimed
               </div>
             </div>
           </div>
@@ -1115,14 +923,14 @@ useEffect(() => {
             const canClaim = isUnlocked && !isClaimed && !isClaimingReward;
             
             return (
-              <div key={reward.level} className={`relative bg-black/40 backdrop-blur-xl border rounded-xl p-2 transition-all duration-300 ${
+              <div key={reward.level} className={`relative bg-black/40 backdrop-blur-xl border rounded-lg p-2 transition-all duration-300 ${
                 isUnlocked 
-                  ? 'border-green-400/30 shadow-[0_0_20px_rgba(34,197,94,0.1)]' 
+                  ? 'border-green-400/30 shadow-[0_0_15px_rgba(34,197,94,0.1)]' 
                   : 'border-gray-600/30'
               }`}>
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
-                    <div className="text-lg">{reward.icon}</div>
+                    <div className="text-base">{reward.icon}</div>
                     <div>
                       <div className={`font-mono font-bold text-xs tracking-wider ${
                         isUnlocked ? 'text-green-400' : 'text-gray-400'
@@ -1130,22 +938,14 @@ useEffect(() => {
                         {reward.name}
                       </div>
                       <div className="text-gray-400 font-mono text-xs tracking-wider">
-                        {reward.requirements} referrals required
-                      </div>
-                      <div className="text-gray-500 font-mono text-xs tracking-wider">
-                        Progress: {Math.min(referralData.totalReferrals, reward.requirements)}/{reward.requirements}
+                        {reward.requirements} refs • {Math.min(referralData.totalReferrals, reward.requirements)}/{reward.requirements}
                       </div>
                     </div>
                   </div>
                   <div className="text-right">
                     <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider">
-                      +{reward.rewards.points} pts, +{reward.rewards.gems} gems
+                      +{reward.rewards.points}p +{reward.rewards.gems}g
                     </div>
-                    {reward.rewards.special && (
-                      <div className="text-purple-400 font-mono text-xs tracking-wider">
-                        {reward.rewards.special}
-                      </div>
-                    )}
                     {canClaim && (
                       <button
                         onClick={() => claimReward(reward)}
@@ -1171,220 +971,19 @@ useEffect(() => {
         </div>
       )}
 
-      {dataLoaded && activeTab === 'share' && (
-        <div className="space-y-2">
-          {/* Share Options */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-            <div className="text-center mb-2">
-              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider mb-1">SHARE YOUR REFERRAL LINK</div>
-              <div className="text-cyan-300 font-mono text-xs tracking-wider mb-2 break-all">
-                {`https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`}
-              </div>
-              <button
-                onClick={shareReferral}
-                className="px-3 py-1.5 bg-cyan-600 hover:bg-cyan-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-cyan-400"
-              >
-                {copied ? '✓ LINK COPIED' : 'SHARE LINK'}
-              </button>
-            </div>
-          </div>
-
-         <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
-            <div className="text-center">
-              <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-1">QR CODE</div>
-              <button
-                onClick={() => setShowQR(!showQR)}
-                className="px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-purple-400"
-              >
-                {showQR ? 'HIDE QR' : 'SHOW QR'}
-              </button>
-                          {showQR && (
-              <div className="mt-2 p-3 bg-white rounded-lg">
-                <img
-                  src={`https://api.qrserver.com/v1/create-qr-code/?size=200x200&data=${encodeURIComponent(`https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`)}`}
-                  alt="Referral QR Code"
-                  className="w-48 h-48 mx-auto"
-                />
-                <div className="text-gray-600 font-mono text-xs tracking-wider mt-2">
-                  Scan to join with referral code: {referralData.code}
-                </div>
-              </div>
-            )}
-            </div>
-          </div>
-
-          {/* Social Share Buttons */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
-            <div className="text-center">
-              <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-1">SHARE ON SOCIAL</div>
-              <div className="flex justify-center gap-1">
-                <button 
-                  onClick={() => {
-                    const text = `🚀 Join DivineTap Mining and start earning rewards! Use my referral link: https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`;
-                    const url = `https://twitter.com/intent/tweet?text=${encodeURIComponent(text)}`;
-                    window.open(url, '_blank');
-                  }}
-                  className="px-2 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-blue-400"
-                >
-                  Twitter
-                </button>
-                <button 
-                  onClick={() => {
-                    const text = `🚀 Join DivineTap Mining and start earning rewards! Use my referral link: https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`;
-                    const url = `https://t.me/share/url?url=${encodeURIComponent(`https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`)}&text=${encodeURIComponent(text)}`;
-                    window.open(url, '_blank');
-                  }}
-                  className="px-2 py-1.5 bg-blue-500 hover:bg-blue-400 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-blue-400"
-                >
-                  Telegram
-                </button>
-                <button 
-                  onClick={() => {
-                    const text = `🚀 Join DivineTap Mining and start earning rewards! Use my referral link: https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`;
-                    const url = `https://wa.me/?text=${encodeURIComponent(text)}`;
-                    window.open(url, '_blank');
-                  }}
-                  className="px-2 py-1.5 bg-green-600 hover:bg-green-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-green-400"
-                >
-                  WhatsApp
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
-
-      {dataLoaded && activeTab === 'analytics' && (
-        <div className="space-y-2">
-          {/* Analytics Overview */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-yellow-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(251,191,36,0.1)]">
-            <div className="text-center mb-2">
-              <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider mb-1">📊 REFERRAL ANALYTICS</div>
-              <div className="grid grid-cols-2 gap-1 text-xs">
-                <div className="bg-gray-800/50 rounded-lg p-1.5">
-                  <div className="text-green-400 font-bold">{referralData.analytics.totalAttempts}</div>
-                  <div className="text-gray-400">Total Attempts</div>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-1.5">
-                  <div className="text-blue-400 font-bold">{referralData.analytics.successfulReferrals}</div>
-                  <div className="text-gray-400">Successful</div>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-1.5">
-                  <div className="text-red-400 font-bold">{referralData.analytics.failedAttempts}</div>
-                  <div className="text-gray-400">Failed</div>
-                </div>
-                <div className="bg-gray-800/50 rounded-lg p-1.5">
-                  <div className="text-purple-400 font-bold">{referralData.analytics.conversionRate.toFixed(1)}%</div>
-                  <div className="text-gray-400">Success Rate</div>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Code Tester */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
-            <div className="text-center mb-2">
-              <div className="text-purple-400 font-mono font-bold text-xs tracking-wider mb-1">🔧 CODE TESTER</div>
-              <div className="space-y-1">
-                <input
-                  type="text"
-                  value={testCode}
-                  onChange={(e) => setTestCode(e.target.value)}
-                  placeholder="Enter referral code to test..."
-                  className="w-full px-2 py-1.5 bg-gray-800/50 text-white rounded-lg border border-purple-500/30 focus:border-purple-400 focus:outline-none font-mono text-xs"
-                />
-                <div className="flex gap-1">
-                  <button
-                    onClick={async () => {
-                      if (testCode.trim()) {
-                        const result = await testReferralCode(testCode.trim());
-                        alert(result.success ? `✅ Valid code! Referrer: ${result.referrer}` : `❌ ${result.error}`);
-                      }
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-purple-600 hover:bg-purple-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-purple-400"
-                  >
-                    TEST CODE
-                  </button>
-                  <button
-                    onClick={async () => {
-                      // Simulate start parameter processing
-                      const launchParams = { startParam: testCode.trim() };
-                      if (launchParams.startParam) {
-                        console.log('🧪 Simulating start parameter:', launchParams.startParam);
-                        alert(`🧪 Simulating referral link: https://t.me/DivineTaps_bot/mine?startapp=${launchParams.startParam}`);
-                      }
-                    }}
-                    className="flex-1 px-3 py-1.5 bg-blue-600 hover:bg-blue-500 text-white font-mono text-xs font-bold tracking-wider rounded-lg transition-all duration-300 border border-blue-400"
-                  >
-                    SIMULATE
-                  </button>
-                </div>
-              </div>
-            </div>
-          </div>
-
-          {/* Referral Attempts History */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-2 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-            <div className="flex items-center justify-between mb-2">
-              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider">📜 ATTEMPT HISTORY</div>
-              <button
-                onClick={clearReferralHistory}
-                className="text-red-400 hover:text-red-300 font-mono text-xs tracking-wider"
-              >
-                CLEAR
-              </button>
-            </div>
-            <div className="space-y-1 max-h-48 overflow-y-auto">
-              {referralData.referralAttempts.length > 0 ? (
-                referralData.referralAttempts.map((attempt) => (
-                  <div key={attempt.id} className="bg-gray-800/50 rounded-lg p-1.5">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-1.5">
-                        <div className={`w-1.5 h-1.5 rounded-full ${
-                          attempt.status === 'success' ? 'bg-green-400' :
-                          attempt.status === 'failed' ? 'bg-red-400' :
-                          attempt.status === 'invalid' ? 'bg-yellow-400' :
-                          attempt.status === 'duplicate' ? 'bg-blue-400' :
-                          'bg-gray-400'
-                        }`}></div>
-                        <span className="text-xs font-mono text-gray-300">{attempt.code}</span>
-                      </div>
-                      <div className="text-xs text-gray-400 font-mono">
-                        {new Date(attempt.timestamp).toLocaleTimeString()}
-                      </div>
-                    </div>
-                    {attempt.reason && (
-                      <div className="text-xs text-gray-500 mt-1">{attempt.reason}</div>
-                    )}
-                    {attempt.referrer_username && (
-                      <div className="text-xs text-green-400 mt-1">By: {attempt.referrer_username}</div>
-                    )}
-                  </div>
-                ))
-              ) : (
-                <div className="text-center text-gray-500 py-3">
-                  <div className="text-lg mb-1">📋</div>
-                  <div className="text-xs">No referral attempts yet</div>
-                </div>
-              )}
-            </div>
-          </div>
-        </div>
-      )}
-
       {/* Enhanced Reward Modal */}
       {showRewardModal && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="relative bg-black/90 backdrop-blur-2xl rounded-xl p-4 text-center max-w-sm mx-4 border border-cyan-400/30 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
-            <div className="text-3xl mb-3 animate-bounce">
+          <div className="relative bg-black/90 backdrop-blur-2xl rounded-lg p-4 text-center max-w-sm mx-4 border border-cyan-400/30 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+            <div className="text-2xl mb-2 animate-bounce">
               {rewardMessage.includes('🚫') ? '❌' : '🎉'}
             </div>
             
-            <h3 className="text-white font-mono font-bold text-lg mb-3 tracking-wider">
+            <h3 className="text-white font-mono font-bold text-base mb-2 tracking-wider">
               {rewardMessage.includes('🚫') ? 'REWARD UNAVAILABLE' : 'REWARD UNLOCKED!'}
             </h3>
             
-            <div className="bg-cyan-500/20 backdrop-blur-xl rounded-lg p-3 border border-cyan-400/30 mb-4">
+            <div className="bg-cyan-500/20 backdrop-blur-xl rounded-lg p-2 border border-cyan-400/30 mb-3">
               <p className="text-cyan-200 text-xs font-mono tracking-wider whitespace-pre-line">
                 {rewardMessage}
               </p>

@@ -2,6 +2,7 @@ import React, { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { GiCoins, GiLightningArc, GiUpgrade } from 'react-icons/gi';
 import { useGameContext } from '@/contexts/GameContext';
 import { useAuth } from '@/hooks/useAuth';
+import { useReferralIntegration } from '@/hooks/useReferralIntegration';
 import './TaskCenter.css';
 
 interface Task {
@@ -31,9 +32,10 @@ interface GameState {
 export const TaskCenter: React.FC = () => {
   const { addGems } = useGameContext();
   const { user } = useAuth();
+  const { referralData, loadReferralData } = useReferralIntegration();
   
-  // Add state for hiding completed tasks
-  const [hideCompleted, setHideCompleted] = useState(true);
+  // Remove auto-hiding functionality - completed tasks are always visible
+  // const [hideCompleted, setHideCompleted] = useState(false);
   
   // Centralized state management
   const [completedTasks, setCompletedTasks] = useState<string[]>([]);
@@ -153,7 +155,7 @@ export const TaskCenter: React.FC = () => {
       join_telegram: 0,
       retweet_post: 0,
       submit_wallet: 0,
-      invite_friend: 0,
+      invite_friend: referralData?.totalReferrals > 0 ? 1 : 0,
       like_post: 0
     };
 
@@ -164,10 +166,11 @@ export const TaskCenter: React.FC = () => {
 
     // Auto-complete tasks
     const tasksToComplete = [
-      { id: 'mine_1000', condition: newProgress.mine_1000 >= 1000, reward: '50 Gems' },
-      { id: 'mine_10000', condition: newProgress.mine_10000 >= 10000, reward: '100 Gems' },
-      { id: 'mine_1hour', condition: newProgress.mine_1hour >= 3600, reward: '75 Gems' },
-      { id: 'buy_upgrade', condition: newProgress.buy_upgrade >= 1, reward: '25 Gems' }
+      { id: 'mine_1000', condition: newProgress.mine_1000 >= 1000, reward: '75 Gems' },
+      { id: 'mine_10000', condition: newProgress.mine_10000 >= 10000, reward: '150 Gems' },
+      { id: 'mine_1hour', condition: newProgress.mine_1hour >= 3600, reward: '100 Gems' },
+      { id: 'buy_upgrade', condition: newProgress.buy_upgrade >= 1, reward: '50 Gems' },
+      { id: 'invite_friend', condition: newProgress.invite_friend >= 1, reward: '100 Gems' }
     ];
 
     tasksToComplete.forEach(({ id, condition, reward }) => {
@@ -181,7 +184,7 @@ export const TaskCenter: React.FC = () => {
       }
     });
 
-  }, [user?.id, readGameState, calculateMiningTime, completedTasks, processingTasks]);
+  }, [user?.id, readGameState, calculateMiningTime, completedTasks, processingTasks, referralData]);
 
   // Optimized completeTask function
   const completeTask = useCallback((taskId: string, reward: string) => {
@@ -274,6 +277,13 @@ export const TaskCenter: React.FC = () => {
     safeSetItem(completedTasksKey, completedTasks);
   }, [completedTasks, user?.id, getUserSpecificKey, safeSetItem]);
 
+  // Load referral data
+  useEffect(() => {
+    if (user?.id) {
+      loadReferralData();
+    }
+  }, [user?.id, loadReferralData]);
+
   // Optimized polling with better cleanup
   useEffect(() => {
     if (!user?.id) return;
@@ -305,8 +315,15 @@ export const TaskCenter: React.FC = () => {
       setTimeout(calculateProgress, 100);
     };
 
+    const handleReferralUpdate = (e: CustomEvent) => {
+      console.log('🎉 Referral update detected:', e.detail);
+      // Force immediate progress calculation when referrals change
+      setTimeout(calculateProgress, 100);
+    };
+
     window.addEventListener('storage', handleStorageChange);
     window.addEventListener('upgradePurchased', handleUpgradePurchase as EventListener);
+    window.addEventListener('referralUpdated', handleReferralUpdate as EventListener);
 
     return () => {
       if (intervalRef.current) {
@@ -315,17 +332,18 @@ export const TaskCenter: React.FC = () => {
       }
       window.removeEventListener('storage', handleStorageChange);
       window.removeEventListener('upgradePurchased', handleUpgradePurchase as EventListener);
+      window.removeEventListener('referralUpdated', handleReferralUpdate as EventListener);
     };
   }, [user?.id, calculateProgress]);
 
-  // Memoized task definitions - Reordered to prioritize social tasks
+  // Compact professional task definitions
   const tasks: Task[] = useMemo(() => [
-    // Social Tasks First
+    // Social Tasks
     {
       id: 'follow_twitter',
-      title: 'Follow on Twitter',
-      description: 'Follow our official Twitter account',
-      reward: '30 Gems',
+      title: 'Follow DivineTaps on Twitter',
+      description: 'Stay updated with latest news and airdrops',
+      reward: '50 Gems',
       progress: completedTasks.includes('follow_twitter') ? 1 : (taskProgress.follow_twitter || 0),
       max: 1,
       completed: completedTasks.includes('follow_twitter'),
@@ -334,9 +352,9 @@ export const TaskCenter: React.FC = () => {
     },
     {
       id: 'join_telegram',
-      title: 'Join Telegram',
-      description: 'Join our Telegram community',
-      reward: '40 Gems',
+      title: 'Join Telegram Community',
+      description: 'Connect with fellow miners and get tips',
+      reward: '75 Gems',
       progress: completedTasks.includes('join_telegram') ? 1 : (taskProgress.join_telegram || 0),
       max: 1,
       completed: completedTasks.includes('join_telegram'),
@@ -345,9 +363,9 @@ export const TaskCenter: React.FC = () => {
     },
     {
       id: 'retweet_post',
-      title: 'Retweet Latest Post',
-      description: 'Retweet our latest announcement',
-      reward: '35 Gems',
+      title: 'Share Latest News',
+      description: 'Help spread the word about DivineTaps',
+      reward: '60 Gems',
       progress: completedTasks.includes('retweet_post') ? 1 : (taskProgress.retweet_post || 0),
       max: 1,
       completed: completedTasks.includes('retweet_post'),
@@ -357,8 +375,8 @@ export const TaskCenter: React.FC = () => {
     {
       id: 'like_post',
       title: 'Like Latest Post',
-      description: 'Like our latest social media post',
-      reward: '20 Gems',
+      description: 'Boost community engagement',
+      reward: '40 Gems',
       progress: completedTasks.includes('like_post') ? 1 : (taskProgress.like_post || 0),
       max: 1,
       completed: completedTasks.includes('like_post'),
@@ -367,33 +385,33 @@ export const TaskCenter: React.FC = () => {
     },
     {
       id: 'invite_friend',
-      title: 'Invite a Friend',
-      description: 'Invite a friend to join the game',
-      reward: '50 Gems',
+      title: 'Invite Friends',
+      description: `Share referral link and earn bonuses${referralData?.code ? ` (Code: ${referralData.code})` : ''}`,
+      reward: '100 Gems',
       progress: completedTasks.includes('invite_friend') ? 1 : (taskProgress.invite_friend || 0),
       max: 1,
       completed: completedTasks.includes('invite_friend'),
       icon: <span className="text-green-400">👥</span>,
       type: 'social'
     },
-    // Airdrop Tasks Second
+    // Airdrop Tasks
     {
       id: 'submit_wallet',
-      title: 'Submit Wallet for Airdrop',
-      description: 'Submit your wallet address for airdrop',
-      reward: '100 Gems',
+      title: 'Submit Wallet for Airdrops',
+      description: 'Get early access to token launches',
+      reward: '150 Gems',
       progress: completedTasks.includes('submit_wallet') ? 1 : (taskProgress.submit_wallet || 0),
       max: 1,
       completed: completedTasks.includes('submit_wallet'),
       icon: <span className="text-purple-400">💎</span>,
       type: 'airdrop'
     },
-    // Mining Tasks Last
+    // Mining Tasks
     {
       id: 'mine_1000',
       title: 'Mine 1,000 Points',
-      description: 'Accumulate 1,000 divine points',
-      reward: '50 Gems',
+      description: 'Reach your first mining milestone',
+      reward: '75 Gems',
       progress: completedTasks.includes('mine_1000') ? 1000 : (taskProgress.mine_1000 || 0),
       max: 1000,
       completed: completedTasks.includes('mine_1000'),
@@ -403,8 +421,8 @@ export const TaskCenter: React.FC = () => {
     {
       id: 'mine_10000',
       title: 'Mine 10,000 Points',
-      description: 'Accumulate 10,000 divine points',
-      reward: '100 Gems',
+      description: 'Reach advanced mining level',
+      reward: '150 Gems',
       progress: completedTasks.includes('mine_10000') ? 10000 : (taskProgress.mine_10000 || 0),
       max: 10000,
       completed: completedTasks.includes('mine_10000'),
@@ -414,8 +432,8 @@ export const TaskCenter: React.FC = () => {
     {
       id: 'mine_1hour',
       title: 'Mine for 1 Hour',
-      description: 'Keep mining active for 1 hour',
-      reward: '75 Gems',
+      description: 'Stay active for 1 hour',
+      reward: '100 Gems',
       progress: completedTasks.includes('mine_1hour') ? 3600 : (taskProgress.mine_1hour || 0),
       max: 3600,
       completed: completedTasks.includes('mine_1hour'),
@@ -424,9 +442,9 @@ export const TaskCenter: React.FC = () => {
     },
     {
       id: 'buy_upgrade',
-      title: 'Buy Your First Upgrade',
-      description: 'Purchase any mining upgrade',
-      reward: '25 Gems',
+      title: 'Buy First Upgrade',
+      description: 'Invest in mining efficiency',
+      reward: '50 Gems',
       progress: completedTasks.includes('buy_upgrade') ? 1 : (taskProgress.buy_upgrade || 0),
       max: 1,
       completed: completedTasks.includes('buy_upgrade'),
@@ -451,102 +469,191 @@ export const TaskCenter: React.FC = () => {
 
   const handleTaskAction = useCallback((task: Task) => {
     if (completedTasks.includes(task.id)) {
-      displayTaskModal(task, 'invite', 'This task has already been completed!', 'OK');
+      displayTaskModal(task, 'invite', '🎉 This task has already been completed! You\'re awesome!', 'Thanks!');
       return;
     }
     
     if (processingTasks.has(task.id)) {
-      displayTaskModal(task, 'invite', 'This task is currently being processed. Please wait...', 'OK');
+      displayTaskModal(task, 'invite', '⚡ This task is currently being processed. Please wait a moment...', 'OK');
       return;
     }
 
     switch (task.id) {
       case 'follow_twitter':
-        window.open('https://x.com/DivineTaps', '_blank');
-        setTimeout(() => {
-          displayTaskModal(
-            task,
-            'social',
-            'Did you follow @DivineTaps on Twitter?',
-            'Yes, Complete Task',
-            'Not Yet',
-            () => completeTask(task.id, task.reward),
-            () => setShowTaskModal(false)
-          );
-        }, 3000);
+        // Enhanced social experience
+        displayTaskModal(
+          task,
+          'social',
+          '🌟 Ready to follow DivineTaps on Twitter?\n\nYou\'ll get:\n• Latest news & updates\n• Exclusive airdrop alerts\n• Community highlights\n• Early access to features',
+          'Follow Now!',
+          'Maybe Later',
+          () => {
+            window.open('https://x.com/DivineTaps', '_blank');
+            setTimeout(() => {
+              displayTaskModal(
+                task,
+                'social',
+                '🐦 Did you successfully follow @DivineTaps?\n\nThanks for joining our community!',
+                'Yes, I Followed!',
+                'I\'ll Do It Later',
+                () => completeTask(task.id, task.reward),
+                () => setShowTaskModal(false)
+              );
+            }, 2000);
+          },
+          () => setShowTaskModal(false)
+        );
         break;
+        
       case 'join_telegram':
-        window.open('https://t.me/DivineTaps', '_blank');
-        setTimeout(() => {
-          displayTaskModal(
-            task,
-            'social',
-            'Did you join our Telegram group?',
-            'Yes, Complete Task',
-            'Not Yet',
-            () => completeTask(task.id, task.reward),
-            () => setShowTaskModal(false)
-          );
-        }, 3000);
+        // Enhanced community experience
+        displayTaskModal(
+          task,
+          'social',
+          '💬 Ready to join our Telegram community?\n\nYou\'ll get:\n• Real-time chat with miners\n• Strategy sharing\n• Exclusive tips & tricks\n• Direct support from team',
+          'Join Community!',
+          'Maybe Later',
+          () => {
+            window.open('https://t.me/DivineTaps', '_blank');
+            setTimeout(() => {
+              displayTaskModal(
+                task,
+                'social',
+                '📱 Did you successfully join our Telegram group?\n\nWelcome to the DivineTaps family!',
+                'Yes, I Joined!',
+                'I\'ll Do It Later',
+                () => completeTask(task.id, task.reward),
+                () => setShowTaskModal(false)
+              );
+            }, 2000);
+          },
+          () => setShowTaskModal(false)
+        );
         break;
+        
       case 'retweet_post':
-        window.open('https://twitter.com/intent/retweet?tweet_id=1946298009924288617', '_blank');
-        setTimeout(() => {
-          displayTaskModal(
-            task,
-            'social',
-            'Did you retweet our latest post?',
-            'Yes, Complete Task',
-            'Not Yet',
-            () => completeTask(task.id, task.reward),
-            () => setShowTaskModal(false)
-          );
-        }, 3000);
+        // Enhanced sharing experience
+        displayTaskModal(
+          task,
+          'social',
+          '🔄 Ready to share our latest news?\n\nHelp spread the word about DivineTaps and earn bonus rewards!',
+          'Share Now!',
+          'Maybe Later',
+          () => {
+            window.open('https://twitter.com/intent/retweet?tweet_id=1946298009924288617', '_blank');
+            setTimeout(() => {
+              displayTaskModal(
+                task,
+                'social',
+                '🔄 Did you successfully retweet our post?\n\nThanks for helping us grow!',
+                'Yes, I Shared!',
+                'I\'ll Do It Later',
+                () => completeTask(task.id, task.reward),
+                () => setShowTaskModal(false)
+              );
+            }, 2000);
+          },
+          () => setShowTaskModal(false)
+        );
         break;
+        
       case 'submit_wallet':
         setWalletAddress('');
         setWalletError('');
         setShowWalletModal(true);
         break;
+        
       case 'invite_friend':
+        // Enhanced referral experience with actual integration
         displayTaskModal(
           task,
           'invite',
-          '👥 Share your referral link with friends!\n\nYou can find your referral link in the Referral System tab.',
-          'Got It!',
-          undefined,
-          () => completeTask(task.id, task.reward)
+          '👥 Ready to invite friends and earn together?\n\nBenefits:\n• Earn 100 Gems per friend\n• Get referral bonuses\n• Build your mining network\n• Unlock exclusive rewards\n\nYour referral code: ' + (referralData?.code || 'Loading...') + '\n\nShare this code with friends to complete the task!',
+          'Share My Code!',
+          'View Referral System',
+          () => {
+            // Copy referral code to clipboard
+            if (referralData?.code) {
+              navigator.clipboard.writeText(referralData.code);
+              // Show success message
+              displayTaskModal(
+                task,
+                'invite',
+                '📋 Referral code copied to clipboard!\n\nShare it with friends:\n' + referralData.code + '\n\nWhen someone uses your code, this task will automatically complete!',
+                'Got It!',
+                'View Referral System',
+                () => setShowTaskModal(false),
+                () => {
+                  // Navigate to referral system
+                  window.dispatchEvent(new CustomEvent('navigateToReferralSystem'));
+                  setShowTaskModal(false);
+                }
+              );
+            } else {
+              // If no referral code, show error
+              displayTaskModal(
+                task,
+                'invite',
+                '⚠️ Referral code not available yet.\n\nPlease try again in a moment or check the Referral System tab.',
+                'OK',
+                'View Referral System',
+                () => setShowTaskModal(false),
+                () => {
+                  window.dispatchEvent(new CustomEvent('navigateToReferralSystem'));
+                  setShowTaskModal(false);
+                }
+              );
+            }
+          },
+          () => {
+            // Navigate to referral system
+            window.dispatchEvent(new CustomEvent('navigateToReferralSystem'));
+            setShowTaskModal(false);
+          }
         );
         break;
+        
       case 'like_post':
-        window.open('https://x.com/intent/like?tweet_id=1946298009924288617', '_blank');
-        setTimeout(() => {
-          displayTaskModal(
-            task,
-            'social',
-            'Did you like our latest post?',
-            'Yes, Complete Task',
-            'Not Yet',
-            () => completeTask(task.id, task.reward),
-            () => setShowTaskModal(false)
-          );
-        }, 3000);
+        // Enhanced engagement experience
+        displayTaskModal(
+          task,
+          'social',
+          '❤️ Ready to show some love?\n\nLike our latest post and help boost our community engagement!',
+          'Like Now!',
+          'Maybe Later',
+          () => {
+            window.open('https://x.com/intent/like?tweet_id=1946298009924288617', '_blank');
+            setTimeout(() => {
+              displayTaskModal(
+                task,
+                'social',
+                '❤️ Did you successfully like our post?\n\nThanks for the support!',
+                'Yes, I Liked It!',
+                'I\'ll Do It Later',
+                () => completeTask(task.id, task.reward),
+                () => setShowTaskModal(false)
+              );
+            }, 2000);
+          },
+          () => setShowTaskModal(false)
+        );
         break;
+        
       default:
         break;
     }
   }, [completedTasks, processingTasks, displayTaskModal, completeTask]);
 
-  const getMiningStatus = useCallback(() => {
-    return gameState.isMining ? 'ACTIVE' : 'INACTIVE';
-  }, [gameState.isMining]);
+  // const getMiningStatus = useCallback(() => {
+  //   return gameState.isMining ? 'ACTIVE' : 'INACTIVE';
+  // }, [gameState.isMining]);
 
   // Filter tasks by type
   const miningTasks = useMemo(() => tasks.filter(task => task.type === 'mining'), [tasks]);
   const socialTasks = useMemo(() => tasks.filter(task => task.type === 'social'), [tasks]);
   const airdropTasks = useMemo(() => tasks.filter(task => task.type === 'airdrop'), [tasks]);
 
-  const [activeTab, setActiveTab] = useState<'all' | 'mining' | 'social' | 'airdrop'>('all');
+  const [activeTab, setActiveTab] = useState<'all' | 'mining' | 'social' | 'airdrop' | 'completed'>('all');
 
   const getCurrentTasks = useCallback(() => {
     let filteredTasks = tasks;
@@ -556,15 +663,11 @@ export const TaskCenter: React.FC = () => {
       case 'mining': filteredTasks = miningTasks; break;
       case 'social': filteredTasks = socialTasks; break;
       case 'airdrop': filteredTasks = airdropTasks; break;
-    }
-    
-    // Hide completed tasks if enabled
-    if (hideCompleted) {
-      filteredTasks = filteredTasks.filter(task => !task.completed);
+      case 'completed': filteredTasks = tasks.filter(task => task.completed); break;
     }
     
     return filteredTasks;
-  }, [activeTab, miningTasks, socialTasks, airdropTasks, tasks, hideCompleted]);
+  }, [activeTab, miningTasks, socialTasks, airdropTasks, tasks]);
 
   // Debug function for development
   const resetMiningTimeTracking = useCallback(() => {
@@ -594,16 +697,72 @@ export const TaskCenter: React.FC = () => {
           completedTasks,
           processingTasks: Array.from(processingTasks),
           miningTime,
-          autoCompleted: Array.from(autoCompletedTasksRef.current)
+          autoCompleted: Array.from(autoCompletedTasksRef.current),
+          referralData
         });
       };
     }
-  }, [resetMiningTimeTracking, gameState, taskProgress, completedTasks, processingTasks, miningTime]);
+  }, [resetMiningTimeTracking, gameState, taskProgress, completedTasks, processingTasks, miningTime, referralData]);
+
+  // Listen for navigation events
+  useEffect(() => {
+    const handleNavigateToReferralSystem = () => {
+      // Dispatch event to parent component to switch to referral system
+      window.dispatchEvent(new CustomEvent('switchToReferralSystem'));
+    };
+
+    window.addEventListener('navigateToReferralSystem', handleNavigateToReferralSystem);
+    
+    return () => {
+      window.removeEventListener('navigateToReferralSystem', handleNavigateToReferralSystem);
+    };
+  }, []);
 
   return (
-    <div className="task-center-container flex-1 p-custom space-y-2 overflow-y-auto game-scrollbar">
+    <div className="task-center-container flex-1 p-4 space-y-3 overflow-y-auto">
+      {/* Compact Header */}
+      <div className="flex items-center justify-between bg-gray-900/50 border border-gray-700 rounded-lg p-3">
+        <div className="flex items-center gap-4">
+          <div>
+            <h1 className="text-base font-semibold text-white">Task Center</h1>
+            <p className="text-xs text-gray-400">
+              {activeTab === 'completed' ? 'Completed tasks' : 'Complete tasks to earn rewards'}
+            </p>
+          </div>
+          {/* <CompletedTasksToggle
+            completedTasksCount={completedTasks.length}
+            hideCompleted={hideCompleted}
+            onToggle={() => setHideCompleted(!hideCompleted)}
+          /> */}
+        </div>
+        <div className="flex items-center gap-3 text-xs">
+          {activeTab === 'completed' ? (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                <span className="text-gray-300">{completedTasks.length} done</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-yellow-500 rounded-full"></span>
+                <span className="text-gray-300">{completedTasks.length * 50} gems</span>
+              </div>
+            </>
+          ) : (
+            <>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-green-500 rounded-full"></span>
+                <span className="text-gray-300">{completedTasks.length} done</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
+                <span className="text-gray-300">{tasks.length - completedTasks.length} left</span>
+              </div>
+            </>
+          )}
+        </div>
+      </div>
       {/* Header */}
-      <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_30px_rgba(0,255,255,0.1)]">
+      {/* <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_30px_rgba(0,255,255,0.1)]">
         <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-cyan-400"></div>
         <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-cyan-400"></div>
         <div className="absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 border-cyan-400"></div>
@@ -620,10 +779,10 @@ export const TaskCenter: React.FC = () => {
             Complete missions to earn bonus rewards
           </p>
         </div>
-      </div>
+      </div> */}
 
       {/* Mining Status */}
-      <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
+      {/* <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
             <div className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse"></div>
@@ -660,206 +819,263 @@ export const TaskCenter: React.FC = () => {
             )}
           </div>
         </div>
-      </div>
+      </div> */}
 
       {/* Task Controls */}
       <div className="flex flex-col gap-2">
-        {/* Show/Hide Completed Toggle */}
-        <div className="flex justify-end">
-          <button
-            onClick={() => setHideCompleted(!hideCompleted)}
-            className={`px-3 py-1 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
-              hideCompleted
-                ? 'bg-gray-600 text-gray-300'
-                : 'bg-cyan-600 text-white'
-            }`}
-          >
-            {hideCompleted ? '👁️ Show Completed' : '🚫 Hide Completed'}
-          </button>
-        </div>
-
-        {/* Task Type Tabs */}
-        <div className="flex gap-1">
-          {[
-            { id: 'all', name: 'All', count: hideCompleted ? tasks.filter(t => !t.completed).length : tasks.length },
-            { id: 'social', name: 'Social', count: hideCompleted ? socialTasks.filter(t => !t.completed).length : socialTasks.length },
-            { id: 'mining', name: 'Mining', count: hideCompleted ? miningTasks.filter(t => !t.completed).length : miningTasks.length },
-            { id: 'airdrop', name: 'Airdrop', count: hideCompleted ? airdropTasks.filter(t => !t.completed).length : airdropTasks.length }
-          ].map(({ id, name, count }) => (
-            <button
-              key={id}
-              onClick={() => setActiveTab(id as any)}
-              className={`flex-1 flex items-center justify-center gap-1 py-2 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
-                activeTab === id
-                  ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-[0_0_20px_rgba(0,255,255,0.3)]'
-                  : 'bg-black/40 border border-cyan-500/30 text-cyan-300 hover:bg-cyan-500/20'
-              }`}
-            >
-              {name} ({count})
-            </button>
-          ))}
+        {/* Show/Hide Completed Toggle - Auto-hide when no completed tasks */}
+        {/* Enhanced Task Type Tabs */}
+        <div className="bg-gray-900/50 border border-gray-700 rounded-xl p-2">
+          <div className="flex gap-1">
+            {[
+              { 
+                id: 'all', 
+                name: 'All Tasks', 
+                count: tasks.length,
+                icon: '📋',
+                color: 'blue',
+                description: 'View all available tasks'
+              },
+              { 
+                id: 'social', 
+                name: 'Social', 
+                count: socialTasks.length,
+                icon: '🌐',
+                color: 'purple',
+                description: 'Social media engagement'
+              },
+              { 
+                id: 'mining', 
+                name: 'Mining', 
+                count: miningTasks.length,
+                icon: '⛏️',
+                color: 'yellow',
+                description: 'Mining achievements'
+              },
+              { 
+                id: 'airdrop', 
+                name: 'Airdrop', 
+                count: airdropTasks.length,
+                icon: '💎',
+                color: 'cyan',
+                description: 'Airdrop opportunities'
+              },
+              { 
+                id: 'completed', 
+                name: 'Completed', 
+                count: completedTasks.length,
+                icon: '✅',
+                color: 'green',
+                description: 'Finished tasks'
+              }
+            ].map(({ id, name, count, icon, color, description }) => {
+              const isActive = activeTab === id;
+              const colorClasses = {
+                blue: isActive ? 'bg-blue-600/80 border-blue-500 text-white' : 'hover:bg-blue-600/20 hover:border-blue-500/50 text-blue-300',
+                purple: isActive ? 'bg-purple-600/80 border-purple-500 text-white' : 'hover:bg-purple-600/20 hover:border-purple-500/50 text-purple-300',
+                yellow: isActive ? 'bg-yellow-600/80 border-yellow-500 text-white' : 'hover:bg-yellow-600/20 hover:border-yellow-500/50 text-yellow-300',
+                cyan: isActive ? 'bg-cyan-600/80 border-cyan-500 text-white' : 'hover:bg-cyan-600/20 hover:border-cyan-500/50 text-cyan-300',
+                green: isActive ? 'bg-green-600/80 border-green-500 text-white' : 'hover:bg-green-600/20 hover:border-green-500/50 text-green-300'
+              };
+              
+              return (
+                <button
+                  key={id}
+                  onClick={() => setActiveTab(id as any)}
+                  className={`flex-1 flex flex-col items-center gap-0.5 py-2 px-1 rounded-lg border transition-all duration-200 ${
+                    colorClasses[color as keyof typeof colorClasses]
+                  } ${isActive ? 'shadow-lg scale-105' : 'hover:scale-102'}`}
+                  title={description}
+                >
+                  <div className="text-sm">{icon}</div>
+                  <div className="text-[10px] font-medium leading-tight">{name}</div>
+                  <div className={`text-[9px] font-bold px-1.5 py-0.5 rounded-full ${
+                    isActive 
+                      ? 'bg-white/20 text-white' 
+                      : 'bg-gray-700/50 text-gray-300'
+                  }`}>
+                    {count}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 
-      {/* Task List */}
-      <div className="space-y-2">
+      {/* Compact Professional Task List */}
+      <div className="space-y-1">
         {getCurrentTasks().map((task) => {
           const isCompleted = task.completed;
           const isProcessing = processingTasks.has(task.id);
+          const progressPercentage = Math.min((task.progress / task.max) * 100, 100);
           
           return (
-            <div key={task.id} className={`relative bg-black/40 backdrop-blur-xl border rounded-lg p-3 transition-all duration-300 ${
+            <div key={task.id} className={`bg-gray-900/30 border rounded-md p-3 transition-colors ${
               isCompleted 
-                ? 'bg-green-500/20 border-green-400 shadow-[0_0_20px_rgba(34,197,94,0.1)]' 
+                ? 'border-green-600/50 bg-green-900/10' 
                 : isProcessing
-                ? 'bg-orange-500/20 border-orange-400 shadow-[0_0_20px_rgba(255,165,0,0.1)]'
-                : 'bg-gray-800/50 border-cyan-500/30 shadow-[0_0_20px_rgba(0,255,255,0.1)]'
+                ? 'border-orange-600/50 bg-orange-900/10'
+                : 'border-gray-700/50 hover:border-gray-600/50'
             }`}>
-              <div className="flex items-center justify-between mb-2">
-                <div className="flex items-center gap-2">
-                  {task.icon}
-                  <div>
-                    <h3 className={`font-mono font-bold text-sm tracking-wider ${
-                      isCompleted ? 'text-green-400' : 'text-cyan-300'
-                    }`}>
-                      {task.title}
-                    </h3>
-                    <p className="text-gray-400 text-xs font-mono">{task.description}</p>
-                  </div>
-                </div>
-                <div className="text-right">
-                  <div className="text-yellow-400 font-mono text-sm font-bold tracking-wider">{task.reward}</div>
-                  {isCompleted && (
-                    <div className="text-green-400 text-xs font-mono tracking-wider">✓ COMPLETED</div>
-                  )}
-                  {isProcessing && (
-                    <div className="text-orange-400 text-xs font-mono tracking-wider animate-pulse">⏳ PROCESSING</div>
-                  )}
-                </div>
-              </div>
               
-              {/* Progress Bar */}
-              <div className="w-full bg-gray-700 rounded-full h-2 mb-2">
-                <div 
-                  className={`h-2 rounded-full transition-all duration-300 ${
-                    isCompleted ? 'bg-green-500' : 'bg-cyan-500'
-                  }`}
-                  style={{ width: `${Math.min((task.progress / task.max) * 100, 100)}%` }}
-                ></div>
-              </div>
-              
+              {/* Compact Task Row */}
               <div className="flex items-center justify-between">
-                <div className="text-xs text-gray-400 font-mono tracking-wider">
-                  {task.id === 'mine_1hour' ? (
-                    `Progress: ${Math.floor(task.progress / 60)}m ${task.progress % 60}s / 60m 0s`
-                  ) : (
-                    `Progress: ${task.progress.toLocaleString()}/${task.max.toLocaleString()}`
-                  )}
+                {/* Left: Icon and Info */}
+                <div className="flex items-center gap-3 flex-1 min-w-0">
+                  <div className="text-base flex-shrink-0">
+                    {task.icon}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center gap-2 mb-1">
+                      <h3 className={`font-medium text-sm truncate ${
+                        isCompleted ? 'text-green-400' : 'text-white'
+                      }`}>
+                        {task.title}
+                      </h3>
+                      <span className="text-yellow-400 text-xs font-medium flex-shrink-0">
+                        {task.reward}
+                      </span>
+                    </div>
+                    <p className="text-gray-400 text-xs truncate">{task.description}</p>
+                  </div>
                 </div>
                 
-                {/* Action Button */}
-                {task.type === 'mining' ? (
-                  <div className="text-xs text-gray-500 font-mono tracking-wider">
-                    AUTO-TRACKED
+                {/* Right: Progress and Action */}
+                <div className="flex items-center gap-3 ml-3 flex-shrink-0">
+                  {/* Progress Info */}
+                  <div className="text-right">
+                    <div className="text-xs text-gray-400">
+                      {Math.round(progressPercentage)}%
+                    </div>
+                    <div className="text-xs text-gray-500">
+                      {task.id === 'mine_1hour' 
+                        ? `${Math.floor(task.progress / 60)}m/${Math.floor(task.max / 60)}m`
+                        : `${task.progress.toLocaleString()}/${task.max.toLocaleString()}`
+                      }
+                    </div>
                   </div>
-                ) : (
-                  <button
-                    onClick={() => handleTaskAction(task)}
-                    disabled={isCompleted || isProcessing}
-                    className={`px-3 py-1 rounded-lg font-mono text-xs font-bold tracking-wider transition-all duration-300 ${
-                      isCompleted
-                        ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
-                        : isProcessing
-                        ? 'bg-orange-600 text-orange-200 cursor-not-allowed animate-pulse'
-                        : 'bg-cyan-600 hover:bg-cyan-500 text-white border border-cyan-400'
-                    }`}
-                  >
-                    {isCompleted ? 'COMPLETED' : isProcessing ? 'PROCESSING...' : 'ACTION'}
-                  </button>
-                )}
+                  
+                                {/* Status/Action */}
+              {activeTab === 'completed' ? (
+                <div className="text-xs text-green-400 px-2 py-1 bg-green-900/20 rounded">
+                  ✓ Done
+                </div>
+              ) : task.type === 'mining' ? (
+                <div className="text-xs text-gray-500 px-2 py-1 bg-gray-800/50 rounded">
+                  Auto
+                </div>
+              ) : (
+                <button
+                  onClick={() => handleTaskAction(task)}
+                  disabled={isCompleted || isProcessing}
+                  className={`px-3 py-1 rounded text-xs font-medium transition-colors ${
+                    isCompleted
+                      ? 'bg-gray-600 text-gray-400 cursor-not-allowed'
+                      : isProcessing
+                      ? 'bg-orange-600 text-orange-200 cursor-not-allowed'
+                      : 'bg-blue-600 hover:bg-blue-500 text-white'
+                  }`}
+                >
+                  {isCompleted ? 'Done' : isProcessing ? '...' : 'Start'}
+                </button>
+              )}
+                </div>
               </div>
+              
+              {/* Compact Progress Bar */}
+              <div className="mt-2">
+                <div className="w-full bg-gray-700/50 rounded-full h-1">
+                  <div 
+                    className={`h-1 rounded-full transition-all duration-300 ${
+                      isCompleted ? 'bg-green-500' : 'bg-blue-500'
+                    }`}
+                    style={{ width: `${progressPercentage}%` }}
+                  ></div>
+                </div>
+              </div>
+              
+              {/* Status Indicator */}
+              {(isCompleted || isProcessing) && (
+                <div className="mt-2 text-xs">
+                  {isCompleted && (
+                    <span className="text-green-400">✓ Completed</span>
+                  )}
+                  {isProcessing && (
+                    <span className="text-orange-400 animate-pulse">Processing...</span>
+                  )}
+                </div>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Reward Modal */}
+      {/* Clean Reward Modal */}
       {showRewardModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="relative bg-black/90 backdrop-blur-2xl rounded-xl p-6 text-center max-w-sm mx-4 border border-cyan-400/30 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
-            <div className="text-4xl mb-4 animate-bounce">🎉</div>
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 text-center max-w-sm mx-4">
+            <div className="text-4xl mb-4">🎉</div>
             
-            <h3 className="text-white font-mono font-bold text-xl mb-4 tracking-wider">TASK COMPLETED!</h3>
+            <h3 className="text-white font-semibold text-lg mb-4">Task Completed!</h3>
             
-            <div className="bg-cyan-500/20 backdrop-blur-xl rounded-lg p-4 border border-cyan-400/30 mb-6">
-              <p className="text-cyan-200 text-sm font-mono tracking-wider">{rewardMessage}</p>
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+              <p className="text-blue-200 text-sm">{rewardMessage}</p>
             </div>
             
             <button
               onClick={() => setShowRewardModal(false)}
-              className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-mono font-bold py-3 px-6 rounded-lg tracking-wider hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 shadow-[0_0_20px_rgba(0,255,255,0.3)]"
+              className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-6 rounded transition-colors"
             >
-              AWESOME! ✨
+              Great!
             </button>
           </div>
         </div>
       )}
 
-      {/* Custom Task Modal */}
+      {/* Clean Task Modal */}
       {showTaskModal && currentTaskModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="relative bg-black/90 backdrop-blur-2xl rounded-xl p-6 text-center max-w-md mx-4 border border-cyan-400/30 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 text-center max-w-md mx-4">
             {/* Close button */}
             <button
               onClick={() => setShowTaskModal(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-white text-2xl transition-colors duration-300"
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl transition-colors"
             >
               ×
             </button>
             
-            {/* Corner decorations */}
-            <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-cyan-400"></div>
-            <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-cyan-400"></div>
-            <div className="absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 border-cyan-400"></div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-cyan-400"></div>
-            
-            {/* Task Icon */}
-            <div className="text-4xl mb-4">
+            <div className="text-3xl mb-4">
               {currentTaskModal.type === 'social' && '🌐'}
               {currentTaskModal.type === 'wallet' && '💎'}
               {currentTaskModal.type === 'invite' && '👥'}
             </div>
             
-            {/* Task Title */}
-            <h3 className="text-white font-mono font-bold text-lg mb-3 tracking-wider">
+            <h3 className="text-white font-semibold text-lg mb-4">
               {currentTaskModal.task.title}
             </h3>
             
-            {/* Task Message */}
-            <div className="bg-cyan-500/10 backdrop-blur-xl rounded-lg p-4 border border-cyan-400/20 mb-6">
-              <p className="text-cyan-200 text-sm font-mono tracking-wider whitespace-pre-line">
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+              <p className="text-blue-200 text-sm whitespace-pre-line">
                 {currentTaskModal.message}
               </p>
             </div>
             
-            {/* Reward Info */}
-            <div className="bg-yellow-500/10 backdrop-blur-xl rounded-lg p-3 border border-yellow-400/20 mb-6">
-              <div className="text-yellow-400 font-mono font-bold text-sm tracking-wider">
-                REWARD: {currentTaskModal.task.reward}
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-3 mb-6">
+              <div className="text-yellow-400 font-medium text-sm">
+                Reward: {currentTaskModal.task.reward}
               </div>
             </div>
             
-            {/* Action Buttons */}
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => {
                   currentTaskModal.onConfirm();
                   setShowTaskModal(false);
                 }}
-                className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-mono font-bold py-3 px-6 rounded-lg tracking-wider hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 shadow-[0_0_20px_rgba(0,255,255,0.3)] flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-6 rounded transition-colors"
               >
-                <span>✅</span>
-                <span>{currentTaskModal.confirmText}</span>
+                {currentTaskModal.confirmText}
               </button>
               
               {currentTaskModal.cancelText && (
@@ -868,10 +1084,9 @@ export const TaskCenter: React.FC = () => {
                     currentTaskModal.onCancel?.();
                     setShowTaskModal(false);
                   }}
-                  className="bg-gradient-to-r from-gray-600 to-gray-500 text-white font-mono font-bold py-3 px-6 rounded-lg tracking-wider hover:from-gray-500 hover:to-gray-400 transition-all duration-300 flex items-center gap-2"
+                  className="bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-6 rounded transition-colors"
                 >
-                  <span>❌</span>
-                  <span>{currentTaskModal.cancelText}</span>
+                  {currentTaskModal.cancelText}
                 </button>
               )}
             </div>
@@ -879,73 +1094,53 @@ export const TaskCenter: React.FC = () => {
         </div>
       )}
 
-      {/* Custom Wallet Input Modal */}
+      {/* Clean Wallet Input Modal */}
       {showWalletModal && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md flex items-center justify-center z-50 p-4">
-          <div className="relative bg-black/90 backdrop-blur-2xl rounded-xl p-6 text-center max-w-md mx-4 border border-cyan-400/30 shadow-[0_0_30px_rgba(0,255,255,0.3)]">
+        <div className="fixed inset-0 bg-black/80 flex items-center justify-center z-50 p-4">
+          <div className="bg-gray-900 border border-gray-700 rounded-lg p-6 text-center max-w-md mx-4">
             {/* Close button */}
             <button
               onClick={() => setShowWalletModal(false)}
-              className="absolute top-2 right-2 text-gray-400 hover:text-white text-2xl transition-colors duration-300"
+              className="absolute top-4 right-4 text-gray-400 hover:text-white text-xl transition-colors"
             >
               ×
             </button>
             
-            {/* Corner decorations */}
-            <div className="absolute top-0 left-0 w-3 h-3 border-l-2 border-t-2 border-cyan-400"></div>
-            <div className="absolute top-0 right-0 w-3 h-3 border-r-2 border-t-2 border-cyan-400"></div>
-            <div className="absolute bottom-0 left-0 w-3 h-3 border-l-2 border-b-2 border-cyan-400"></div>
-            <div className="absolute bottom-0 right-0 w-3 h-3 border-r-2 border-b-2 border-cyan-400"></div>
+            <div className="text-3xl mb-4">💎</div>
             
-            {/* Wallet Icon */}
-            <div className="text-4xl mb-4">💎</div>
+            <h3 className="text-white font-semibold text-lg mb-4">Submit Wallet for Airdrop</h3>
             
-            {/* Title */}
-            <h3 className="text-white font-mono font-bold text-lg mb-3 tracking-wider">
-              SUBMIT WALLET FOR AIRDROP
-            </h3>
-            
-            {/* Description */}
-            <div className="bg-cyan-500/10 backdrop-blur-xl rounded-lg p-4 border border-cyan-400/20 mb-6">
-              <p className="text-cyan-200 text-sm font-mono tracking-wider">
-                Enter your wallet address to receive exclusive airdrops and rewards!
+            <div className="bg-blue-900/30 border border-blue-700 rounded-lg p-4 mb-6">
+              <p className="text-blue-200 text-sm">
+                Enter your wallet address to receive exclusive airdrops and rewards
               </p>
             </div>
             
-            {/* Wallet Input */}
             <div className="mb-6">
-              <label className="block text-cyan-400 font-mono font-bold text-sm mb-2 tracking-wider">
-                WALLET ADDRESS
-              </label>
+              <label className="block text-gray-300 text-sm mb-2">Wallet Address</label>
               <input
                 type="text"
                 value={walletAddress}
                 onChange={(e) => {
                   setWalletAddress(e.target.value);
-                  setWalletError(''); // Clear error when user types
+                  setWalletError('');
                 }}
-                placeholder="Enter your wallet address here..."
-                className="w-full bg-black/50 border border-cyan-400/30 rounded-lg px-4 py-3 text-white font-mono text-sm tracking-wider placeholder-gray-500 focus:outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-400/20 transition-all duration-300"
+                placeholder="Enter your TON wallet address..."
+                className="w-full bg-gray-800 border border-gray-600 rounded px-3 py-2 text-white text-sm focus:outline-none focus:border-blue-500"
                 autoFocus
               />
               {walletError && (
-                <div className="mt-2 text-red-400 font-mono text-xs tracking-wider">
-                  ❌ {walletError}
-                </div>
+                <div className="mt-2 text-red-400 text-xs">{walletError}</div>
               )}
             </div>
             
-            {/* Reward Info */}
-            <div className="bg-yellow-500/10 backdrop-blur-xl rounded-lg p-3 border border-yellow-400/20 mb-6">
-              <div className="text-yellow-400 font-mono font-bold text-sm tracking-wider">
-                REWARD: 100 Gems
-              </div>
-              <div className="text-yellow-300 font-mono text-xs tracking-wider mt-1">
+            <div className="bg-yellow-900/30 border border-yellow-700 rounded-lg p-4 mb-6">
+              <div className="text-yellow-400 font-medium text-sm mb-2">Reward: 150 Gems</div>
+              <div className="text-yellow-300 text-xs">
                 + Access to exclusive airdrops
               </div>
             </div>
             
-            {/* Action Buttons */}
             <div className="flex gap-3 justify-center">
               <button
                 onClick={() => {
@@ -963,27 +1158,24 @@ export const TaskCenter: React.FC = () => {
                     return;
                   }
                   
-                  // Success - close modal and show success message
                   setShowWalletModal(false);
                   displayTaskModal(
                     tasks.find(t => t.id === 'submit_wallet')!,
                     'invite',
-                    '✅ Wallet address submitted successfully!\n\nYou will receive 100 Gems and access to exclusive airdrops!',
-                    'Awesome!'
+                    'Wallet address submitted successfully! You will receive 150 Gems and access to exclusive airdrops.',
+                    'Great!'
                   );
                 }}
-                className="bg-gradient-to-r from-cyan-600 to-blue-600 text-white font-mono font-bold py-3 px-6 rounded-lg tracking-wider hover:from-cyan-500 hover:to-blue-500 transition-all duration-300 shadow-[0_0_20px_rgba(0,255,255,0.3)] flex items-center gap-2"
+                className="bg-blue-600 hover:bg-blue-500 text-white font-medium py-2 px-6 rounded transition-colors"
               >
-                <span>💎</span>
-                <span>Submit Wallet</span>
+                Submit
               </button>
               
               <button
                 onClick={() => setShowWalletModal(false)}
-                className="bg-gradient-to-r from-gray-600 to-gray-500 text-white font-mono font-bold py-3 px-6 rounded-lg tracking-wider hover:from-gray-500 hover:to-gray-400 transition-all duration-300 flex items-center gap-2"
+                className="bg-gray-600 hover:bg-gray-500 text-white font-medium py-2 px-6 rounded transition-colors"
               >
-                <span>❌</span>
-                <span>Cancel</span>
+                Cancel
               </button>
             </div>
           </div>
