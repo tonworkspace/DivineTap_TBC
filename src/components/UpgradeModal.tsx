@@ -211,7 +211,7 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
             
             {/* Points Display */}
             <div className="flex flex-col">
-              <span className="text-sm font-mono text-cyan-400">Divine Points</span>
+              <span className="text-sm font-mono text-cyan-400">The Billion Coin</span>
               <span className="flex items-center text-2xl font-mono font-bold text-yellow-300">
                 <FaCoins className="mr-2 text-yellow-400" />
                 <span className="tabular-nums">

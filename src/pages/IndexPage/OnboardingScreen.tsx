@@ -1,4 +1,4 @@
-import { FC, useState, useEffect } from 'react';
+import { FC, useState, useEffect, useCallback, useMemo } from 'react';
 import { 
   HiOutlineUser, 
   HiOutlineMail, 
@@ -12,8 +12,9 @@ import {
 import { useAuth } from '@/hooks/useAuth';
 import { useTonAddress } from '@tonconnect/ui-react';
 import { submitOnboardingForm, checkOnboardingStatus, type OnboardingFormData } from '@/lib/api';
-
-
+import { useNotificationSystem } from '@/components/NotificationSystem';
+import { supabase } from '@/lib/supabaseClient';
+import { OnboardingDebugger } from '@/components/OnboardingDebugger';
 
 interface OnboardingStep {
   id: string;
@@ -23,13 +24,25 @@ interface OnboardingStep {
   emoji: string;
 }
 
+// Development mode check
+const isDevelopment = process.env.NODE_ENV === 'development';
+
+// Debug logging function - only logs in development
+const debugLog = (...args: any[]) => {
+  if (isDevelopment) {
+    console.log(...args);
+  }
+};
+
 export const OnboardingScreen: FC = () => {
   const { user } = useAuth();
   const userFriendlyAddress = useTonAddress();
+  const { showSystemNotification, showAchievementNotification } = useNotificationSystem();
   const [currentStep, setCurrentStep] = useState(0);
   const [loading, setLoading] = useState(true);
   const [shouldShow, setShouldShow] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
+
   const [formData, setFormData] = useState<OnboardingFormData>({
     firstName: '',
     lastName: '',
@@ -40,7 +53,23 @@ export const OnboardingScreen: FC = () => {
     agreedToTerms: false
   });
 
-  const steps: OnboardingStep[] = [
+  // Debug logging - only in development
+  useEffect(() => {
+    if (isDevelopment) {
+      debugLog('🔍 OnboardingScreen Debug:', {
+        user: user ? { id: user.id, username: user.username } : null,
+        userFriendlyAddress,
+        loading,
+        shouldShow,
+        currentStep
+      });
+      
+  
+    }
+  }, [user, userFriendlyAddress, loading, shouldShow, currentStep]);
+
+  // Memoize steps to prevent unnecessary re-renders
+  const steps: OnboardingStep[] = useMemo(() => [
     {
       id: 'welcome',
       title: "Welcome to TBC Mining Revolution",
@@ -83,37 +112,61 @@ export const OnboardingScreen: FC = () => {
       icon: <HiOutlineDocumentText className="w-8 h-8 text-blue-400" />,
       emoji: "📋"
     }
-  ];
+  ], []);
 
+  // Simplified onboarding check - force show for testing
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      debugLog('❌ No user found');
+      return;
+    }
+
+    debugLog('✅ User found, checking onboarding status...');
 
     const checkOnboarding = async () => {
       try {
         // Check if user has completed onboarding from database
         const hasCompletedOnboarding = await checkOnboardingStatus(user.id);
+        debugLog('📊 Database onboarding status:', hasCompletedOnboarding);
         
-        if (!hasCompletedOnboarding) {
+        // Also check localStorage as backup
+        const localStorageCompleted = localStorage.getItem(`onboarding_completed_${user.id}`);
+        debugLog('📦 localStorage onboarding status:', localStorageCompleted);
+        
+        // Show onboarding only if NOT completed in both database and localStorage
+        if (!hasCompletedOnboarding && !localStorageCompleted) {
           setShouldShow(true);
+          debugLog('✅ Setting shouldShow to true - user needs onboarding');
+        } else {
+          setShouldShow(false);
+          debugLog('❌ User has already completed onboarding - not showing');
         }
 
-        // Show loading screen
+        // Reduced loading time for faster experience
         const loadingTimer = setTimeout(() => {
           setLoading(false);
-        }, 2000);
+          debugLog('⏰ Loading timer completed');
+        }, 1000);
 
         return () => clearTimeout(loadingTimer);
       } catch (error) {
-        console.error('Error checking onboarding status:', error);
-        // Fallback to localStorage check
+        debugLog('❌ Error checking onboarding status:', error);
+        // Fallback to localStorage check only
         const hasCompletedOnboarding = localStorage.getItem(`onboarding_completed_${user.id}`);
+        debugLog('📦 localStorage onboarding status (fallback):', hasCompletedOnboarding);
+        
         if (!hasCompletedOnboarding) {
           setShouldShow(true);
+          debugLog('✅ Setting shouldShow to true (fallback)');
+        } else {
+          setShouldShow(false);
+          debugLog('❌ User has already completed onboarding (fallback)');
         }
         
         const loadingTimer = setTimeout(() => {
           setLoading(false);
-        }, 2000);
+          debugLog('⏰ Loading timer completed (fallback)');
+        }, 1000);
 
         return () => clearTimeout(loadingTimer);
       }
@@ -122,111 +175,337 @@ export const OnboardingScreen: FC = () => {
     checkOnboarding();
   }, [user]);
 
-  // Update wallet address when connected
+  // Update wallet address when connected - optimized with useCallback
   useEffect(() => {
     if (userFriendlyAddress) {
       setFormData(prev => ({
         ...prev,
         tonWalletAddress: userFriendlyAddress
       }));
+      debugLog('🔗 Wallet address updated:', userFriendlyAddress);
     }
   }, [userFriendlyAddress]);
 
-  const handleInputChange = (field: keyof OnboardingFormData, value: string | boolean) => {
+  // Optimized input change handler with useCallback
+  const handleInputChange = useCallback((field: keyof OnboardingFormData, value: string | boolean) => {
     setFormData(prev => ({
       ...prev,
       [field]: value
     }));
-  };
+    debugLog('📝 Form field updated:', field, value);
+  }, []);
 
-  const validateCurrentStep = (): boolean => {
+  // Memoized validation function
+  const validateCurrentStep = useCallback((): boolean => {
+    debugLog('🔍 Validating step:', currentStep, 'Form data:', formData);
+    
     switch (currentStep) {
       case 1: // Personal Information
-        return formData.firstName.trim() !== '' && formData.lastName.trim() !== '';
+        const personalValid = formData.firstName.trim() !== '' && formData.lastName.trim() !== '';
+        debugLog('📝 Personal validation:', personalValid, { firstName: formData.firstName, lastName: formData.lastName });
+        return personalValid;
       case 2: // Contact Details
         const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-        return emailRegex.test(formData.email);
+        const emailValid = emailRegex.test(formData.email);
+        debugLog('📧 Email validation:', emailValid, { email: formData.email });
+        return emailValid;
       case 3: // Wallet Connection
-        return formData.tonWalletAddress.trim() !== '';
+        const walletValid = formData.tonWalletAddress.trim() !== '';
+        debugLog('🔗 Wallet validation:', walletValid, { wallet: formData.tonWalletAddress });
+        return walletValid;
       case 4: // TBC Status
+        debugLog('💎 TBC status validation: always true (optional)');
         return true; // Always valid as it's optional
       case 5: // Terms
-        return formData.agreedToTerms;
+        const termsValid = formData.agreedToTerms;
+        debugLog('📋 Terms validation:', termsValid, { agreedToTerms: formData.agreedToTerms });
+        return termsValid;
       default:
+        debugLog('✅ Default validation: always true');
         return true;
     }
-  };
+  }, [currentStep, formData]);
 
-  const handleNext = () => {
+  // Enhanced debugging function
+  const debugFormSubmission = useCallback(() => {
+    console.log('🔍 ONBOARDING DEBUG INFO:', {
+      user: user ? { id: user.id, telegram_id: user.telegram_id } : 'NO USER',
+      currentStep,
+      formData: {
+        firstName: formData.firstName,
+        lastName: formData.lastName,
+        email: formData.email,
+        tonWalletAddress: formData.tonWalletAddress,
+        isTBCian: formData.isTBCian,
+        tbcHoldings: formData.tbcHoldings,
+        agreedToTerms: formData.agreedToTerms
+      },
+      validation: {
+        step1: formData.firstName.trim() !== '' && formData.lastName.trim() !== '',
+        step2: /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email),
+        step3: formData.tonWalletAddress.trim() !== '',
+        step4: true, // Always true (optional)
+        step5: formData.agreedToTerms,
+        overall: validateCurrentStep()
+      },
+      isSubmitting,
+      shouldShow,
+      userFriendlyAddress
+    });
+  }, [user, currentStep, formData, validateCurrentStep, isSubmitting, shouldShow, userFriendlyAddress]);
+
+  // Optimized navigation handlers
+  const handleNext = useCallback(() => {
+    debugLog('➡️ Next button clicked, current step:', currentStep);
     if (validateCurrentStep() && currentStep < steps.length - 1) {
       setCurrentStep(prev => prev + 1);
+      debugLog('✅ Moving to next step');
+      
+      // Show progress notification for first step completion
+      if (currentStep === 0) {
+        showSystemNotification(
+          '🚀 Getting Started',
+          'Great! Let\'s set up your mining profile step by step.',
+          'info'
+        );
+      }
+      
+      // Show notification when reaching the final step
+      if (currentStep === steps.length - 2) {
+        showSystemNotification(
+          '📋 Final Step',
+          'Almost there! Please review and agree to the terms to complete your setup.',
+          'info'
+        );
+      }
+    } else {
+      debugLog('❌ Cannot move to next step - validation failed or at last step');
     }
-  };
+  }, [validateCurrentStep, currentStep, steps.length, showSystemNotification]);
 
-  const handlePrev = () => {
+  const handlePrev = useCallback(() => {
+    debugLog('⬅️ Previous button clicked, current step:', currentStep);
     if (currentStep > 0) {
       setCurrentStep(prev => prev - 1);
+      debugLog('✅ Moving to previous step');
     }
-  };
+  }, [currentStep]);
 
-  const handleSubmit = async () => {
-    if (!validateCurrentStep() || !user) return;
+  // Enhanced submit handler with better error handling
+  const handleSubmit = useCallback(async () => {
+    debugLog('🚀 Submit button clicked');
+    
+    // Debug form state before submission
+    debugFormSubmission();
+    
+    if (!validateCurrentStep() || !user) {
+      debugLog('❌ Submit validation failed');
+      
+      // Detailed validation feedback
+      if (!user) {
+        debugLog('❌ No user found');
+        showSystemNotification(
+          '❌ Authentication Error',
+          'User not authenticated. Please refresh the page and try again.',
+          'error'
+        );
+        return;
+      }
+      
+      if (!validateCurrentStep()) {
+        debugLog('❌ Form validation failed');
+        
+        // Check specific validation issues
+        const issues = [];
+        if (!formData.firstName.trim()) issues.push('First name is required');
+        if (!formData.lastName.trim()) issues.push('Last name is required');
+        if (!formData.email.trim()) issues.push('Email is required');
+        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) issues.push('Valid email format required');
+        if (!formData.tonWalletAddress.trim()) issues.push('TON wallet address is required');
+        if (!formData.agreedToTerms) issues.push('Terms agreement is required');
+        
+        showSystemNotification(
+          '⚠️ Form Incomplete',
+          `Please fix the following: ${issues.join(', ')}`,
+          'warning'
+        );
+        return;
+      }
+      return;
+    }
 
     setIsSubmitting(true);
     try {
+      debugLog('📤 Submitting form data:', formData);
+      
+      // Test database connection first
+      const { error: testError } = await supabase
+        .from('users')
+        .select('id')
+        .eq('id', user.id)
+        .single();
+      
+      if (testError) {
+        debugLog('❌ Database connection test failed:', testError);
+        showSystemNotification(
+          '❌ Database Error',
+          'Unable to connect to database. Please check your connection and try again.',
+          'error'
+        );
+        return;
+      }
+      
+      debugLog('✅ Database connection test passed');
+      
       // Submit onboarding data to backend
       const result = await submitOnboardingForm(user.id, formData);
       
       if (result.success) {
-        // Mark onboarding as completed locally as well
+        debugLog('✅ Onboarding submitted successfully');
+        
+        // PERMANENTLY MARK ONBOARDING AS COMPLETED
+        // 1. Update database (already done in submitOnboardingForm)
+        // 2. Update localStorage
         localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+        // 3. Update sessionStorage for immediate effect
+        sessionStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+
+        // 4. Show beautiful completion notification
+        showAchievementNotification({
+          name: '🎉 Welcome to TBC Mining Revolution!',
+          description: `Welcome ${formData.firstName}! Your profile has been successfully set up. You're now ready to start mining and earning TBC rewards!`
+        });
+
+        // 5. Show additional system notification
+        showSystemNotification(
+          '🚀 Profile Setup Complete',
+          `Welcome ${formData.firstName}! Your TBC mining journey begins now. Connect your wallet and start mining to earn rewards!`,
+          'success'
+        );
+        
+        // 6. Close the onboarding screen permanently
         setShouldShow(false);
+        
+        debugLog('🔒 Onboarding permanently completed and closed');
+        
+        // 7. Reload the page to ensure clean state after a short delay
+        setTimeout(() => {
+          window.location.reload();
+        }, 2000); // Increased delay to allow notifications to be seen
+        
       } else {
-        console.error('Onboarding submission failed:', result.error);
-        // You could show an error message to the user here
-        alert('Failed to submit onboarding data. Please try again.');
+        debugLog('❌ Onboarding submission failed:', result.error);
+        showSystemNotification(
+          '❌ Submission Failed',
+          `Failed to submit onboarding data: ${result.error}. Please try again.`,
+          'error'
+        );
       }
     } catch (error) {
-      console.error('Error submitting onboarding:', error);
-      alert('An error occurred while submitting your data. Please try again.');
+      debugLog('❌ Error submitting onboarding:', error);
+      showSystemNotification(
+        '❌ Network Error',
+        'An error occurred while submitting your data. Please check your connection and try again.',
+        'error'
+      );
     } finally {
       setIsSubmitting(false);
     }
-  };
+  }, [validateCurrentStep, user, formData, showAchievementNotification, showSystemNotification, debugFormSubmission]);
 
-  const handleSkip = () => {
+  const handleSkip = useCallback(async () => {
+    debugLog('⏭️ Skip button clicked');
     if (user) {
-      localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+      try {
+        // Mark onboarding as completed but skipped in database
+        const { error } = await supabase
+          .from('users')
+          .update({
+            onboarding_completed: true,
+            onboarding_completed_at: new Date().toISOString(),
+            // Don't set profile data to indicate it was skipped
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', user.id);
+
+        if (error) {
+          console.error('Error marking onboarding as skipped:', error);
+        }
+
+        // PERMANENTLY MARK ONBOARDING AS COMPLETED (SKIPPED)
+        localStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+        sessionStorage.setItem(`onboarding_completed_${user.id}`, 'true');
+        
+        // Set reminder tracking
+        localStorage.setItem(`onboarding_skipped_${user.id}`, 'true');
+        localStorage.setItem(`onboarding_last_reminder_${user.id}`, Date.now().toString());
+        localStorage.setItem(`onboarding_reminder_count_${user.id}`, '0');
+        
+        debugLog('🔒 Onboarding permanently skipped and closed');
+        
+        // Show skip notification with reminder
+        showSystemNotification(
+          '⏭️ Onboarding Skipped',
+          'You can complete your profile setup later. We\'ll remind you to unlock exclusive features!',
+          'info'
+        );
+      } catch (error) {
+        console.error('Error handling skip:', error);
+        showSystemNotification(
+          '⚠️ Skip Error',
+          'There was an issue skipping setup. Please try again.',
+          'warning'
+        );
+        return;
+      }
     }
     setShouldShow(false);
-  };
+  }, [user, showSystemNotification]);
 
-  if (!user || !shouldShow) return null;
+  // Memoized progress percentage
+  const progressPercentage = useMemo(() => {
+    return ((currentStep + 1) / steps.length) * 100;
+  }, [currentStep, steps.length]);
+
+  // Check if onboarding should be shown (no force show for production)
+  const shouldDisplayOnboarding = shouldShow;
+
+  if (!user) {
+    debugLog('❌ No user - returning null');
+    return null;
+  }
+
+  if (!shouldDisplayOnboarding) {
+    debugLog('❌ Should not show - returning null');
+    return null;
+  }
+
+  debugLog('🎯 Rendering onboarding screen');
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-gradient-to-br from-black/95 via-gray-900/95 to-blue-900/95 backdrop-blur-sm">
+      {/* Enhanced Debugger - Only in development */}
+      {isDevelopment && (
+        <OnboardingDebugger
+          formData={formData}
+          currentStep={currentStep}
+          validateCurrentStep={validateCurrentStep}
+          isSubmitting={isSubmitting}
+        />
+      )}
+      
       <div className="max-w-md w-full px-6">
         {loading ? (
           <div className="flex flex-col items-center">
             <div className="relative">
               <div className="relative w-20 h-20">
-                <div className="absolute inset-0 bg-blue-500/20 rounded-full blur-lg animate-pulse"></div>
+                {/* Reduced animation complexity */}
+                <div className="absolute inset-0 bg-blue-500/20 rounded-full"></div>
                 <div className="relative w-full h-full flex items-center justify-center">
-                  <HiOutlineShieldCheck size={48} className="text-blue-500 animate-bounce" />
+                  <HiOutlineShieldCheck size={48} className="text-blue-500" />
                 </div>
-                {[...Array(4)].map((_, i) => (
-                  <div
-                    key={i}
-                    className="absolute w-3 h-3 bg-blue-400 rounded-full animate-ping"
-                    style={{
-                      top: '50%',
-                      left: '50%',
-                      transform: `rotate(${i * 90}deg) translateX(35px)`,
-                      animationDelay: `${i * 0.3}s`,
-                      animationDuration: '2s'
-                    }}
-                  />
-                ))}
+                
+                {/* Removed particles for faster performance */}
               </div>
             </div>
             <div className="mt-8 text-center">
@@ -236,7 +515,7 @@ export const OnboardingScreen: FC = () => {
               <p className="text-blue-300 text-lg">
                 ✨ Setting up your mining profile...
               </p>
-              <div className="mt-4 text-sm text-blue-200 animate-pulse">
+              <div className="mt-4 text-sm text-blue-200">
                 Preparing your divine resurrection...
               </div>
             </div>
@@ -245,13 +524,13 @@ export const OnboardingScreen: FC = () => {
           <div className="relative">
             <button
               onClick={handleSkip}
-              className="absolute -top-12 right-0 text-sm text-blue-300 hover:text-white transition-colors bg-gray-800/50 px-3 py-1 rounded-lg hover:bg-gray-700/50 border border-blue-600/30"
+              className="absolute -top-12 right-0 text-sm text-blue-300 hover:text-white transition-colors duration-100 bg-gray-800/50 px-3 py-1 rounded-lg hover:bg-gray-700/50 border border-blue-600/30"
             >
               Skip Setup
             </button>
             
-            <div className="text-center animate-fade-in">
-              {/* Step Header */}
+            <div className="text-center">
+              {/* Step Header - removed animations */}
               <div className="relative mb-6">
                 <div className="flex items-center justify-center w-20 h-20 mx-auto rounded-full bg-gradient-to-br from-blue-600/10 via-slate-600/10 to-slate-800/10 border border-blue-500/20 shadow-xl backdrop-blur-sm">
                   <div className="text-4xl">{steps[currentStep].emoji}</div>
@@ -267,20 +546,20 @@ export const OnboardingScreen: FC = () => {
                 {steps[currentStep].description}
               </p>
 
-              {/* Progress Bar */}
+              {/* Progress Bar - minimal animation */}
               <div className="w-full h-1.5 bg-slate-800/50 rounded-full mb-8 overflow-hidden border border-slate-700/30">
                 <div
-                  className="h-full bg-gradient-to-r from-blue-600 to-blue-500 rounded-full transition-all duration-500 ease-out"
-                  style={{ width: `${((currentStep + 1) / steps.length) * 100}%` }}
+                  className="h-full bg-gradient-to-r from-blue-600 to-blue-500 rounded-full transition-all duration-100"
+                  style={{ width: `${progressPercentage}%` }}
                 />
               </div>
 
-              {/* Step Indicators */}
+              {/* Step Indicators - removed animations */}
               <div className="flex justify-center gap-2 mb-8">
                 {steps.map((_, index) => (
                   <div
                     key={index}
-                    className={`w-2 h-2 rounded-full transition-all duration-300 ${
+                    className={`w-2 h-2 rounded-full transition-colors duration-200 ${
                       index === currentStep
                         ? 'bg-blue-500'
                         : index < currentStep
@@ -316,9 +595,16 @@ export const OnboardingScreen: FC = () => {
                         type="text"
                         value={formData.firstName}
                         onChange={(e) => handleInputChange('firstName', e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                        className={`w-full px-4 py-3 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors duration-100 ${
+                          formData.firstName.trim() === '' 
+                            ? 'bg-slate-800/50 border-red-500/50 focus:border-red-400/50 focus:ring-red-500/30' 
+                            : 'bg-slate-800/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/30'
+                        }`}
                         placeholder="Enter your first name"
                       />
+                      {formData.firstName.trim() === '' && (
+                        <p className="text-xs text-red-400 mt-1">First name is required</p>
+                      )}
                     </div>
                     <div>
                       <label className="block text-sm font-medium text-slate-300 mb-2">
@@ -328,9 +614,16 @@ export const OnboardingScreen: FC = () => {
                         type="text"
                         value={formData.lastName}
                         onChange={(e) => handleInputChange('lastName', e.target.value)}
-                        className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                        className={`w-full px-4 py-3 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors duration-100 ${
+                          formData.lastName.trim() === '' 
+                            ? 'bg-slate-800/50 border-red-500/50 focus:border-red-400/50 focus:ring-red-500/30' 
+                            : 'bg-slate-800/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/30'
+                        }`}
                         placeholder="Enter your last name"
                       />
+                      {formData.lastName.trim() === '' && (
+                        <p className="text-xs text-red-400 mt-1">Last name is required</p>
+                      )}
                     </div>
                   </div>
                 )}
@@ -344,9 +637,19 @@ export const OnboardingScreen: FC = () => {
                       type="email"
                       value={formData.email}
                       onChange={(e) => handleInputChange('email', e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                      className={`w-full px-4 py-3 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors duration-100 ${
+                        formData.email.trim() === '' || !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)
+                          ? 'bg-slate-800/50 border-red-500/50 focus:border-red-400/50 focus:ring-red-500/30' 
+                          : 'bg-slate-800/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/30'
+                      }`}
                       placeholder="Enter your email address"
                     />
+                    {formData.email.trim() === '' && (
+                      <p className="text-xs text-red-400 mt-1">Email address is required</p>
+                    )}
+                    {formData.email.trim() !== '' && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email) && (
+                      <p className="text-xs text-red-400 mt-1">Please enter a valid email format</p>
+                    )}
                     <p className="text-xs text-slate-400 mt-2">
                       We'll use this to send you important updates and rewards.
                     </p>
@@ -362,9 +665,16 @@ export const OnboardingScreen: FC = () => {
                       type="text"
                       value={formData.tonWalletAddress}
                       onChange={(e) => handleInputChange('tonWalletAddress', e.target.value)}
-                      className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                      className={`w-full px-4 py-3 border rounded-lg text-white placeholder-slate-400 focus:outline-none focus:ring-1 transition-colors duration-100 ${
+                        formData.tonWalletAddress.trim() === '' 
+                          ? 'bg-slate-800/50 border-red-500/50 focus:border-red-400/50 focus:ring-red-500/30' 
+                          : 'bg-slate-800/50 border-slate-600/50 focus:border-blue-500/50 focus:ring-blue-500/30'
+                      }`}
                       placeholder="Enter your TON wallet address"
                     />
+                    {formData.tonWalletAddress.trim() === '' && (
+                      <p className="text-xs text-red-400 mt-1">TON wallet address is required</p>
+                    )}
                     {userFriendlyAddress && (
                       <p className="text-xs text-green-400 mt-2">
                         ✅ Wallet connected: {userFriendlyAddress.slice(0, 8)}...{userFriendlyAddress.slice(-6)}
@@ -385,7 +695,7 @@ export const OnboardingScreen: FC = () => {
                       <div className="flex gap-4 justify-center">
                         <button
                           onClick={() => handleInputChange('isTBCian', true)}
-                          className={`px-6 py-3 rounded-lg border transition-all ${
+                          className={`px-6 py-3 rounded-lg border transition-colors duration-100 ${
                             formData.isTBCian
                               ? 'bg-blue-600/50 border-blue-500/50 text-white'
                               : 'bg-slate-800/50 border-slate-600/50 text-slate-300 hover:bg-slate-700/50'
@@ -395,7 +705,7 @@ export const OnboardingScreen: FC = () => {
                         </button>
                         <button
                           onClick={() => handleInputChange('isTBCian', false)}
-                          className={`px-6 py-3 rounded-lg border transition-all ${
+                          className={`px-6 py-3 rounded-lg border transition-colors duration-100 ${
                             !formData.isTBCian
                               ? 'bg-blue-600/50 border-blue-500/50 text-white'
                               : 'bg-slate-800/50 border-slate-600/50 text-slate-300 hover:bg-slate-700/50'
@@ -415,7 +725,7 @@ export const OnboardingScreen: FC = () => {
                           type="text"
                           value={formData.tbcHoldings}
                           onChange={(e) => handleInputChange('tbcHoldings', e.target.value)}
-                          className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-all"
+                          className="w-full px-4 py-3 bg-slate-800/50 border border-slate-600/50 rounded-lg text-white placeholder-slate-400 focus:outline-none focus:border-blue-500/50 focus:ring-1 focus:ring-blue-500/30 transition-colors duration-100"
                           placeholder="e.g., 1000 TBC"
                         />
                         <p className="text-xs text-slate-400 mt-2">
@@ -465,7 +775,7 @@ export const OnboardingScreen: FC = () => {
               <div className="flex items-center justify-between">
                 <button
                   onClick={handlePrev}
-                  className={`flex items-center px-4 py-2 rounded-lg transition-all duration-200 ${
+                  className={`flex items-center px-4 py-2 rounded-lg transition-colors duration-100 ${
                     currentStep === 0
                       ? 'opacity-0 pointer-events-none'
                       : 'text-slate-300 hover:text-white bg-slate-800/50 hover:bg-slate-700/50 border border-slate-600/50'
@@ -476,32 +786,90 @@ export const OnboardingScreen: FC = () => {
                 </button>
 
                 {currentStep === steps.length - 1 ? (
-                  <button
-                    onClick={handleSubmit}
-                    disabled={isSubmitting || !validateCurrentStep()}
-                    className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg border border-blue-500/30 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    {isSubmitting ? (
-                      <>
-                        <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin mr-2"></div>
-                        Submitting...
-                      </>
-                    ) : (
-                      <>
-                        Complete Setup
-                        <HiOutlineArrowRight className="w-4 h-4 ml-2" />
-                      </>
+                  <div className="flex flex-col items-end space-y-2">
+                    {/* Validation Error Message */}
+                    {!validateCurrentStep() && (
+                      <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-500/30">
+                        {(() => {
+                          if (!formData.firstName.trim() || !formData.lastName.trim()) {
+                            return 'Please enter your first and last name';
+                          }
+                          if (!formData.email.trim()) {
+                            return 'Please enter a valid email address';
+                          }
+                          if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+                            return 'Please enter a valid email format';
+                          }
+                          if (!formData.tonWalletAddress.trim()) {
+                            return 'Please enter your TON wallet address';
+                          }
+                          if (!formData.agreedToTerms) {
+                            return 'Please agree to the terms and conditions';
+                          }
+                          return 'Please complete all required fields';
+                        })()}
+                      </div>
                     )}
-                  </button>
+                    
+                    <button
+                      onClick={handleSubmit}
+                      disabled={isSubmitting || !validateCurrentStep()}
+                      className={`flex items-center px-6 py-2 rounded-lg transition-colors duration-100 shadow-lg border font-medium ${
+                        isSubmitting || !validateCurrentStep()
+                          ? 'bg-gray-600 text-gray-400 border-gray-500/30 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 border-blue-500/30 hover:border-blue-400/50'
+                      }`}
+                    >
+                      {isSubmitting ? (
+                        <>
+                          <div className="w-4 h-4 border border-white border-t-transparent rounded-full animate-spin mr-2"></div>
+                          Submitting...
+                        </>
+                      ) : (
+                        <>
+                          Complete Setup
+                          <HiOutlineArrowRight className="w-4 h-4 ml-2" />
+                        </>
+                      )}
+                    </button>
+                  </div>
                 ) : (
-                  <button
-                    onClick={handleNext}
-                    disabled={!validateCurrentStep()}
-                    className="flex items-center px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-all shadow-lg border border-blue-500/30 font-medium disabled:opacity-50 disabled:cursor-not-allowed"
-                  >
-                    Next
-                    <HiOutlineArrowRight className="w-4 h-4 ml-2" />
-                  </button>
+                  <div className="flex flex-col items-end space-y-2">
+                    {/* Validation Error Message */}
+                    {!validateCurrentStep() && (
+                      <div className="text-xs text-red-400 bg-red-900/20 px-2 py-1 rounded border border-red-500/30">
+                        {(() => {
+                          switch (currentStep) {
+                            case 1:
+                              if (!formData.firstName.trim()) return 'Please enter your first name';
+                              if (!formData.lastName.trim()) return 'Please enter your last name';
+                              return 'Please complete all fields';
+                            case 2:
+                              if (!formData.email.trim()) return 'Please enter your email address';
+                              if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) return 'Please enter a valid email format';
+                              return 'Please enter a valid email';
+                            case 3:
+                              return 'Please enter your TON wallet address';
+                            default:
+                              return 'Please complete all required fields';
+                          }
+                        })()}
+                      </div>
+                    )}
+                    
+                    <button
+                      onClick={handleNext}
+                      disabled={!validateCurrentStep()}
+                      className={`flex items-center px-6 py-2 rounded-lg transition-colors duration-100 shadow-lg border font-medium ${
+                        !validateCurrentStep()
+                          ? 'bg-gray-600 text-gray-400 border-gray-500/30 cursor-not-allowed'
+                          : 'bg-blue-600 text-white hover:bg-blue-700 border-blue-500/30 hover:border-blue-400/50'
+                      }`}
+                    >
+                      Next
+                      <HiOutlineArrowRight className="w-4 h-4 ml-2" />
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

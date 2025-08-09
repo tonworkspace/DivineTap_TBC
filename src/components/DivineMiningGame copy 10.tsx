@@ -5,8 +5,6 @@ import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabaseClient';
 import { migrateToUserSpecificKeys, validateUserDataIsolation, checkForDataLeakage, clearUserData } from '@/utils/userDataIsolation';
 // import { UpgradesStatusSection } from './UpgradesStatusSection';
-import { highVoltage, bear } from '../images';
-
 
 
 interface Upgrade {
@@ -164,7 +162,7 @@ const getCurrentTier = (level: number) => {
       name: 'DIVINE', 
       symbol: '👑', 
       color: 'text-white',
-      description: 'Divine TBCIAN mining mastery - transcending mortal limits',
+      description: 'Divine TONERS mining mastery - transcending mortal limits',
       benefits: ['+500% mining efficiency', '+300% energy regeneration', 'All upgrades unlocked', 'Divine powers activated'],
       nextTier: null
     };
@@ -182,7 +180,7 @@ const getCurrentTier = (level: number) => {
       name: 'MASTER', 
       symbol: '🌟', 
       color: 'text-yellow-400',
-      description: 'Ultimate TBCIAN mining mastery and expertise',
+      description: 'Ultimate TONERS mining mastery and expertise',
       benefits: ['+200% mining efficiency', '+150% energy regeneration', 'Exclusive advanced upgrades', 'Performance optimization bonus'],
       nextTier: { name: 'TRANSCENDENT', level: 75, symbol: '✨' }
     };
@@ -191,7 +189,7 @@ const getCurrentTier = (level: number) => {
       name: 'EXPERT', 
       symbol: '💎', 
       color: 'text-purple-400',
-      description: 'Advanced mining techniques and deep TBCIAN knowledge',
+      description: 'Advanced mining techniques and deep TONERS knowledge',
       benefits: ['+100% mining efficiency', '+75% energy regeneration', 'Quantum upgrades unlocked', 'Enhanced auto-mining'],
       nextTier: { name: 'MASTER', level: 50, symbol: '🌟' }
     };
@@ -200,7 +198,7 @@ const getCurrentTier = (level: number) => {
       name: 'ADEPT', 
       symbol: '🔮', 
       color: 'text-blue-400',
-      description: 'Intermediate mining practices and growing TBCIAN expertise',
+      description: 'Intermediate mining practices and growing TONERS expertise',
       benefits: ['+50% mining efficiency', '+40% energy regeneration', 'Advanced upgrades unlocked', 'Improved energy management'],
       nextTier: { name: 'EXPERT', level: 30, symbol: '💎' }
     };
@@ -209,7 +207,7 @@ const getCurrentTier = (level: number) => {
       name: 'NOVICE', 
       symbol: '🌱', 
       color: 'text-green-400',
-      description: 'Beginning the TBCIAN mining journey with basic operations',
+      description: 'Beginning the TONERS mining journey with basic operations',
       benefits: ['+25% mining efficiency', '+20% energy regeneration', 'Basic upgrades available', 'Energy conservation'],
       nextTier: { name: 'ADEPT', level: 15, symbol: '🔮' }
     };
@@ -4632,33 +4630,19 @@ export const DivineMiningGame: React.FC = () => {
                 disabled={!gameState.isMining && gameState.currentEnergy < 1}
                 className={`
                   relative w-52 h-52 rounded-full transition-all duration-300 font-mono font-bold z-10
-                  bg-cover bg-center bg-no-repeat overflow-hidden
                   ${gameState.isMining 
-                    ? 'shadow-[0_0_40px_rgba(239,68,68,0.8)] border-2 border-red-300/60' 
+                    ? 'bg-gradient-to-br from-red-500 via-orange-500 to-red-700 hover:from-red-400 hover:via-orange-400 hover:to-red-600 text-white shadow-[0_0_40px_rgba(239,68,68,0.8)] border-2 border-red-300/60' 
                     : gameState.currentEnergy < 1
-                    ? 'shadow-[0_0_15px_rgba(107,114,128,0.3)] border-2 border-gray-600/40'
-                    : 'shadow-[0_0_40px_rgba(6,182,212,0.8)] border-2 border-cyan-300/60'
+                    ? 'bg-gradient-to-br from-gray-800 via-gray-700 to-gray-900 text-gray-400 cursor-not-allowed border-2 border-gray-600/40 shadow-[0_0_15px_rgba(107,114,128,0.3)]'
+                    : 'bg-gradient-to-br from-emerald-500 via-cyan-500 to-blue-600 hover:from-emerald-400 hover:via-cyan-400 hover:to-blue-500 text-white shadow-[0_0_40px_rgba(6,182,212,0.8)] border-2 border-cyan-300/60'
                   }
                   ${!gameState.isMining && gameState.currentEnergy >= 1 ? 'hover:scale-105' : gameState.isMining ? 'hover:scale-102' : ''}
                   active:scale-95
                   backdrop-blur-xl
                 `}
-                style={{
-                  backgroundImage: gameState.isMining 
-                    ? `url(${highVoltage})` 
-                    : gameState.currentEnergy < 1 
-                    ? `url(${bear})` 
-                    : `url(${highVoltage})`,
-                  backgroundSize: '85% 85%',
-                  backgroundPosition: 'center',
-                  backgroundRepeat: 'no-repeat'
-                }}
               >
-                
                 {/* Inner content container */}
                 <div className="relative flex flex-col items-center justify-center h-full overflow-hidden">
-                  {/* Semi-transparent overlay for better text readability */}
-                  <div className="absolute inset-0 bg-black/20 rounded-full"></div>
                   {/* Animated particles for mining state */}
                   {gameState.isMining && (
                     <div className="absolute inset-0 overflow-hidden rounded-full">
@@ -4690,11 +4674,12 @@ export const DivineMiningGame: React.FC = () => {
                   <div className={`
                     text-xs font-mono font-bold tracking-wider mb-1 uppercase
                     ${gameState.isMining ? 'animate-pulse' : ''}
+                    bg-gradient-to-r bg-clip-text text-transparent
                     ${gameState.isMining 
-                      ? 'text-yellow-200 drop-shadow-[0_0_4px_rgba(0,0,0,0.8)]' 
+                      ? 'from-white via-yellow-200 to-white' 
                       : gameState.currentEnergy < 1 
-                      ? 'text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.8)]'
-                      : 'text-white drop-shadow-[0_0_4px_rgba(0,0,0,0.8)]'
+                      ? 'from-gray-400 to-gray-500'
+                      : 'from-white via-cyan-200 to-white'
                     }
                   `}>
                     {gameState.isMining ? 'STOP' : gameState.currentEnergy < 1 ? 'LOW PWR' : 'START'}
@@ -4704,12 +4689,12 @@ export const DivineMiningGame: React.FC = () => {
                   <div className={`
                     text-xs font-mono font-bold px-2 py-0.5 rounded-full backdrop-blur-sm
                     ${gameState.isMining 
-                      ? 'bg-white/25 text-yellow-200 border-yellow-300/50' 
+                      ? 'bg-white/20 text-yellow-200' 
                       : gameState.currentEnergy < 1
-                      ? 'bg-gray-800/70 text-gray-300 border-gray-600/50'
-                      : 'bg-white/25 text-cyan-200 border-cyan-300/50'
+                      ? 'bg-gray-800/60 text-gray-400'
+                      : 'bg-white/20 text-cyan-200'
                     }
-                    border drop-shadow-[0_0_4px_rgba(255,255,255,0.3)]
+                    border border-white/30
                   `}>
                     {gameState.isMining ? `${getBoostedMiningRate().toFixed(1)} TBC/s` : 'Ready'}
                   </div>

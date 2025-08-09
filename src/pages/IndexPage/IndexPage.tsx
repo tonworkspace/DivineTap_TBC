@@ -2,6 +2,9 @@ import { FC, useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/hooks/useAuth';
 import { useTheme } from '@/contexts/ThemeContext';
 import { OnboardingScreen } from './OnboardingScreen';
+import { resetOnboardingStatus } from '@/lib/api';
+import { useNotificationSystem } from '@/components/NotificationSystem';
+import { OnboardingReminder } from '@/components/OnboardingReminder';
 import { DivineMiningGame } from '@/components/DivineMiningGame';
 import { DivinePointsLeaderboard } from '@/components/DivinePointsLeaderboard';
 import { TaskCenter } from '@/components/TaskCenter';
@@ -484,6 +487,7 @@ const UpgradeShopModal: FC<{
 
 export const IndexPage: FC = () => {
   const { user, isLoading, error } = useAuth();
+  const { showSystemNotification } = useNotificationSystem();
   
   // Skip loading if user is already authenticated
   const shouldShowLoading = isLoading && !user;
@@ -500,6 +504,7 @@ export const IndexPage: FC = () => {
   
   // Upgrade Shop Modal State
   const [showUpgradeShop, setShowUpgradeShop] = useState(false);
+  const [showOnboarding, setShowOnboarding] = useState(false);
   
   // TON Network Configuration
   const isMainnet = false; // You can toggle this for testing
@@ -509,6 +514,21 @@ export const IndexPage: FC = () => {
   
   // Add referral integration
   useReferralIntegration();
+  
+  // Function to reopen onboarding
+  const handleOpenOnboarding = useCallback(() => {
+    if (user) {
+      // Clear onboarding completion status
+      localStorage.removeItem(`onboarding_completed_${user.id}`);
+      sessionStorage.removeItem(`onboarding_completed_${user.id}`);
+      // Clear reminder tracking
+      localStorage.removeItem(`onboarding_skipped_${user.id}`);
+      localStorage.removeItem(`onboarding_reminder_count_${user.id}`);
+      localStorage.removeItem(`onboarding_last_reminder_${user.id}`);
+      // Show onboarding
+      setShowOnboarding(true);
+    }
+  }, [user]);
   
   // Global event listener for opening upgrade shop
   useEffect(() => {
@@ -980,7 +1000,62 @@ export const IndexPage: FC = () => {
       </div>
       
       <div className="relative z-10">
-        {!isLoading && user && <OnboardingScreen />}
+        {/* Onboarding Reminder */}
+        {!isLoading && user && <OnboardingReminder onOpenOnboarding={handleOpenOnboarding} />}
+        
+        {/* Onboarding Screen */}
+        {!isLoading && user && (showOnboarding || <OnboardingScreen />)}
+
+        {/* Debug Button - Only in development */}
+        {!isLoading && user && process.env.NODE_ENV === 'development' && (
+          <div className="fixed top-4 right-4 z-60">
+            <button
+              onClick={async () => {
+                try {
+                  console.log('🔄 Development: Resetting onboarding for user:', user.id);
+                  
+                  // Clear all local storage
+                  localStorage.removeItem(`onboarding_completed_${user.id}`);
+                  sessionStorage.removeItem(`onboarding_completed_${user.id}`);
+                  
+                  // Reset in database
+                  const result = await resetOnboardingStatus(user.id);
+                  
+                  if (result.success) {
+                    console.log('✅ Onboarding reset successfully');
+                    showSystemNotification(
+                      '🔄 Onboarding Reset',
+                      'Onboarding has been reset successfully! Page will reload.',
+                      'success'
+                    );
+                    
+                    // Reload page after a short delay to show notification
+                    setTimeout(() => {
+                      window.location.reload();
+                    }, 1500);
+                  } else {
+                    console.error('❌ Failed to reset onboarding:', result.error);
+                    showSystemNotification(
+                      '❌ Reset Failed',
+                      `Failed to reset onboarding: ${result.error}`,
+                      'error'
+                    );
+                  }
+                } catch (error) {
+                  console.error('❌ Error resetting onboarding:', error);
+                  showSystemNotification(
+                    '❌ Reset Error',
+                    'Error resetting onboarding. Please try again.',
+                    'error'
+                  );
+                }
+              }}
+              className="bg-red-600 text-white px-3 py-1 rounded text-xs hover:bg-red-700 transition-colors"
+            >
+              Reset Onboarding
+            </button>
+          </div>
+        )}
 
                  {/* Enhanced Cyberpunk Main Content Area */}
          <div className="flex-1 pb-20 px-4 pt-4 max-w-md mx-auto">

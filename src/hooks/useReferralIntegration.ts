@@ -292,7 +292,92 @@ export const useReferralIntegration = () => {
     }
   }, [user?.id, generateReferralCode]);
 
-  // Load referral data from database
+  // Debug function to validate referral points calculations
+  const validateReferralPoints = useCallback((referralUser: ReferralUser) => {
+    const debug = {
+      userId: referralUser.id,
+      username: referralUser.username,
+      pointSource: referralUser.pointSource,
+      pointsEarned: referralUser.pointsEarned,
+      tbcCoins: referralUser.tbcCoins || 0,
+      totalTbcEarned: referralUser.totalTbcEarned || 0,
+      totalEarned: referralUser.total_earned || 0,
+      balance: referralUser.balance || 0,
+      isActive: referralUser.isActive,
+      calculation: {
+        basePoints: 0,
+        bonuses: 0,
+        total: 0
+      }
+    };
+
+    // Recalculate points to validate
+    let calculatedPoints = 0;
+    let bonuses = 0;
+
+    switch (referralUser.pointSource) {
+      case 'tbc_current':
+      case 'tbc_total':
+        calculatedPoints = Math.max(referralUser.tbcCoins || 0, referralUser.totalTbcEarned || 0);
+        if (referralUser.gameData?.miningLevel && referralUser.gameData?.pointsPerSecond > 0) {
+          bonuses = Math.floor(referralUser.gameData.pointsPerSecond * 100);
+        }
+        break;
+      
+      case 'staking':
+        calculatedPoints = Math.floor((referralUser.total_earned || 0) * 100);
+        // Add stake bonuses if available
+        bonuses = 0; // Would need stakesData to calculate
+        break;
+      
+      case 'stake_potential':
+        calculatedPoints = Math.floor((referralUser.total_earned || 0) * 100);
+        break;
+      
+      case 'sbt':
+        calculatedPoints = Math.floor((referralUser as any).total_sbt || 0);
+        break;
+      
+      case 'activity':
+      case 'new':
+        const daysSinceJoined = Math.floor((Date.now() - referralUser.joinedAt) / (1000 * 60 * 60 * 24));
+        const loginStreak = ((referralUser as any).login_streak || 0);
+        const activityPoints = loginStreak * 20;
+        const timeBonus = Math.min(daysSinceJoined * 30, 300);
+        calculatedPoints = Math.max(0, Math.min(activityPoints + timeBonus, 1000));
+        break;
+    }
+
+    // Apply minimum bonus for active users
+    if (referralUser.isActive && calculatedPoints < 100) {
+      bonuses += (100 - calculatedPoints);
+      calculatedPoints = 100;
+    }
+
+    debug.calculation = {
+      basePoints: calculatedPoints - bonuses,
+      bonuses: bonuses,
+      total: calculatedPoints
+    };
+
+    // Validate accuracy
+    const isAccurate = Math.abs(calculatedPoints - referralUser.pointsEarned) <= 1; // Allow 1 point difference for rounding
+    
+    console.log('🔍 Referral Points Validation:', {
+      ...debug,
+      isAccurate,
+      difference: calculatedPoints - referralUser.pointsEarned
+    });
+
+    return {
+      isAccurate,
+      calculatedPoints,
+      actualPoints: referralUser.pointsEarned,
+      debug
+    };
+  }, []);
+
+  // Add validation to the main load function
   const loadReferralData = useCallback(async () => {
     if (!user?.id) return;
 
@@ -378,17 +463,6 @@ export const useReferralIntegration = () => {
         }
       }
 
-      // Get referral earnings
-      const { data: earnings, error: earningsError } = await supabase
-        .from('referral_earnings')
-        .select('amount')
-        .eq('user_id', user.id);
-
-      if (earningsError) {
-        console.error('Error loading referral earnings:', earningsError);
-      }
-
-      const totalEarned = earnings?.reduce((sum, e) => sum + Number(e.amount), 0) || 0;
       const totalReferrals = referrals?.length || 0;
       const activeReferrals = referrals?.filter(r => r.referred?.is_active).length || 0;
 
@@ -406,35 +480,64 @@ export const useReferralIntegration = () => {
         let friendPoints = 0;
         let pointSource: 'tbc_current' | 'tbc_total' | 'staking' | 'stake_potential' | 'sbt' | 'activity' | 'new' = 'new'; // Track the source for display
         
-        // Priority 1: TBC Coins (Divine Points) from mining game
+        // Priority 1: TBC Coins (Divine Points) from mining game - MOST ACCURATE
         if (tbcCoins > 0 || totalTbcEarned > 0) {
+          // Use the higher value between current TBC coins and total earned
           friendPoints = Math.max(tbcCoins, totalTbcEarned);
           pointSource = tbcCoins > totalTbcEarned ? 'tbc_current' : 'tbc_total';
+          
+          // Add bonus for active mining (if they have mining level and points per second)
+          if (gameData?.miningLevel && gameData?.pointsPerSecond > 0) {
+            const miningBonus = Math.floor(gameData.pointsPerSecond * 100); // Bonus for active mining
+            friendPoints += miningBonus;
+          }
         }
-        // Priority 2: Staking earnings (converted to points)
+        // Priority 2: Staking earnings (converted to points) - ACCURATE STAKING REWARDS
         else if (r.referred.total_earned && Number(r.referred.total_earned) > 0) {
+          // Convert TON staking earnings to points (1 TON = 100 points)
           friendPoints = Math.floor(Number(r.referred.total_earned) * 100);
           pointSource = 'staking';
+          
+          // Add bonus for active stakes
+          if (stakesData.length > 0) {
+            const activeStakesBonus = stakesData.length * 50; // 50 points per active stake
+            friendPoints += activeStakesBonus;
+          }
         }
-        // Priority 3: Active staking potential
+        // Priority 3: Active staking potential - FUTURE EARNINGS
         else if (stakesData.length > 0) {
           const totalStakeEarned = stakesData.reduce((sum, stake) => sum + Number(stake.total_earned || 0), 0);
           if (totalStakeEarned > 0) {
             friendPoints = Math.floor(totalStakeEarned * 100);
             pointSource = 'stake_potential';
+          } else {
+            // If no earnings yet, give points for active stakes
+            const totalStaked = stakesData.reduce((sum, stake) => sum + Number(stake.amount || 0), 0);
+            friendPoints = Math.floor(totalStaked * 10); // 10 points per TON staked
           }
         }
-        // Priority 4: SBT tokens
+        // Priority 4: SBT tokens - TOKEN HOLDINGS
         else if ((r.referred as any).total_sbt && Number((r.referred as any).total_sbt) > 0) {
           friendPoints = Math.floor(Number((r.referred as any).total_sbt));
           pointSource = 'sbt';
         }
-        // Priority 5: Activity-based points for new users
+        // Priority 5: Activity-based points for new users - ENGAGEMENT REWARDS
         else {
           const daysSinceJoined = Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24));
-          const activityPoints = ((r.referred as any).login_streak || 0) * 10;
-          friendPoints = Math.max(0, Math.min(daysSinceJoined * 50 + activityPoints, 1000)); // Cap at 1000 for new users
+          const loginStreak = ((r.referred as any).login_streak || 0);
+          const activityPoints = loginStreak * 20; // 20 points per day of login streak
+          const timeBonus = Math.min(daysSinceJoined * 30, 300); // Max 300 points for time bonus
+          
+          friendPoints = Math.max(0, Math.min(activityPoints + timeBonus, 1000)); // Cap at 1000 for new users
           pointSource = daysSinceJoined < 1 ? 'new' : 'activity';
+        }
+
+        // Ensure points are never negative and have a minimum value for active users
+        friendPoints = Math.max(0, friendPoints);
+        
+        // Add minimum bonus for active users
+        if (r.referred.is_active && friendPoints < 100) {
+          friendPoints = 100; // Minimum 100 points for active users
         }
 
         return {
@@ -456,6 +559,18 @@ export const useReferralIntegration = () => {
         };
       }) || [];
 
+      // Calculate total earnings from all referrals (more accurate calculation)
+      const totalReferralPoints = referralUsers.reduce((sum, referral) => sum + referral.pointsEarned, 0);
+      const totalReferralEarnings = Math.floor(totalReferralPoints / 100); // Convert points back to TON equivalent
+      
+      // Validate all referral points calculations in development
+      if (import.meta.env.DEV) {
+        console.log('🔍 Validating referral points calculations...');
+        referralUsers.forEach(referral => {
+          validateReferralPoints(referral);
+        });
+      }
+      
       // Calculate level based on referrals
       const level = Math.floor(totalReferrals / 5) + 1;
 
@@ -464,10 +579,10 @@ export const useReferralIntegration = () => {
         code: referralCode || prev.code, // Use existing code if referralCode is not set yet
         totalReferrals,
         activeReferrals,
-        totalEarned,
+        totalEarned: totalReferralEarnings, // Use calculated earnings instead of database value
         rewards: { 
-          points: Math.floor(totalEarned * 100), 
-          gems: Math.floor(totalEarned * 10), 
+          points: totalReferralPoints, // Use actual calculated points
+          gems: Math.floor(totalReferralPoints / 10), // 1 gem per 10 points
           special: [] 
         },
         referrals: referralUsers,
@@ -1050,6 +1165,7 @@ export const useReferralIntegration = () => {
     clearReferralHistory,
     loadReferralAttempts,
     forceRefreshReferralData,
-    processReferralCodeManually
+    processReferralCodeManually,
+    validateReferralPoints
   };
 }; 
