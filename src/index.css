@@ -1842,3 +1842,13 @@ body {
 .animate-mining-glow {
   animation: miningGlow 1s ease-in-out infinite;
 }
+
+/* Seamless Marquee for ShoutboxHeader */
+@keyframes marquee-seamless {
+  from { transform: translateX(0); }
+  to { transform: translateX(-50%); }
+}
+
+.animate-marquee-seamless {
+  animation: marquee-seamless var(--scroll-duration, 40s) linear infinite;
+}

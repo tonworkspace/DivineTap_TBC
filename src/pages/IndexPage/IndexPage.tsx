@@ -21,6 +21,7 @@ import { BiHome } from 'react-icons/bi';
 // Import gem sync test utilities for debugging
 import '@/utils/gemSyncTest';
 import DailyRewards from '@/components/DailyRewards';
+import { ShoutboxHeader } from '@/components/ShoutboxHeader/ShoutboxHeader';
 
 
 
@@ -903,6 +904,7 @@ export const IndexPage: FC = () => {
     <ErrorBoundary>
       <GameProvider>
         <div className="w-full min-h-screen relative overflow-hidden">
+          <ShoutboxHeader />
           {/* Network Warning */}
           {showNetworkWarning && (
             <div className="fixed top-0 left-0 right-0 z-50 bg-gradient-to-r from-red-600 to-red-500 text-white p-3 text-center font-mono font-bold text-sm animate-pulse">

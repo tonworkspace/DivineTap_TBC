@@ -35,7 +35,7 @@ export const ShoutboxHeader: FC<{ onTabChange?: (tab: string) => void }> = ({ on
           <div 
             ref={scrollRef}
             className={`flex items-center h-full whitespace-nowrap
-                      ${isPaused ? 'animate-pause' : 'animate-marquee'}`}
+                      ${isPaused ? 'animate-pause' : 'animate-marquee-seamless'}`}
           >
             {shoutboxMessages.map((message, index) => (
               <div 
