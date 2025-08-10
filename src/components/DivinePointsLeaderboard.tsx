@@ -280,6 +280,9 @@ export const DivinePointsLeaderboard: React.FC = () => {
         data = leaderboardData.topPlayers;
     }
 
+    // Ensure the data is always sorted correctly by points in descending order
+    data.sort((a, b) => b.divinePoints - a.divinePoints);
+
     // Apply search filter
     if (searchTerm.trim()) {
       data = data.filter(player => 
