@@ -107,9 +107,6 @@ export const ReferralSystem: React.FC = () => {
   const [isClaimingReward, setIsClaimingReward] = useState(false);
   const [dataLoaded, setDataLoaded] = useState(false);
   const [showManualEntry, setShowManualEntry] = useState(false);
-  const [showOverviewExplanation, setShowOverviewExplanation] = useState(false);
-  const [showRewardsExplanation, setShowRewardsExplanation] = useState(false);
-  const [showSharingTips, setShowSharingTips] = useState(false);
   
   // Enhanced network visualization
   const [uplineData, setUplineData] = useState<UplineInfo[]>([]);
@@ -155,124 +152,7 @@ export const ReferralSystem: React.FC = () => {
     return safeGetFromStorage(claimedKey, []);
   });
 
-  // Load claimed rewards from database on component mount
-  const loadClaimedRewardsFromDatabase = useCallback(async () => {
-    if (!user?.id) return;
-
-    try {
-      console.log('🔄 Loading claimed rewards from database for user:', user.id);
-      
-      // Use the database function to get claimed rewards
-      const { data: dbRewards, error: dbError } = await supabase
-        .rpc('get_user_claimed_rewards', { p_user_id: user.id });
-
-      if (dbError) {
-        console.warn('⚠️ Database function failed, trying direct query:', dbError);
-        
-        // Fallback to direct query
-        const { data: fallbackRewards, error: fallbackError } = await supabase
-          .from('referral_claimed_rewards')
-          .select('reward_key, claimed_at')
-          .eq('user_id', user.id);
-
-        if (fallbackError) {
-          console.warn('⚠️ Fallback query also failed, using localStorage:', fallbackError);
-          return;
-        }
-
-        if (fallbackRewards && fallbackRewards.length > 0) {
-          const dbClaimedKeys = fallbackRewards.map((r: { reward_key: string }) => r.reward_key);
-          console.log('✅ Loaded claimed rewards from fallback query:', dbClaimedKeys);
-          
-          setClaimedRewards(dbClaimedKeys);
-          
-          const userId = user.id.toString();
-          const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
-          safeSetToStorage(claimedKey, dbClaimedKeys);
-        }
-      } else if (dbRewards && dbRewards.length > 0) {
-        const dbClaimedKeys = dbRewards.map((r: { reward_key: string }) => r.reward_key);
-        console.log('✅ Loaded claimed rewards from database function:', dbClaimedKeys);
-        
-        // Update state with database data
-        setClaimedRewards(dbClaimedKeys);
-        
-        // Also update localStorage for offline access
-        const userId = user.id.toString();
-        const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
-        safeSetToStorage(claimedKey, dbClaimedKeys);
-      } else {
-        console.log('ℹ️ No claimed rewards found in database');
-      }
-    } catch (error) {
-      console.error('❌ Error loading claimed rewards from database:', error);
-    }
-  }, [user?.id, getUserSpecificKey, safeSetToStorage]);
-
-  // Save claimed rewards to both localStorage and database
-  const saveClaimedReward = useCallback(async (rewardKey: string, reward: ReferralReward) => {
-    if (!user?.id) return;
-
-    try {
-      console.log('💾 Saving claimed reward to database:', rewardKey);
-      
-      // Parse reward key to get level and requirements
-      const [levelStr, requirementsStr] = rewardKey.split('_');
-      const level = parseInt(levelStr);
-      const requirements = parseInt(requirementsStr);
-      
-      // Try to use the database function first
-      const { error: functionError } = await supabase
-        .rpc('claim_referral_reward', {
-          p_user_id: user.id,
-          p_reward_level: level,
-          p_reward_requirements: requirements,
-          p_reward_name: reward.name,
-          p_points_awarded: reward.rewards.points,
-          p_gems_awarded: reward.rewards.gems,
-          p_special_reward: reward.rewards.special || null
-        });
-
-      if (functionError) {
-        console.warn('⚠️ Database function failed, trying direct insert:', functionError);
-        
-        // Fallback to direct insert
-        const { error: insertError } = await supabase
-          .from('referral_claimed_rewards')
-          .insert({
-            user_id: user.id,
-            reward_key: rewardKey,
-            reward_name: reward.name,
-            reward_level: level,
-            reward_requirements: requirements,
-            points_awarded: reward.rewards.points,
-            gems_awarded: reward.rewards.gems,
-            special_reward: reward.rewards.special || null,
-            claimed_at: new Date().toISOString()
-          });
-
-        if (insertError) {
-          console.error('❌ Direct insert also failed:', insertError);
-          throw insertError;
-        }
-      }
-
-      console.log('✅ Reward saved to database successfully');
-      
-      // Also update localStorage for offline access
-      const userId = user.id.toString();
-      const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
-      const currentClaimed = safeGetFromStorage(claimedKey, []);
-      const updatedClaimed = [...currentClaimed, rewardKey];
-      safeSetToStorage(claimedKey, updatedClaimed);
-      
-    } catch (error) {
-      console.error('❌ Error saving claimed reward:', error);
-      throw error;
-    }
-  }, [user?.id, getUserSpecificKey, safeGetFromStorage, safeSetToStorage]);
-
-  // Save claimed rewards to localStorage whenever it changes (fallback)
+  // Save claimed rewards to localStorage whenever it changes
   useEffect(() => {
     if (!isMountedRef.current) return;
     
@@ -280,13 +160,6 @@ export const ReferralSystem: React.FC = () => {
     const claimedKey = getUserSpecificKey('referral_claimed_rewards', userId);
     safeSetToStorage(claimedKey, claimedRewards);
   }, [claimedRewards, user?.id, getUserSpecificKey, safeSetToStorage]);
-
-  // Load claimed rewards from database on user change
-  useEffect(() => {
-    if (user?.id) {
-      loadClaimedRewardsFromDatabase();
-    }
-  }, [user?.id, loadClaimedRewardsFromDatabase]);
 
   // Enhanced data loading effect
   useEffect(() => {
@@ -380,10 +253,7 @@ export const ReferralSystem: React.FC = () => {
       addPoints(reward.rewards.points);
       addGems(reward.rewards.gems, `referral_level_${reward.level}`);
       
-      // Mark as claimed in database and update state
-      await saveClaimedReward(rewardKey, reward);
-      
-      // Update local state
+      // Mark as claimed
       setClaimedRewards(prev => {
         const newClaimed = [...prev, rewardKey];
         console.log('✅ Reward claimed successfully:', newClaimed);
@@ -407,7 +277,7 @@ export const ReferralSystem: React.FC = () => {
     } finally {
       setIsClaimingReward(false);
     }
-  }, [referralData.totalReferrals, addPoints, addGems, claimedRewards, isClaimingReward, saveClaimedReward]);
+  }, [referralData.totalReferrals, addPoints, addGems, claimedRewards, isClaimingReward]);
 
   // Load upline and downline data
   const loadNetworkData = useCallback(async () => {
@@ -830,69 +700,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Referral System Explanation */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-cyan-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(0,255,255,0.1)]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-cyan-400 font-mono font-bold text-xs tracking-wider">📚 HOW REFERRAL REWARDS WORK</div>
-              <button
-                onClick={() => setShowOverviewExplanation(!showOverviewExplanation)}
-                className="text-cyan-300 hover:text-cyan-200 font-mono text-xs tracking-wider transition-colors duration-300"
-              >
-                {showOverviewExplanation ? 'HIDE DETAILS' : 'SHOW DETAILS'}
-              </button>
-            </div>
-            
-            {showOverviewExplanation && (
-              <div className="space-y-3 text-xs">
-                {/* One-Time Bonuses */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-green-500/20">
-                  <div className="text-green-400 font-mono font-bold mb-1">🎯 ONE-TIME BONUSES</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-green-300">1 referral:</span> 100 points + 10 gems</div>
-                    <div>• <span className="text-green-300">3 referrals:</span> 300 points + 30 gems</div>
-                    <div>• <span className="text-green-300">5 referrals:</span> 500 points + 50 gems + VIP Access</div>
-                    <div>• <span className="text-green-300">10 referrals:</span> 1,000 points + 100 gems + NFT</div>
-                    <div>• <span className="text-green-300">20 referrals:</span> 2,500 points + 250 gems + Legendary Status</div>
-                  </div>
-                </div>
-
-                {/* Ongoing Earnings */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-blue-500/20">
-                  <div className="text-blue-400 font-mono font-bold mb-1">💰 ONGOING EARNINGS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-blue-300">TBC Mining:</span> Earn from friends' mining activities</div>
-                    <div>• <span className="text-blue-300">Staking:</span> Earn from friends' TON staking (×100 points)</div>
-                    <div>• <span className="text-blue-300">Activity:</span> Earn from friends' daily activity</div>
-                    <div>• <span className="text-blue-300">Performance-based:</span> More active friends = more earnings</div>
-                  </div>
-                </div>
-
-                {/* How It Works */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-purple-500/20">
-                  <div className="text-purple-400 font-mono font-bold mb-1">⚡ HOW IT WORKS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>1. <span className="text-purple-300">Share your referral code</span> with friends</div>
-                    <div>2. <span className="text-purple-300">Friends join</span> using your code</div>
-                    <div>3. <span className="text-purple-300">Earn rewards</span> as they play and stake</div>
-                    <div>4. <span className="text-purple-300">Claim bonuses</span> at referral milestones</div>
-                    <div>5. <span className="text-purple-300">Build your network</span> for passive income</div>
-                  </div>
-                </div>
-
-                {/* Tips */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-yellow-500/20">
-                  <div className="text-yellow-400 font-mono font-bold mb-1">💡 PRO TIPS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-yellow-300">Quality over quantity:</span> Active friends earn you more</div>
-                    <div>• <span className="text-yellow-300">Help your network:</span> Guide friends to maximize their earnings</div>
-                    <div>• <span className="text-yellow-300">Stay active:</span> Your activity boosts network performance</div>
-                    <div>• <span className="text-yellow-300">Claim rewards:</span> Don't forget to claim milestone bonuses</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           {/* Add Manual Entry Button if user has no referrer */}
           {!referralData.referrals.length && (
             <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,146,60,0.1)]">
@@ -974,7 +781,7 @@ useEffect(() => {
           {downlineData.length > 0 ? (
             <div className="relative bg-black/40 backdrop-blur-xl border border-green-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(34,197,94,0.1)]">
               <div className="text-center mb-2">
-                <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-2">YOUR DOWNLINE</div>
+                <div className="text-green-400 font-mono font-bold text-xs tracking-wider mb-2">�� YOUR DOWNLINE</div>
                 <div className="text-green-300 font-mono text-xs tracking-wider">
                   People you referred
                 </div>
@@ -1302,64 +1109,6 @@ useEffect(() => {
             </div>
           </div>
 
-          {/* Detailed Reward Explanation */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-purple-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(147,51,234,0.1)]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-purple-400 font-mono font-bold text-xs tracking-wider">🎁 REWARD SYSTEM EXPLAINED</div>
-              <button
-                onClick={() => setShowRewardsExplanation(!showRewardsExplanation)}
-                className="text-purple-300 hover:text-purple-200 font-mono text-xs tracking-wider transition-colors duration-300"
-              >
-                {showRewardsExplanation ? 'HIDE DETAILS' : 'SHOW DETAILS'}
-              </button>
-            </div>
-            
-            {showRewardsExplanation && (
-              <div className="space-y-3 text-xs">
-                {/* Milestone Rewards */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-green-500/20">
-                  <div className="text-green-400 font-mono font-bold mb-1">🏆 MILESTONE REWARDS</div>
-                  <div className="text-gray-300 font-mono">
-                    These are one-time bonuses you claim when reaching referral milestones. Each reward can only be claimed once and is permanently saved to your account.
-                  </div>
-                </div>
-
-                {/* Points & Gems */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-yellow-500/20">
-                  <div className="text-yellow-400 font-mono font-bold mb-1">💎 POINTS & GEMS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-yellow-300">Points:</span> Used for upgrades and game progression</div>
-                    <div>• <span className="text-yellow-300">Gems:</span> Premium currency for special items and boosts</div>
-                    <div>• <span className="text-yellow-300">Special Rewards:</span> VIP access, NFTs, and legendary status</div>
-                  </div>
-                </div>
-
-                {/* Earning Mechanics */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-blue-500/20">
-                  <div className="text-blue-400 font-mono font-bold mb-1">📈 EARNING MECHANICS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-blue-300">Performance-Based:</span> More active referrals = higher earnings</div>
-                    <div>• <span className="text-blue-300">TBC Mining:</span> Direct earnings from friends' mining activities</div>
-                    <div>• <span className="text-blue-300">Staking Multiplier:</span> Staking earnings are multiplied by 100x for points</div>
-                    <div>• <span className="text-blue-300">Activity Bonus:</span> Daily activity and streaks boost earnings</div>
-                  </div>
-                </div>
-
-                {/* Claiming Process */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-cyan-500/20">
-                  <div className="text-cyan-400 font-mono font-bold mb-1">⚡ CLAIMING PROCESS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>1. <span className="text-cyan-300">Reach milestone</span> with required number of referrals</div>
-                    <div>2. <span className="text-cyan-300">Click "CLAIM"</span> button on the reward card</div>
-                    <div>3. <span className="text-cyan-300">Rewards are instantly</span> added to your account</div>
-                    <div>4. <span className="text-cyan-300">Progress is saved</span> permanently in database</div>
-                    <div>5. <span className="text-cyan-300">Cannot be claimed twice</span> - each reward is unique</div>
-                  </div>
-                </div>
-              </div>
-            )}
-          </div>
-
           {REFERRAL_REWARDS.map((reward) => {
             const isUnlocked = referralData.totalReferrals >= reward.requirements;
             const isClaimed = claimedRewards.includes(`${reward.level}_${reward.requirements}`);
@@ -1501,67 +1250,6 @@ useEffect(() => {
                 </button>
               </div>
             </div>
-          </div>
-
-          {/* Sharing Tips */}
-          <div className="relative bg-black/40 backdrop-blur-xl border border-orange-500/30 rounded-xl p-3 shadow-[0_0_20px_rgba(251,146,60,0.1)]">
-            <div className="flex items-center justify-between mb-3">
-              <div className="text-orange-400 font-mono font-bold text-xs tracking-wider">💡 SHARING TIPS & STRATEGIES</div>
-              <button
-                onClick={() => setShowSharingTips(!showSharingTips)}
-                className="text-orange-300 hover:text-orange-200 font-mono text-xs tracking-wider transition-colors duration-300"
-              >
-                {showSharingTips ? 'HIDE TIPS' : 'SHOW TIPS'}
-              </button>
-            </div>
-            
-            {showSharingTips && (
-              <div className="space-y-3 text-xs">
-                {/* Best Practices */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-green-500/20">
-                  <div className="text-green-400 font-mono font-bold mb-1">✅ BEST PRACTICES</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-green-300">Personal touch:</span> Add your own message explaining the benefits</div>
-                    <div>• <span className="text-green-300">Show results:</span> Share your earnings and achievements</div>
-                    <div>• <span className="text-green-300">Be helpful:</span> Offer to guide new users through the process</div>
-                    <div>• <span className="text-green-300">Follow up:</span> Check in with referrals to help them succeed</div>
-                  </div>
-                </div>
-
-                {/* Target Audience */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-blue-500/20">
-                  <div className="text-blue-400 font-mono font-bold mb-1">🎯 TARGET AUDIENCE</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-blue-300">Crypto enthusiasts:</span> People interested in mining and staking</div>
-                    <div>• <span className="text-blue-300">Gamers:</span> Users who enjoy earning while playing</div>
-                    <div>• <span className="text-blue-300">Passive income seekers:</span> People looking for automated earnings</div>
-                    <div>• <span className="text-blue-300">TON community:</span> Users already familiar with TON blockchain</div>
-                  </div>
-                </div>
-
-                {/* Sharing Platforms */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-purple-500/20">
-                  <div className="text-purple-400 font-mono font-bold mb-1">📱 SHARING PLATFORMS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-purple-300">Telegram groups:</span> Crypto, mining, and gaming communities</div>
-                    <div>• <span className="text-purple-300">Social media:</span> Twitter, Reddit, Discord servers</div>
-                    <div>• <span className="text-purple-300">Personal network:</span> Friends, family, colleagues</div>
-                    <div>• <span className="text-purple-300">QR codes:</span> Perfect for in-person sharing</div>
-                  </div>
-                </div>
-
-                {/* Success Metrics */}
-                <div className="bg-gray-800/50 rounded-lg p-2 border border-yellow-500/20">
-                  <div className="text-yellow-400 font-mono font-bold mb-1">📊 SUCCESS METRICS</div>
-                  <div className="text-gray-300 font-mono space-y-1">
-                    <div>• <span className="text-yellow-300">Conversion rate:</span> Track how many clicks become referrals</div>
-                    <div>• <span className="text-yellow-300">Active referrals:</span> Monitor who stays active in the game</div>
-                    <div>• <span className="text-yellow-300">Earnings growth:</span> Watch your passive income increase</div>
-                    <div>• <span className="text-yellow-300">Network expansion:</span> Build a sustainable referral network</div>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         </div>
       )}

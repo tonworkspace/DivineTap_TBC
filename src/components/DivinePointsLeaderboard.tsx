@@ -280,6 +280,9 @@ export const DivinePointsLeaderboard: React.FC = () => {
         data = leaderboardData.topPlayers;
     }
 
+    // Ensure the data is always sorted correctly by points in descending order
+    data.sort((a, b) => b.divinePoints - a.divinePoints);
+
     // Apply search filter
     if (searchTerm.trim()) {
       data = data.filter(player => 
@@ -529,7 +532,7 @@ export const DivinePointsLeaderboard: React.FC = () => {
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-2">
                     <div className="flex items-center hover-float">
-                      {getRankIcon(player.rank)}
+                      {getRankIcon(index + 1)}
                       <div className="w-6 h-6 bg-gradient-to-br from-cyan-400 to-blue-500 rounded ml-1.5 flex items-center justify-center">
                         <span className="text-white text-xs">{player.username.charAt(0)}</span>
                       </div>
