@@ -2,6 +2,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { retrieveLaunchParams } from '@telegram-apps/sdk-react';
 import { useAuth } from '@/hooks/useAuth';
 import { supabase } from '@/lib/supabaseClient';
+import { REFERRAL_REWARDS } from '@/lib/rewards';
 
 interface ReferralData {
   code: string;
@@ -537,8 +538,8 @@ export const useReferralIntegration = () => {
         });
       }
       
-      // Calculate level based on referrals
-      const level = Math.floor(totalReferrals / 5) + 1;
+      // Calculate level based on referrals by finding the highest reward tier achieved
+      const level = REFERRAL_REWARDS.slice().reverse().find(r => totalReferrals >= r.requirements)?.level || 1;
 
       setReferralData(prev => ({
         ...prev,

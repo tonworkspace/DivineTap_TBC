@@ -7,19 +7,7 @@ import { useReferralIntegration } from '@/hooks/useReferralIntegration';
 import './ReferralSystem.css';
 import { supabase } from '@/lib/supabaseClient';
 import { ReferralPrompt } from '@/components/ReferralPrompt';
-
-interface ReferralReward {
-  level: number;
-  name: string;
-  requirements: number;
-  rewards: {
-    points: number;
-    gems: number;
-    special?: string;
-  };
-  icon: string;
-  color: string;
-}
+import { REFERRAL_REWARDS, ReferralReward } from '@/lib/rewards';
 
 interface UplineInfo {
   id: string;
@@ -41,50 +29,6 @@ interface DownlineInfo {
   level: number; // How many levels down (1 = direct referral)
   directReferrals: number;
 }
-
-// Referral reward tiers
-const REFERRAL_REWARDS: ReferralReward[] = [
-  {
-    level: 1,
-    name: 'First Friend',
-    requirements: 1,
-    rewards: { points: 100, gems: 10 },
-    icon: '👥',
-    color: 'green'
-  },
-  {
-    level: 2,
-    name: 'Social Butterfly',
-    requirements: 3,
-    rewards: { points: 300, gems: 30 },
-    icon: '🦋',
-    color: 'blue'
-  },
-  {
-    level: 3,
-    name: 'Network Builder',
-    requirements: 5,
-    rewards: { points: 500, gems: 50, special: 'VIP Access' },
-    icon: '🌐',
-    color: 'purple'
-  },
-  {
-    level: 4,
-    name: 'Community Leader',
-    requirements: 10,
-    rewards: { points: 1000, gems: 100, special: 'Exclusive NFT' },
-    icon: '👑',
-    color: 'yellow'
-  },
-  {
-    level: 5,
-    name: 'Referral Master',
-    requirements: 20,
-    rewards: { points: 2500, gems: 250, special: 'Legendary Status' },
-    icon: '🏆',
-    color: 'red'
-  }
-];
 
 export const ReferralSystem: React.FC = () => {
   const { addPoints, addGems } = useGameContext();
@@ -644,20 +588,27 @@ useEffect(() => {
               <div className="text-lg mb-1">{currentLevel.icon}</div>
               <div className="text-yellow-400 font-mono font-bold text-xs tracking-wider mb-1">{currentLevel.name}</div>
               <div className="text-yellow-300 font-mono text-xs tracking-wider mb-1">
-                Level {currentLevel.level} • {referralData.totalReferrals}/{currentLevel.requirements} referrals
+                Level {currentLevel.level} • {referralData.totalReferrals} referrals
               </div>
               
               {/* Progress Bar */}
-              <div className="w-full bg-gray-700 rounded-full h-1.5 mb-1">
-                <div 
-                  className="h-1.5 bg-yellow-500 rounded-full transition-all duration-300"
-                  style={{ width: `${Math.min((referralData.totalReferrals / currentLevel.requirements) * 100, 100)}%` }}
-                ></div>
-              </div>
+              {nextLevel && (
+                <div className="w-full bg-gray-700 rounded-full h-1.5 mb-1">
+                  <div
+                    className="h-1.5 bg-yellow-500 rounded-full transition-all duration-300"
+                    style={{ width: `${Math.min(((referralData.totalReferrals - currentLevel.requirements) / (nextLevel.requirements - currentLevel.requirements)) * 100, 100)}%` }}
+                  ></div>
+                </div>
+              )}
               
               {nextLevel && (
                 <div className="text-gray-400 font-mono text-xs tracking-wider">
-                  Next: {nextLevel.name} ({nextLevel.requirements - referralData.totalReferrals} more)
+                  Next: {nextLevel.name} ({nextLevel.requirements - referralData.totalReferrals} more referrals to go)
+                </div>
+              )}
+              {!nextLevel && (
+                <div className="text-green-400 font-mono text-xs tracking-wider">
+                  You have reached the maximum level!
                 </div>
               )}
             </div>
