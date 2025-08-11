@@ -109,18 +109,31 @@ export const ReferralSystem: React.FC = () => {
   useEffect(() => {
     let mounted = true;
     
-    const loadData = async () => {
+    const loadAllData = async () => {
       if (!user?.id || !mounted) return;
       
       try {
-        console.log('🔄 Loading referral data for user:', user.id);
+        console.log('🔄 Loading all referral data for user:', user.id);
         
+        // Fetch claimed rewards from the database
+        const { data: claimedData, error: claimedError } = await supabase
+          .rpc('get_user_claimed_rewards', { p_user_id: user.id });
+
+        if (claimedError) {
+          console.error('Error fetching claimed rewards:', claimedError);
+        } else if (claimedData) {
+          const claimedKeys = claimedData.map((r: any) => r.reward_key);
+          if (mounted) {
+            setClaimedRewards(claimedKeys);
+          }
+        }
+
         // Force reload referral data
         await loadReferralData();
         
         if (mounted) {
           setDataLoaded(true);
-          console.log('✅ Referral data loaded successfully');
+          console.log('✅ All referral data loaded successfully');
         }
       } catch (error) {
         console.error('❌ Error loading referral data:', error);
@@ -130,7 +143,7 @@ export const ReferralSystem: React.FC = () => {
       }
     };
 
-    loadData();
+    loadAllData();
     
     return () => {
       mounted = false;
