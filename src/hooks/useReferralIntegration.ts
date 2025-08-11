@@ -467,95 +467,61 @@ export const useReferralIntegration = () => {
       const activeReferrals = referrals?.filter(r => r.referred?.is_active).length || 0;
 
       // Convert database referrals to display format with TBC Coins prioritized
-      const referralUsers: ReferralUser[] = (referrals as DatabaseReferral[])?.map(r => {
+      const referralUsers: ReferralUser[] = (referrals as DatabaseReferral[]).map(r => {
         const userId = r.referred.id;
         const gameData = gameDataMap[userId];
         const stakesData = stakesDataMap[userId] || [];
-        
-        // Get TBC Coins (Divine Points) - this is the primary currency to display
+
         const tbcCoins = gameData?.divinePoints || 0;
         const totalTbcEarned = gameData?.totalPointsEarned || 0;
-        
-        // Calculate friend's total value from multiple sources
+
         let friendPoints = 0;
-        let pointSource: 'tbc_current' | 'tbc_total' | 'staking' | 'stake_potential' | 'sbt' | 'activity' | 'new' = 'new'; // Track the source for display
-        
-        // Priority 1: TBC Coins (Divine Points) from mining game - MOST ACCURATE
-        if (tbcCoins > 0 || totalTbcEarned > 0) {
-          // Use the higher value between current TBC coins and total earned
-          friendPoints = Math.max(tbcCoins, totalTbcEarned);
-          pointSource = tbcCoins > totalTbcEarned ? 'tbc_current' : 'tbc_total';
-          
-          // Add bonus for active mining (if they have mining level and points per second)
-          if (gameData?.miningLevel && gameData?.pointsPerSecond > 0) {
-            const miningBonus = Math.floor(gameData.pointsPerSecond * 100); // Bonus for active mining
-            friendPoints += miningBonus;
-          }
+        let pointSource: ReferralUser['pointSource'] = 'new';
+
+        // Simplified Point Calculation Logic
+        // Priority 1: Game Data (TBC Coins)
+        if (gameData) {
+            friendPoints = Math.max(tbcCoins, totalTbcEarned);
+            pointSource = 'tbc_total';
         }
-        // Priority 2: Staking earnings (converted to points) - ACCURATE STAKING REWARDS
+        // Priority 2: Staking Earnings
         else if (r.referred.total_earned && Number(r.referred.total_earned) > 0) {
-          // Convert TON staking earnings to points (1 TON = 100 points)
-          friendPoints = Math.floor(Number(r.referred.total_earned) * 100);
-          pointSource = 'staking';
-          
-          // Add bonus for active stakes
-          if (stakesData.length > 0) {
-            const activeStakesBonus = stakesData.length * 50; // 50 points per active stake
-            friendPoints += activeStakesBonus;
-          }
+            friendPoints = Math.floor(Number(r.referred.total_earned) * 100);
+            pointSource = 'staking';
         }
-        // Priority 3: Active staking potential - FUTURE EARNINGS
-        else if (stakesData.length > 0) {
-          const totalStakeEarned = stakesData.reduce((sum, stake) => sum + Number(stake.total_earned || 0), 0);
-          if (totalStakeEarned > 0) {
-            friendPoints = Math.floor(totalStakeEarned * 100);
-            pointSource = 'stake_potential';
-          } else {
-            // If no earnings yet, give points for active stakes
-            const totalStaked = stakesData.reduce((sum, stake) => sum + Number(stake.amount || 0), 0);
-            friendPoints = Math.floor(totalStaked * 10); // 10 points per TON staked
-          }
-        }
-        // Priority 4: SBT tokens - TOKEN HOLDINGS
-        else if ((r.referred as any).total_sbt && Number((r.referred as any).total_sbt) > 0) {
-          friendPoints = Math.floor(Number((r.referred as any).total_sbt));
-          pointSource = 'sbt';
-        }
-        // Priority 5: Activity-based points for new users - ENGAGEMENT REWARDS
+        // Priority 3: Activity Fallback
         else {
-          const daysSinceJoined = Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24));
-          const loginStreak = ((r.referred as any).login_streak || 0);
-          const activityPoints = loginStreak * 20; // 20 points per day of login streak
-          const timeBonus = Math.min(daysSinceJoined * 30, 300); // Max 300 points for time bonus
-          
-          friendPoints = Math.max(0, Math.min(activityPoints + timeBonus, 1000)); // Cap at 1000 for new users
-          pointSource = daysSinceJoined < 1 ? 'new' : 'activity';
+            const daysSinceJoined = Math.floor((Date.now() - new Date(r.created_at).getTime()) / (1000 * 60 * 60 * 24));
+            const loginStreak = (r.referred as any).login_streak || 0;
+            const activityPoints = loginStreak * 20;
+            const timeBonus = Math.min(daysSinceJoined * 30, 300);
+            friendPoints = Math.max(0, Math.min(activityPoints + timeBonus, 1000));
+            pointSource = daysSinceJoined < 1 ? 'new' : 'activity';
         }
 
-        // Ensure points are never negative and have a minimum value for active users
+        // Ensure points are non-negative
         friendPoints = Math.max(0, friendPoints);
-        
-        // Add minimum bonus for active users
+
+        // Give a minimum point value to active users so they don't show as 0
         if (r.referred.is_active && friendPoints < 100) {
-          friendPoints = 100; // Minimum 100 points for active users
+            friendPoints = 100;
         }
 
         return {
-          id: r.referred.id.toString(),
-          username: r.referred.username || `User_${r.referred.telegram_id}`,
-          joinedAt: new Date(r.created_at).getTime(),
-          isActive: r.referred.is_active,
-          pointsEarned: Math.max(0, friendPoints),
-          avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.referred.username}`,
-          telegram_id: r.referred.telegram_id,
-          rank: r.referred.rank,
-          total_earned: Number(r.referred.total_earned || 0),
-          balance: Number((r.referred as any).balance || 0),
-          // Additional data for enhanced display
-          tbcCoins: tbcCoins,
-          totalTbcEarned: totalTbcEarned,
-          pointSource: pointSource,
-          gameData: gameData
+            id: r.referred.id.toString(),
+            username: r.referred.username || `User_${r.referred.telegram_id}`,
+            joinedAt: new Date(r.created_at).getTime(),
+            isActive: r.referred.is_active,
+            pointsEarned: friendPoints,
+            avatar: `https://api.dicebear.com/7.x/avataaars/svg?seed=${r.referred.username}`,
+            telegram_id: r.referred.telegram_id,
+            rank: r.referred.rank,
+            total_earned: Number(r.referred.total_earned || 0),
+            balance: Number((r.referred as any).balance || 0),
+            tbcCoins: tbcCoins,
+            totalTbcEarned: totalTbcEarned,
+            pointSource: pointSource,
+            gameData: gameData,
         };
       }) || [];
 
@@ -598,31 +564,28 @@ export const useReferralIntegration = () => {
   // Process Telegram start parameter for referral tracking
   const processStartParameter = useCallback(async () => {
     if (!user?.id || isProcessing) return;
-    
+
     setIsProcessing(true);
-    
+
     try {
       const launchParams = retrieveLaunchParams();
       const startParam = launchParams.startParam;
-      
+
       console.log('Processing start parameter:', startParam);
-      
-      // Update debug info
+
       setDebugInfo(prev => ({
         ...prev,
         startParam: startParam ?? null,
         processed: false,
-        error: null
+        error: null,
       }));
-      
-      // Check if start parameter exists and is valid
+
       if (!startParam || startParam.length === 0) {
         console.log('No start parameter found');
         setDebugInfo(prev => ({ ...prev, processed: true }));
         return;
       }
-      
-      // Enhanced validation
+
       const validation = validateReferralCode(startParam);
       if (!validation.isValid) {
         console.log('Invalid start parameter:', validation.error);
@@ -630,184 +593,52 @@ export const useReferralIntegration = () => {
         setDebugInfo(prev => ({ ...prev, error: validation.error || 'Invalid code', processed: true }));
         return;
       }
-      
-      // Extract referrer ID from start parameter
+
       const referrerIdMatch = startParam.match(/DIVINE(\d{6})/i);
       const referrerId = parseInt(referrerIdMatch![1]);
-      
-      // Check if user already has a referrer
-      const { data: existingUser, error: userError } = await supabase
-        .from('users')
-        .select('referrer_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (userError) {
-        console.error('Error checking existing user:', userError);
-        await trackReferralAttempt(startParam, 'failed', 'Database error');
-        setDebugInfo(prev => ({ ...prev, error: 'Database error', processed: true }));
-        return;
-      }
-      
-      // Enhanced duplicate prevention checks
-      if (existingUser?.referrer_id) {
-        console.log('User already has a referrer:', existingUser.referrer_id);
-        await trackReferralAttempt(startParam, 'duplicate', 'Already has referrer');
-        setDebugInfo(prev => ({ ...prev, error: 'Already has referrer', processed: true }));
+
+      // Call the safe referral creation function
+      const { data, error } = await supabase.rpc('create_referral_safe', {
+        p_referrer_id: referrerId,
+        p_referred_id: user.id,
+      });
+
+      if (error) {
+        console.error('Error creating referral via RPC:', error);
+        await trackReferralAttempt(startParam, 'failed', error.message);
+        setDebugInfo(prev => ({ ...prev, error: error.message, processed: true }));
         return;
       }
 
-      // Check if referral relationship already exists in referrals table
-      const { data: existingReferral, error: existingReferralError } = await supabase
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', referrerId)
-        .eq('referred_id', user.id)
-        .single();
-
-      if (existingReferralError && existingReferralError.code !== 'PGRST116') {
-        console.error('Error checking existing referral:', existingReferralError);
-        await trackReferralAttempt(startParam, 'failed', 'Database error checking duplicates');
-        setDebugInfo(prev => ({ ...prev, error: 'Database error', processed: true }));
+      if (!data.success) {
+        console.log('Referral creation failed:', data.error);
+        await trackReferralAttempt(startParam, 'failed', data.error);
+        setDebugInfo(prev => ({ ...prev, error: data.error, processed: true }));
         return;
       }
 
-      if (existingReferral) {
-        console.log('Referral relationship already exists:', existingReferral.id);
-        await trackReferralAttempt(startParam, 'duplicate', 'Referral relationship exists');
-        setDebugInfo(prev => ({ ...prev, error: 'Referral relationship already exists', processed: true }));
-        return;
-      }
-
-      // Prevent self-referral
-      if (referrerId === user.id) {
-        console.log('Self-referral attempt detected');
-        await trackReferralAttempt(startParam, 'invalid', 'Cannot refer yourself');
-        setDebugInfo(prev => ({ ...prev, error: 'Cannot refer yourself', processed: true }));
-        return;
-      }
-      
-      // Check if referrer exists
-      const { data: referrer, error: referrerError } = await supabase
-        .from('users')
-        .select('id, username, telegram_id')
-        .eq('id', referrerId)
-        .single();
-      
-      if (referrerError || !referrer) {
-        console.log('Referrer not found:', referrerId);
-        await trackReferralAttempt(startParam, 'failed', 'Referrer not found');
-        setDebugInfo(prev => ({ ...prev, error: 'Referrer not found', processed: true }));
-        return;
-      }
-
-      // Prevent circular referrals (check if referrer was referred by current user)
-      const { data: circularCheck, error: circularError } = await supabase
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', user.id)
-        .eq('referred_id', referrerId)
-        .single();
-
-      if (circularError && circularError.code !== 'PGRST116') {
-        console.error('Error checking circular referrals:', circularError);
-      }
-
-      if (circularCheck) {
-        console.log('Circular referral attempt detected');
-        await trackReferralAttempt(startParam, 'invalid', 'Circular referral not allowed');
-        setDebugInfo(prev => ({ ...prev, error: 'Circular referral not allowed', processed: true }));
-        return;
-      }
-      
-      console.log('Valid referrer found:', referrer.username);
-      
-      // Create referral relationship
-      const { error: referralError } = await supabase
-        .from('referrals')
-        .insert({
-          referrer_id: referrerId,
-          referred_id: user.id
-        });
-      
-      if (referralError) {
-        console.error('Error creating referral:', referralError);
-        setDebugInfo(prev => ({ ...prev, error: 'Failed to create referral', processed: true }));
-        return;
-      }
-      
-      // Update user's referrer_id
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ referrer_id: referrerId })
-        .eq('id', user.id);
-      
-      if (updateError) {
-        console.error('Error updating user referrer:', updateError);
-        setDebugInfo(prev => ({ ...prev, error: 'Failed to update user', processed: true }));
-        return;
-      }
-      
-      // Update referrer's direct_referrals count
-      const { error: countError } = await supabase
-        .rpc('increment_direct_referrals', { user_id: referrerId });
-      
-      if (countError) {
-        console.error('Error updating referrer count:', countError);
-      }
-      
-      // Give welcome bonus to new user
-      const welcomeBonus = 1000;
-      const { error: bonusError } = await supabase
-        .from('referral_earnings')
-        .insert({
-          user_id: user.id,
-          referral_id: user.id,
-          amount: welcomeBonus,
-          level: 0
-        });
-      
-      if (bonusError) {
-        console.error('Error giving welcome bonus:', bonusError);
-      }
-      
-      // Give referral bonus to referrer
-      const referralBonus = 500;
-      const { error: referrerBonusError } = await supabase
-        .from('referral_earnings')
-        .insert({
-          user_id: referrerId,
-          referral_id: user.id,
-          amount: referralBonus,
-          level: 1
-        });
-      
-      if (referrerBonusError) {
-        console.error('Error giving referrer bonus:', referrerBonusError);
-      }
-      
-      console.log('Referral processed successfully!');
-      await trackReferralAttempt(startParam, 'success', 'Referral processed successfully', referrer.username);
-      setDebugInfo(prev => ({ 
-        ...prev, 
-        referredBy: referrer.username, 
-        processed: true 
+      console.log('Referral processed successfully via RPC!', data.message);
+      await trackReferralAttempt(startParam, 'success', data.message);
+      setDebugInfo(prev => ({
+        ...prev,
+        referredBy: `User ${referrerId}`, // Username not available from this RPC
+        processed: true,
       }));
-      
-      // Reload referral data
+
+      // Reload referral data to reflect the changes
       await loadReferralData();
-      
+
     } catch (error) {
       console.error('Error processing start parameter:', error);
       await trackReferralAttempt(
-        retrieveLaunchParams().startParam || 'unknown', 
-        'failed', 
+        retrieveLaunchParams().startParam || 'unknown',
+        'failed',
         error instanceof Error ? error.message : 'Unknown error'
       );
-      setDebugInfo(prev => ({ 
-        ...prev, 
+      setDebugInfo(prev => ({
+        ...prev,
         error: error instanceof Error ? error.message : 'Unknown error',
-        processed: true 
+        processed: true,
       }));
     } finally {
       setIsProcessing(false);
@@ -1007,138 +838,47 @@ export const useReferralIntegration = () => {
   // Process referral code manually (for the ReferralPrompt)
   const processReferralCodeManually = useCallback(async (referralCode: string) => {
     if (!user?.id) return { success: false, error: 'User not authenticated' };
-    
+
     try {
-      // Validate the code
       const validation = validateReferralCode(referralCode);
       if (!validation.isValid) {
         await trackReferralAttempt(referralCode, 'invalid', validation.error);
         return { success: false, error: validation.error };
       }
-      
-      // Extract referrer ID
+
       const referrerIdMatch = referralCode.match(/DIVINE(\d{6})/i);
       if (!referrerIdMatch) {
         await trackReferralAttempt(referralCode, 'invalid', 'Invalid code format');
         return { success: false, error: 'Invalid code format' };
       }
-      
+
       const referrerId = parseInt(referrerIdMatch[1]);
-      
-      // Enhanced duplicate prevention checks
-      const { data: existingUser } = await supabase
-        .from('users')
-        .select('referrer_id')
-        .eq('id', user.id)
-        .single();
-      
-      if (existingUser?.referrer_id) {
-        await trackReferralAttempt(referralCode, 'duplicate', 'User already has a referrer');
-        return { success: false, error: 'You already have a referrer' };
+
+      // Call the safe referral creation function
+      const { data, error } = await supabase.rpc('create_referral_safe', {
+        p_referrer_id: referrerId,
+        p_referred_id: user.id,
+      });
+
+      if (error) {
+        console.error('Error creating referral via RPC:', error);
+        await trackReferralAttempt(referralCode, 'failed', error.message);
+        return { success: false, error: error.message };
       }
 
-      // Check if referral relationship already exists in referrals table
-      const { data: existingReferral, error: existingReferralError } = await supabase
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', referrerId)
-        .eq('referred_id', user.id)
-        .single();
-
-      if (existingReferralError && existingReferralError.code !== 'PGRST116') {
-        console.error('Error checking existing referral:', existingReferralError);
-        await trackReferralAttempt(referralCode, 'failed', 'Database error checking duplicates');
-        return { success: false, error: 'Database error occurred' };
+      if (!data.success) {
+        console.log('Referral creation failed:', data.error);
+        await trackReferralAttempt(referralCode, 'failed', data.error);
+        return { success: false, error: data.error };
       }
 
-      if (existingReferral) {
-        await trackReferralAttempt(referralCode, 'duplicate', 'Referral relationship already exists');
-        return { success: false, error: 'Referral relationship already exists' };
-      }
-
-      // Prevent self-referral
-      if (referrerId === user.id) {
-        await trackReferralAttempt(referralCode, 'invalid', 'Cannot refer yourself');
-        return { success: false, error: 'You cannot refer yourself' };
-      }
-      
-      // Check if referrer exists
-      const { data: referrer, error: referrerError } = await supabase
-        .from('users')
-        .select('id, username, telegram_id')
-        .eq('id', referrerId)
-        .single();
-      
-      if (referrerError || !referrer) {
-        await trackReferralAttempt(referralCode, 'failed', 'Referrer not found');
-        return { success: false, error: 'Referrer not found' };
-      }
-
-      // Prevent circular referrals (check if referrer was referred by current user)
-      const { data: circularCheck, error: circularError } = await supabase
-        .from('referrals')
-        .select('id')
-        .eq('referrer_id', user.id)
-        .eq('referred_id', referrerId)
-        .single();
-
-      if (circularError && circularError.code !== 'PGRST116') {
-        console.error('Error checking circular referrals:', circularError);
-      }
-
-      if (circularCheck) {
-        await trackReferralAttempt(referralCode, 'invalid', 'Circular referral not allowed');
-        return { success: false, error: 'Circular referral not allowed - you cannot refer someone who referred you' };
-      }
-      
-      // Create referral relationship
-      const { error: referralError } = await supabase
-        .from('referrals')
-        .insert({
-          referrer_id: referrerId,
-          referred_id: user.id,
-          status: 'active'
-        });
-      
-      if (referralError) {
-        console.error('Error creating referral:', referralError);
-        await trackReferralAttempt(referralCode, 'failed', 'Failed to create referral relationship');
-        return { success: false, error: 'Failed to create referral relationship' };
-      }
-      
-      // Update user's referrer_id
-      const { error: updateError } = await supabase
-        .from('users')
-        .update({ referrer_id: referrerId })
-        .eq('id', user.id);
-      
-      if (updateError) {
-        console.error('Error updating user referrer:', updateError);
-        await trackReferralAttempt(referralCode, 'failed', 'Failed to update user referrer');
-        return { success: false, error: 'Failed to update user referrer' };
-      }
-      
-      // Update referrer's direct_referrals count
-      try {
-        const { error: countError } = await supabase
-          .rpc('increment_direct_referrals', { user_id: referrerId });
-        
-        if (countError) {
-          console.error('Error updating referrer count:', countError);
-          // Don't fail the whole process for this
-        }
-      } catch (error) {
-        console.error('Error incrementing referrer count:', error);
-        // Don't fail the whole process for this
-      }
-      
       // Track the successful attempt
-      await trackReferralAttempt(referralCode, 'success', 'Manual entry successful', referrer.username);
-      
-      // Reload data
+      await trackReferralAttempt(referralCode, 'success', data.message);
+
+      // Reload data to reflect the change
       await loadReferralData();
-      
-      return { success: true, referrer: referrer.username };
+
+      return { success: true, referrer: `User ${referrerId}` };
     } catch (error) {
       console.error('Error processing referral code manually:', error);
       await trackReferralAttempt(referralCode, 'failed', 'System error');
