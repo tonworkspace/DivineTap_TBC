@@ -1,0 +1,169 @@
+/* src/components/ReferralCard.css */
+
+.referral-card {
+  background: linear-gradient(135deg, #ffffff 0%, #f7f8fa 100%);
+  border-radius: 20px;
+  box-shadow: 0 10px 30px rgba(0, 0, 0, 0.05);
+  padding: 24px;
+  max-width: 400px;
+  margin: 20px auto;
+  font-family: 'Inter', sans-serif;
+  color: #333;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+}
+
+.referral-card:hover {
+  transform: translateY(-5px);
+  box-shadow: 0 15px 40px rgba(0, 0, 0, 0.08);
+}
+
+.card-header {
+  text-align: center;
+  margin-bottom: 24px;
+}
+
+.card-header h2 {
+  font-size: 22px;
+  font-weight: 700;
+  margin: 0 0 4px 0;
+  color: #1a202c;
+}
+
+.card-header p {
+  font-size: 14px;
+  color: #718096;
+  margin: 0;
+}
+
+.referral-code-section {
+  display: flex;
+  margin-bottom: 24px;
+}
+
+.referral-code-section input {
+  flex-grow: 1;
+  background-color: #edf2f7;
+  border: 1px solid #e2e8f0;
+  border-radius: 8px 0 0 8px;
+  padding: 12px;
+  font-size: 16px;
+  font-weight: 500;
+  color: #2d3748;
+  font-family: 'Roboto Mono', monospace;
+  outline: none;
+}
+
+.copy-button {
+  background-color: #4a5568;
+  color: white;
+  border: none;
+  padding: 0 16px;
+  border-radius: 0 8px 8px 0;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color 0.2s ease;
+}
+
+.copy-button:hover {
+  background-color: #2d3748;
+}
+
+.copy-button svg {
+  width: 20px;
+  height: 20px;
+}
+
+.stats-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.stat-item {
+  background-color: #f7fafc;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  padding: 16px;
+  text-align: center;
+}
+
+.stat-icon {
+  color: #4a5568;
+  font-size: 24px;
+  margin-bottom: 8px;
+}
+
+.stat-value {
+  font-size: 24px;
+  font-weight: 700;
+  color: #1a202c;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: #718096;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.progress-section {
+  margin-bottom: 24px;
+}
+
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+
+.progress-header h3 {
+  font-size: 14px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0;
+}
+
+.progress-header span {
+  font-size: 12px;
+  color: #718096;
+}
+
+.progress-bar-container {
+  background-color: #e2e8f0;
+  border-radius: 9999px;
+  height: 8px;
+  overflow: hidden;
+}
+
+.progress-bar-filler {
+  background: linear-gradient(90deg, #4c51bf 0%, #6b46c1 100%);
+  height: 100%;
+  border-radius: 9999px;
+  transition: width 0.5s ease-in-out;
+}
+
+.card-footer {
+  text-align: center;
+}
+
+.share-button {
+  background: linear-gradient(90deg, #4c51bf 0%, #6b46c1 100%);
+  color: white;
+  border: none;
+  border-radius: 12px;
+  padding: 14px 24px;
+  font-size: 16px;
+  font-weight: 600;
+  width: 100%;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.share-button:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 15px rgba(76, 81, 191, 0.3);
+}

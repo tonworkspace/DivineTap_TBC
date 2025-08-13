@@ -1,257 +1,196 @@
-/* ReferralSystem.css - Futuristic styling for referral system */
+/* src/components/ReferralSystem.css */
 
-/* Prevent layout shifts */
-.referral-system * {
-  box-sizing: border-box;
+.referral-system-redesigned {
+  padding: 16px;
+  background-color: #f4f7f9;
+  font-family: 'Inter', sans-serif;
 }
 
-/* Smooth transitions for all elements */
-.referral-system * {
-  transition: all 0.2s ease-in-out;
+.join-network-prompt {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  text-align: center;
+  margin: 20px 0;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
-/* Prevent text selection during animations */
-.referral-system {
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  -ms-user-select: none;
-  user-select: none;
+.join-network-prompt h3 {
+  font-size: 18px;
+  font-weight: 600;
+  margin: 0 0 8px 0;
+  color: #1a202c;
 }
 
-/* Stable container heights */
-.referral-system .space-y-2 > * {
-  min-height: 60px;
+.join-network-prompt p {
+  font-size: 14px;
+  color: #718096;
+  margin: 0 0 16px 0;
 }
 
-.referral-system .space-y-3 > * {
-  min-height: 80px;
+.join-network-prompt button {
+  background: linear-gradient(90deg, #4c51bf 0%, #6b46c1 100%);
+  color: white;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease;
 }
 
-/* Custom scrollbar for referral lists */
-.referral-system .game-scrollbar::-webkit-scrollbar {
-  width: 6px;
-}
-
-.referral-system .game-scrollbar::-webkit-scrollbar-track {
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 3px;
-}
-
-.referral-system .game-scrollbar::-webkit-scrollbar-thumb {
-  background: linear-gradient(180deg, #00ffff, #0080ff);
-  border-radius: 3px;
-}
-
-.referral-system .game-scrollbar::-webkit-scrollbar-thumb:hover {
-  background: linear-gradient(180deg, #00ffff, #0066cc);
-}
-
-/* Animation for referral code display */
-@keyframes referralCodeGlow {
-  0%, 100% {
-    text-shadow: 0 0 10px rgba(147, 51, 234, 0.5);
-  }
-  50% {
-    text-shadow: 0 0 20px rgba(147, 51, 234, 0.8), 0 0 30px rgba(147, 51, 234, 0.6);
-  }
-}
-
-.referral-code {
-  animation: referralCodeGlow 2s ease-in-out infinite;
-}
-
-/* Progress bar animation */
-@keyframes progressFill {
-  from {
-    width: 0%;
-  }
-  to {
-    width: var(--progress-width);
-  }
-}
-
-.progress-bar {
-  animation: progressFill 1s ease-out;
-}
-
-/* Referral card hover effects */
-.referral-card {
-  transition: all 0.3s ease;
-}
-
-.referral-card:hover {
+.join-network-prompt button:hover {
   transform: translateY(-2px);
-  box-shadow: 0 8px 25px rgba(0, 255, 255, 0.2);
 }
 
-/* Reward tier animations */
-.reward-tier {
-  transition: all 0.3s ease;
+.details-toggle-button {
+  background-color: #e2e8f0;
+  color: #4a5568;
+  border: none;
+  border-radius: 8px;
+  padding: 10px 20px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+  margin: 16px 0;
+  transition: background-color 0.2s ease;
 }
 
-.reward-tier:hover {
-  transform: scale(1.02);
+.details-toggle-button:hover {
+  background-color: #cbd5e0;
 }
 
-.reward-tier.unlocked {
-  animation: unlockPulse 0.6s ease-out;
+.details-section {
+  margin-top: 20px;
+  animation: fadeIn 0.5s ease-in-out;
 }
 
-@keyframes unlockPulse {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.05);
-  }
-  100% {
-    transform: scale(1);
-  }
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(-10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 
-/* Share button animations */
-.share-button {
-  transition: all 0.3s ease;
+.section-title {
+  font-size: 20px;
+  font-weight: 700;
+  color: #1a202c;
+  margin-bottom: 16px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #e2e8f0;
 }
 
-.share-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 4px 15px rgba(0, 255, 255, 0.3);
+.rewards-list, .referrals-list {
+  background: #fff;
+  border-radius: 12px;
+  padding: 20px;
+  margin-bottom: 20px;
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
 }
 
-/* Copy feedback animation */
-.copy-feedback {
-  animation: copySuccess 0.5s ease-out;
+.reward-item, .friend-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #edf2f7;
 }
 
-@keyframes copySuccess {
-  0% {
-    transform: scale(1);
-  }
-  50% {
-    transform: scale(1.1);
-  }
-  100% {
-    transform: scale(1);
-  }
+.reward-item:last-child, .friend-item:last-child {
+  border-bottom: none;
 }
 
-/* QR code container */
-.qr-container {
-  background: linear-gradient(135deg, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05));
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.2);
+.reward-icon {
+  font-size: 24px;
+  margin-right: 16px;
 }
 
-/* Social share buttons */
-.social-share-btn {
-  transition: all 0.3s ease;
-  position: relative;
-  overflow: hidden;
+.reward-info h4, .friend-info h4 {
+  font-size: 16px;
+  font-weight: 600;
+  color: #2d3748;
+  margin: 0 0 4px 0;
 }
 
-.social-share-btn::before {
-  content: '';
-  position: absolute;
-  top: 0;
-  left: -100%;
-  width: 100%;
-  height: 100%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
-  transition: left 0.5s ease;
+.reward-info p, .friend-info p {
+  font-size: 12px;
+  color: #718096;
+  margin: 0;
 }
 
-.social-share-btn:hover::before {
-  left: 100%;
+.reward-action {
+  margin-left: auto;
+  text-align: right;
 }
 
-/* Level indicator glow */
-.level-indicator {
-  position: relative;
+.reward-action button {
+  background-color: #48bb78;
+  color: white;
+  border: none;
+  border-radius: 6px;
+  padding: 8px 12px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s ease;
 }
 
-.level-indicator::after {
-  content: '';
-  position: absolute;
-  top: -2px;
-  left: -2px;
-  right: -2px;
-  bottom: -2px;
-  background: linear-gradient(45deg, #00ffff, #0080ff, #8000ff, #ff0080);
-  border-radius: inherit;
-  z-index: -1;
-  opacity: 0;
-  transition: opacity 0.3s ease;
+.reward-action button:disabled {
+  background-color: #a0aec0;
+  cursor: not-allowed;
 }
 
-.level-indicator:hover::after {
-  opacity: 1;
+.reward-action button:hover:not(:disabled) {
+  background-color: #38a169;
 }
 
-/* Referral stats counter animation */
-.stats-counter {
-  animation: countUp 1s ease-out;
+.claimed-badge {
+  font-size: 12px;
+  font-weight: 600;
+  color: #48bb78;
 }
 
-@keyframes countUp {
-  from {
-    opacity: 0;
-    transform: translateY(10px);
-  }
-  to {
-    opacity: 1;
-    transform: translateY(0);
-  }
+.reward-item.unlocked .reward-info h4 {
+  color: #38a169;
 }
 
-/* Modal backdrop blur */
-.modal-backdrop {
-  backdrop-filter: blur(8px);
-  -webkit-backdrop-filter: blur(8px);
+.reward-item.claimed .reward-info h4 {
+  text-decoration: line-through;
+  color: #a0aec0;
 }
 
-/* Responsive adjustments */
-@media (max-width: 640px) {
-  .referral-system .grid {
-    grid-template-columns: 1fr;
-  }
-  
-  .referral-system .flex {
-    flex-direction: column;
-  }
-  
-  .referral-system .text-2xl {
-    font-size: 1.25rem;
-  }
-  
-  .referral-system .text-lg {
-    font-size: 1rem;
-  }
+.friend-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background-color: #e2e8f0;
+  color: #718096;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 600;
+  margin-right: 16px;
+  text-transform: uppercase;
 }
 
-/* Dark mode enhancements */
-@media (prefers-color-scheme: dark) {
-  .referral-system {
-    color-scheme: dark;
-  }
+.friend-points {
+  margin-left: auto;
+  text-align: right;
 }
 
-/* High contrast mode support */
-@media (prefers-contrast: high) {
-  .referral-system .border {
-    border-width: 2px;
-  }
-  
-  .referral-system .text-gray-400 {
-    color: #9ca3af;
-  }
+.friend-points span {
+  font-size: 16px;
+  font-weight: 600;
+  color: #4c51bf;
 }
 
-/* Reduced motion support */
-@media (prefers-reduced-motion: reduce) {
-  .referral-system * {
-    animation-duration: 0.01ms !important;
-    animation-iteration-count: 1 !important;
-    transition-duration: 0.01ms !important;
-  }
+.friend-points p {
+  font-size: 12px;
+  color: #a0aec0;
+  margin: 0;
+}
+
+.no-friends {
+  text-align: center;
+  color: #718096;
+  padding: 20px;
 } 
