@@ -3,7 +3,7 @@ import { FiCopy, FiGift, FiUsers } from 'react-icons/fi';
 import './ReferralCard.css';
 
 interface ReferralCardProps {
-  referralCode: string;
+  referralLink: string;
   totalReferrals: number;
   totalEarnings: number;
   nextRewardTier: string;
@@ -14,7 +14,7 @@ interface ReferralCardProps {
 }
 
 export const ReferralCard: React.FC<ReferralCardProps> = ({
-  referralCode,
+  referralLink,
   totalReferrals,
   totalEarnings,
   nextRewardTier,
@@ -26,7 +26,7 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
   const [localCopied, setLocalCopied] = useState(false);
 
   const handleCopy = () => {
-    navigator.clipboard.writeText(referralCode);
+    navigator.clipboard.writeText(referralLink);
     setLocalCopied(true);
     setTimeout(() => setLocalCopied(false), 2000);
   };
@@ -40,7 +40,7 @@ export const ReferralCard: React.FC<ReferralCardProps> = ({
 
       <div className="card-body">
         <div className="referral-code-section">
-          <input type="text" value={referralCode} readOnly />
+          <input type="text" value={referralLink} readOnly />
           <button onClick={handleCopy} className="copy-button">
             {localCopied ? <FiCheck /> : <FiCopy />}
           </button>

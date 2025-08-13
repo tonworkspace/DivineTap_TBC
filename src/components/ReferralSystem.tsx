@@ -291,6 +291,7 @@ export const ReferralSystem: React.FC = () => {
 
   const progress = nextLevel ? (referralData.totalReferrals / nextLevel.requirements) * 100 : 100;
   const referralsNeeded = nextLevel ? nextLevel.requirements - referralData.totalReferrals : 0;
+  const referralLink = `https://t.me/DivineTaps_bot/mine?startapp=${referralData.code}`;
 
   return (
     <div className="flex-1 p-custom space-y-4 overflow-y-auto game-scrollbar referral-system-redesigned">
@@ -301,7 +302,7 @@ export const ReferralSystem: React.FC = () => {
       ) : (
         <>
           <ReferralCard
-            referralCode={referralData.code}
+            referralLink={referralLink}
             totalReferrals={referralData.totalReferrals}
             totalEarnings={referralData.rewards.points}
             nextRewardTier={nextLevel ? nextLevel.name : 'All Tiers Completed'}

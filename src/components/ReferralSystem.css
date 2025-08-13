@@ -2,34 +2,36 @@
 
 .referral-system-redesigned {
   padding: 16px;
-  background-color: #f4f7f9;
+  background-color: #010409;
   font-family: 'Inter', sans-serif;
+  color: #C9D1D9;
 }
 
 .join-network-prompt {
-  background: #fff;
+  background: #0D1117;
+  border: 1px solid #30363D;
   border-radius: 12px;
   padding: 20px;
   text-align: center;
   margin: 20px 0;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .join-network-prompt h3 {
   font-size: 18px;
   font-weight: 600;
   margin: 0 0 8px 0;
-  color: #1a202c;
+  color: #58A6FF;
 }
 
 .join-network-prompt p {
   font-size: 14px;
-  color: #718096;
+  color: #8B949E;
   margin: 0 0 16px 0;
 }
 
 .join-network-prompt button {
-  background: linear-gradient(90deg, #4c51bf 0%, #6b46c1 100%);
+  background: linear-gradient(90deg, #1F6FEB 0%, #388BFD 100%);
   color: white;
   border: none;
   border-radius: 8px;
@@ -45,9 +47,9 @@
 }
 
 .details-toggle-button {
-  background-color: #e2e8f0;
-  color: #4a5568;
-  border: none;
+  background-color: #21262D;
+  color: #C9D1D9;
+  border: 1px solid #30363D;
   border-radius: 8px;
   padding: 10px 20px;
   font-size: 14px;
@@ -58,7 +60,7 @@
 }
 
 .details-toggle-button:hover {
-  background-color: #cbd5e0;
+  background-color: #30363D;
 }
 
 .details-section {
@@ -74,25 +76,26 @@
 .section-title {
   font-size: 20px;
   font-weight: 700;
-  color: #1a202c;
+  color: #58A6FF;
   margin-bottom: 16px;
   padding-bottom: 8px;
-  border-bottom: 1px solid #e2e8f0;
+  border-bottom: 1px solid #30363D;
 }
 
 .rewards-list, .referrals-list {
-  background: #fff;
+  background: #0D1117;
+  border: 1px solid #30363D;
   border-radius: 12px;
   padding: 20px;
   margin-bottom: 20px;
-  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.05);
+  box-shadow: 0 4px 15px rgba(0, 0, 0, 0.2);
 }
 
 .reward-item, .friend-item {
   display: flex;
   align-items: center;
   padding: 12px 0;
-  border-bottom: 1px solid #edf2f7;
+  border-bottom: 1px solid #21262D;
 }
 
 .reward-item:last-child, .friend-item:last-child {
@@ -102,18 +105,19 @@
 .reward-icon {
   font-size: 24px;
   margin-right: 16px;
+  color: #8B949E;
 }
 
 .reward-info h4, .friend-info h4 {
   font-size: 16px;
   font-weight: 600;
-  color: #2d3748;
+  color: #C9D1D9;
   margin: 0 0 4px 0;
 }
 
 .reward-info p, .friend-info p {
   font-size: 12px;
-  color: #718096;
+  color: #8B949E;
   margin: 0;
 }
 
@@ -123,7 +127,7 @@
 }
 
 .reward-action button {
-  background-color: #48bb78;
+  background-color: #238636;
   color: white;
   border: none;
   border-radius: 6px;
@@ -135,35 +139,36 @@
 }
 
 .reward-action button:disabled {
-  background-color: #a0aec0;
+  background-color: #30363D;
+  color: #8B949E;
   cursor: not-allowed;
 }
 
 .reward-action button:hover:not(:disabled) {
-  background-color: #38a169;
+  background-color: #2EA043;
 }
 
 .claimed-badge {
   font-size: 12px;
   font-weight: 600;
-  color: #48bb78;
+  color: #3FB950;
 }
 
 .reward-item.unlocked .reward-info h4 {
-  color: #38a169;
+  color: #3FB950;
 }
 
 .reward-item.claimed .reward-info h4 {
   text-decoration: line-through;
-  color: #a0aec0;
+  color: #8B949E;
 }
 
 .friend-avatar {
   width: 40px;
   height: 40px;
   border-radius: 50%;
-  background-color: #e2e8f0;
-  color: #718096;
+  background-color: #161B22;
+  color: #8B949E;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -180,17 +185,17 @@
 .friend-points span {
   font-size: 16px;
   font-weight: 600;
-  color: #4c51bf;
+  color: #58A6FF;
 }
 
 .friend-points p {
   font-size: 12px;
-  color: #a0aec0;
+  color: #8B949E;
   margin: 0;
 }
 
 .no-friends {
   text-align: center;
-  color: #718096;
+  color: #8B949E;
   padding: 20px;
 } 
