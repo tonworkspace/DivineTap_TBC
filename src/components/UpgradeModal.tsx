@@ -43,6 +43,9 @@ interface UpgradeModalProps {
   currentUpgradePage: number;
   setUpgradeFilter: (filter: 'all' | 'affordable' | 'recommended' | 'hardware' | 'advanced' | 'software' | 'network' | 'infrastructure') => void;
   setCurrentUpgradePage: (page: number) => void;
+  testUpgradeEffects?: () => void;
+  forceReloadUpgrades?: () => void;
+  debugUpgradeSystem?: () => void;
 }
 
 export const UpgradeModal: React.FC<UpgradeModalProps> = ({
@@ -64,6 +67,9 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
   currentUpgradePage,
   setUpgradeFilter,
   setCurrentUpgradePage,
+  testUpgradeEffects,
+  forceReloadUpgrades,
+  debugUpgradeSystem,
 }) => {
   const [isVisible, setIsVisible] = useState(false);
   const [isAnimating, setIsAnimating] = useState(false);
@@ -495,6 +501,31 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
               </button>
             </div>
           )}
+          { (testUpgradeEffects || forceReloadUpgrades || debugUpgradeSystem) &&
+                <div className="mt-3 pt-2 border-t border-gray-600/20 text-center space-x-2">
+                  { testUpgradeEffects && <button
+                    onClick={testUpgradeEffects}
+                    className="px-3 py-1 rounded text-xs font-mono bg-green-700/50 text-green-300 border border-green-600 hover:bg-green-600/50 hover:text-green-200 transition-all duration-300"
+                    title="Test all upgrade effects and check console for detailed analysis"
+                  >
+                    🧪 TEST EFFECTS
+                  </button>}
+                  { debugUpgradeSystem && <button
+                    onClick={debugUpgradeSystem}
+                    className="px-3 py-1 rounded text-xs font-mono bg-gray-700/50 text-gray-300 border border-gray-600 hover:bg-gray-600/50 hover:text-gray-200 transition-all duration-300"
+                    title="Debug upgrade system and check console for detailed analysis"
+                  >
+                    🔍 DEBUG UPGRADES
+                  </button>}
+                  { forceReloadUpgrades && <button
+                    onClick={forceReloadUpgrades}
+                    className="px-3 py-1 rounded text-xs font-mono bg-blue-700/50 text-blue-300 border border-blue-600 hover:bg-blue-600/50 hover:text-blue-200 transition-all duration-300"
+                    title="Force reload upgrades from localStorage"
+                  >
+                    🔄 RELOAD UPGRADES
+                  </button>}
+                </div>
+          }
         </div>
       </div>
     </div>

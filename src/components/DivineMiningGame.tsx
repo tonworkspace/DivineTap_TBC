@@ -2963,14 +2963,14 @@ export const DivineMiningGame: React.FC = () => {
   };
 
   // // Helper function to categorize upgrades
-  // const getUpgradeCategory = (upgradeId: string): string => {
-  //   for (const [category, ids] of Object.entries(UPGRADE_CATEGORIES)) {
-  //     if (ids.includes(upgradeId)) {
-  //       return category;
-  //     }
-  //   }
-  //   return 'POINTS_PER_SECOND'; // Default category
-  // };
+  const getUpgradeCategory = (upgradeId: string): string => {
+    for (const [category, ids] of Object.entries(UPGRADE_CATEGORIES)) {
+      if (ids.includes(upgradeId)) {
+        return category;
+      }
+    }
+    return 'POINTS_PER_SECOND'; // Default category
+  };
 
   // Helper function to check if upgrade is PPS (points per second)
   const isPPSUpgradeType = (upgradeId: string): boolean => {
@@ -3795,30 +3795,154 @@ export const DivineMiningGame: React.FC = () => {
     }
   }, [getUserSpecificKey, achievements]);
 
-  // Debug function to test upgrade system
+  // Function to test all upgrade effects
+  const testUpgradeEffects = useCallback(() => {
+    console.log('🧪 Testing all upgrade effects...');
+
+    // Test energy regeneration
+    const energyRegen = getEnergyRegenerationRate();
+    console.log(`Energy Regeneration: ${energyRegen}/sec`);
+
+    // Test energy efficiency
+    const energyEfficiency = getEnergyEfficiencyBonus();
+    console.log(`Energy Efficiency Bonus: ${(energyEfficiency * 100).toFixed(1)}%`);
+
+    // Test enhanced mining rate
+    const enhancedRate = getEnhancedMiningRate();
+    console.log(`Enhanced Mining Rate: ${enhancedRate}/sec`);
+
+    // Test upgrade categorization
+    upgrades.forEach(upgrade => {
+      const category = getUpgradeCategory(upgrade.id);
+      const isPPS = isPPSUpgradeType(upgrade.id);
+      console.log(`Upgrade ${upgrade.name} (${upgrade.id}): Category=${category}, PPS=${isPPS}, Level=${upgrade.level}, Effect=${upgrade.effectValue}`);
+    });
+
+    // Test auto-mining
+    const autoMiningUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.AUTO_MINING.includes(u.id));
+    const hasAutoMining = autoMiningUpgrades.some(u => u.level > 0);
+    console.log(`Auto-mining: ${hasAutoMining ? 'ENABLED' : 'DISABLED'}`);
+
+    // Test offline bonus
+    const offlineUpgrades = upgrades.filter(u => UPGRADE_CATEGORIES.OFFLINE_BONUS.includes(u.id));
+    const offlineBonus = offlineUpgrades.reduce((sum, u) => sum + (u.effectValue * u.level), 0);
+    console.log(`Offline Bonus: ${(offlineBonus * 100).toFixed(1)}%`);
+
+    showSystemNotification('Upgrade Test Complete', 'Check console for detailed upgrade effect analysis', 'info');
+  }, [upgrades, getEnergyRegenerationRate, getEnergyEfficiencyBonus, getEnhancedMiningRate, showSystemNotification, getUpgradeCategory, isPPSUpgradeType]);
+
+  // Function to force reload upgrades
+  const forceReloadUpgrades = useCallback(() => {
+    console.log('🔄 Force reloading upgrades...');
+    setLoadingMessage('Reloading upgrades...');
+
+    // Clear current upgrades
+    setUpgrades([]);
+
+    // Reload from localStorage first
+    const userUpgradesKey = getUserSpecificKey(UPGRADES_KEY);
+    const savedUpgrades = localStorage.getItem(userUpgradesKey);
+
+    if (savedUpgrades) {
+      try {
+        const parsed = JSON.parse(savedUpgrades);
+        if (Array.isArray(parsed) && parsed.length > 0) {
+          const validatedUpgrades = parsed.map(upgrade => ({
+            id: upgrade.id || 'unknown',
+            name: upgrade.name || 'Unknown Upgrade',
+            level: Math.max(0, Math.min(upgrade.level || 0, upgrade.maxLevel || 50)),
+            effect: upgrade.effect || '+0 effect',
+            baseCost: Math.max(1, upgrade.baseCost || 25),
+            costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
+            effectValue: upgrade.effectValue || 0,
+            category: upgrade.category || 'hardware',
+            description: upgrade.description || 'An upgrade',
+            requires: upgrade.requires || undefined,
+            detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
+            benefits: upgrade.benefits || ['No benefits listed'],
+            tips: upgrade.tips || ['No tips available'],
+            unlockProgress: Math.max(0, Math.min(100, upgrade.unlockProgress || 0)),
+            maxLevel: Math.max(1, upgrade.maxLevel || 50),
+            unlockReward: upgrade.unlockReward || 'No reward'
+          }));
+
+          setUpgrades(validatedUpgrades);
+          console.log('✅ Upgrades reloaded from localStorage:', validatedUpgrades);
+          showSystemNotification('Upgrades Reloaded', 'Successfully reloaded upgrades from localStorage', 'success');
+        } else {
+          throw new Error('Invalid upgrade data format');
+        }
+      } catch (error) {
+        console.error('Error reloading upgrades from localStorage:', error);
+        // Fall back to default upgrades
+        const defaultUpgrades = getInitialUpgrades();
+        setUpgrades(defaultUpgrades);
+        console.log('✅ Loaded default upgrades as fallback:', defaultUpgrades);
+        showSystemNotification('Default Upgrades Loaded', 'Loaded default upgrades due to data corruption', 'warning');
+      }
+    } else {
+      // No saved upgrades, load defaults
+      const defaultUpgrades = getInitialUpgrades();
+      setUpgrades(defaultUpgrades);
+      console.log('✅ Loaded default upgrades (no saved data):', defaultUpgrades);
+      showSystemNotification('Default Upgrades Loaded', 'No saved upgrades found, loaded defaults', 'info');
+    }
+
+    setLoadingMessage('');
+  }, [getUserSpecificKey, getInitialUpgrades, showSystemNotification, setUpgrades, setLoadingMessage]);
+
+  // Debug function to verify upgrade system
   const debugUpgradeSystem = useCallback(() => {
-    console.log('🔍 DEBUG: Upgrade System Status');
-    console.log('Current upgrades:', upgrades.map(u => ({
+    console.log('🔍 Upgrade System Debug Report:');
+    console.log('Current Game State:', {
+      divinePoints: gameState.divinePoints,
+      pointsPerSecond: gameState.pointsPerSecond,
+      upgradesPurchased: gameState.upgradesPurchased,
+      currentEnergy: gameState.currentEnergy,
+      maxEnergy: gameState.maxEnergy,
+      offlineEfficiencyBonus: gameState.offlineEfficiencyBonus
+    });
+
+    console.log('Upgrade Calculations:', {
+      energyRegenRate: getEnergyRegenerationRate(),
+      energyEfficiencyBonus: getEnergyEfficiencyBonus(),
+      enhancedMiningRate: getEnhancedMiningRate(),
+      totalUpgrades: upgrades.length,
+      availableUpgrades: upgrades.filter(u => isUpgradeAvailable(u) && !isUpgradeMaxed(u)).length,
+      maxedUpgrades: upgrades.filter(u => isUpgradeMaxed(u)).length
+    });
+
+    console.log('Upgrade Details:', upgrades.map(u => ({
       id: u.id,
       name: u.name,
       level: u.level,
+      maxLevel: u.maxLevel,
       effectValue: u.effectValue,
-      baseCost: u.baseCost,
-      costMultiplier: u.costMultiplier
+      isAvailable: isUpgradeAvailable(u),
+      isMaxed: isUpgradeMaxed(u),
+      cost: getUpgradeCost(u)
     })));
-    console.log('Current game state:', {
-      divinePoints: gameState.divinePoints,
-      pointsPerSecond: gameState.pointsPerSecond,
-      upgradesPurchased: gameState.upgradesPurchased
-    });
     
-    // Test cost calculation for first upgrade
-    if (upgrades.length > 0) {
-      const testUpgrade = upgrades[0];
-      const cost = getUpgradeCost(testUpgrade);
-      console.log(`Test cost for ${testUpgrade.name}: ${cost}`);
+    // Check for common loading issues
+    const issues = [];
+    if (upgrades.length === 0) issues.push('No upgrades loaded');
+    if (gameState.pointsPerSecond <= 1.0 && upgrades.some(u => u.level > 0)) {
+      issues.push('No upgrade effects applied to PPS');
     }
-  }, [upgrades, gameState, getUpgradeCost]);
+    if (gameState.offlineEfficiencyBonus <= 0 && upgrades.some(u => UPGRADE_CATEGORIES.OFFLINE_BONUS.includes(u.id) && u.level > 0)) {
+      issues.push('No offline bonus upgrades detected');
+    }
+
+    if (issues.length > 0) {
+      console.warn('⚠️ Potential loading issues detected:', issues);
+      showSystemNotification('Loading Issues Found', `Issues: ${issues.join(', ')}`, 'warning');
+    } else {
+      console.log('✅ All upgrade systems appear to be working correctly');
+      showSystemNotification('System Healthy', 'All upgrade systems working correctly', 'success');
+    }
+
+    showSystemNotification('Debug Complete', 'Check console for upgrade system analysis', 'info');
+  }, [gameState, upgrades, getEnergyRegenerationRate, getEnergyEfficiencyBonus, getEnhancedMiningRate, isUpgradeAvailable, isUpgradeMaxed, getUpgradeCost, showSystemNotification]);
 
   // Update purchase upgrade function to save to both localStorage and Supabase
   const purchaseUpgrade = useCallback((upgradeId: string) => {
@@ -4400,7 +4524,10 @@ export const DivineMiningGame: React.FC = () => {
         const upgradeData = {
           upgrades,
           divinePoints: gameState.divinePoints,
-          purchasingUpgrade
+          purchasingUpgrade,
+          testUpgradeEffects,
+          forceReloadUpgrades,
+          debugUpgradeSystem
         };
         
         window.dispatchEvent(new CustomEvent('upgradeDataResponse', { 

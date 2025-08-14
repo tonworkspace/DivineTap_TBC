@@ -479,6 +479,9 @@ const UpgradeShopModal: FC<{
       currentUpgradePage={currentUpgradePage}
       setUpgradeFilter={setUpgradeFilter}
       setCurrentUpgradePage={setCurrentUpgradePage}
+      testUpgradeEffects={upgradeData.testUpgradeEffects}
+      forceReloadUpgrades={upgradeData.forceReloadUpgrades}
+      debugUpgradeSystem={upgradeData.debugUpgradeSystem}
     />
   );
 };

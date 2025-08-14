@@ -58,7 +58,7 @@ export const SendJettonModal = ({
           initial={{ scale: 0.95 }}
           animate={{ scale: 1 }}
           exit={{ scale: 0.95 }}
-          onClick={(e) => e.stopPropagation()}
+          onClick={(e: React.MouseEvent) => e.stopPropagation()}
           className="bg-[#1E1E1E] rounded-2xl max-w-md w-full overflow-hidden border border-gray-800 shadow-xl"
         >
           {/* Header */}
