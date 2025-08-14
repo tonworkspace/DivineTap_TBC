@@ -519,10 +519,15 @@ export const UpgradeModal: React.FC<UpgradeModalProps> = ({
                   </button>}
                   { forceReloadUpgrades && <button
                     onClick={forceReloadUpgrades}
-                    className="px-3 py-1 rounded text-xs font-mono bg-blue-700/50 text-blue-300 border border-blue-600 hover:bg-blue-600/50 hover:text-blue-200 transition-all duration-300"
+                    disabled={divinePoints < 500000000}
+                    className={`px-3 py-1 rounded text-xs font-mono transition-all duration-300 ${
+                      divinePoints >= 500000000
+                        ? 'bg-blue-700/50 text-blue-300 border border-blue-600 hover:bg-blue-600/50 hover:text-blue-200'
+                        : 'bg-gray-700/50 text-gray-500 border border-gray-600 cursor-not-allowed'
+                    }`}
                     title="Force reload upgrades from localStorage"
                   >
-                    🔄 RELOAD UPGRADES
+                    🔄 RELOAD UPGRADES (Cost: 500M)
                   </button>}
                 </div>
           }

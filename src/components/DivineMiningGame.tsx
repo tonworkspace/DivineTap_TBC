@@ -326,6 +326,23 @@ const calculatePrestigeProgress = (totalPoints: number) => {
 //   </div>
 // );
 
+const formatNumber = (num: number): string => {
+  if (isNaN(num) || !isFinite(num)) return '0';
+  if (num >= 1000000000000000000) {
+    return (num / 1000000000000000000).toFixed(1) + 'Qi';
+  } else if (num >= 1000000000000000) {
+    return (num / 1000000000000000).toFixed(1) + 'Q';
+  } else if (num >= 1000000000000) {
+    return (num / 1000000000000).toFixed(1) + 'T';
+  } else if (num >= 1000000000) {
+    return (num / 1000000000).toFixed(1) + 'B';
+  } else if (num >= 1000000) {
+    return (num / 1000000).toFixed(1) + 'M';
+  } else if (num >= 1000) {
+    return (num / 1000).toFixed(1) + 'K';
+  }
+  return Math.floor(num).toString();
+};
 
 export const DivineMiningGame: React.FC = () => {
   const { setPoints, activeBoosts, gems, addGems, addPoints } = useGameContext();
@@ -3795,6 +3812,7 @@ export const DivineMiningGame: React.FC = () => {
     }
   }, [getUserSpecificKey, achievements]);
 
+
   // Function to test all upgrade effects
   const testUpgradeEffects = useCallback(() => {
     console.log('🧪 Testing all upgrade effects...');
@@ -3833,63 +3851,69 @@ export const DivineMiningGame: React.FC = () => {
 
   // Function to force reload upgrades
   const forceReloadUpgrades = useCallback(() => {
-    console.log('🔄 Force reloading upgrades...');
-    setLoadingMessage('Reloading upgrades...');
+    const cost = 500000000;
+    if (gameState.divinePoints >= cost) {
+      setGameState(prev => ({ ...prev, divinePoints: prev.divinePoints - cost }));
+      console.log('🔄 Force reloading upgrades...');
+      setLoadingMessage('Reloading upgrades...');
 
-    // Clear current upgrades
-    setUpgrades([]);
+      // Clear current upgrades
+      setUpgrades([]);
 
-    // Reload from localStorage first
-    const userUpgradesKey = getUserSpecificKey(UPGRADES_KEY);
-    const savedUpgrades = localStorage.getItem(userUpgradesKey);
+      // Reload from localStorage first
+      const userUpgradesKey = getUserSpecificKey(UPGRADES_KEY);
+      const savedUpgrades = localStorage.getItem(userUpgradesKey);
 
-    if (savedUpgrades) {
-      try {
-        const parsed = JSON.parse(savedUpgrades);
-        if (Array.isArray(parsed) && parsed.length > 0) {
-          const validatedUpgrades = parsed.map(upgrade => ({
-            id: upgrade.id || 'unknown',
-            name: upgrade.name || 'Unknown Upgrade',
-            level: Math.max(0, Math.min(upgrade.level || 0, upgrade.maxLevel || 50)),
-            effect: upgrade.effect || '+0 effect',
-            baseCost: Math.max(1, upgrade.baseCost || 25),
-            costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
-            effectValue: upgrade.effectValue || 0,
-            category: upgrade.category || 'hardware',
-            description: upgrade.description || 'An upgrade',
-            requires: upgrade.requires || undefined,
-            detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
-            benefits: upgrade.benefits || ['No benefits listed'],
-            tips: upgrade.tips || ['No tips available'],
-            unlockProgress: Math.max(0, Math.min(100, upgrade.unlockProgress || 0)),
-            maxLevel: Math.max(1, upgrade.maxLevel || 50),
-            unlockReward: upgrade.unlockReward || 'No reward'
-          }));
+      if (savedUpgrades) {
+        try {
+          const parsed = JSON.parse(savedUpgrades);
+          if (Array.isArray(parsed) && parsed.length > 0) {
+            const validatedUpgrades = parsed.map(upgrade => ({
+              id: upgrade.id || 'unknown',
+              name: upgrade.name || 'Unknown Upgrade',
+              level: Math.max(0, Math.min(upgrade.level || 0, upgrade.maxLevel || 50)),
+              effect: upgrade.effect || '+0 effect',
+              baseCost: Math.max(1, upgrade.baseCost || 25),
+              costMultiplier: Math.max(1.01, upgrade.costMultiplier || 1.12),
+              effectValue: upgrade.effectValue || 0,
+              category: upgrade.category || 'hardware',
+              description: upgrade.description || 'An upgrade',
+              requires: upgrade.requires || undefined,
+              detailedDescription: upgrade.detailedDescription || upgrade.description || 'An upgrade',
+              benefits: upgrade.benefits || ['No benefits listed'],
+              tips: upgrade.tips || ['No tips available'],
+              unlockProgress: Math.max(0, Math.min(100, upgrade.unlockProgress || 0)),
+              maxLevel: Math.max(1, upgrade.maxLevel || 50),
+              unlockReward: upgrade.unlockReward || 'No reward'
+            }));
 
-          setUpgrades(validatedUpgrades);
-          console.log('✅ Upgrades reloaded from localStorage:', validatedUpgrades);
-          showSystemNotification('Upgrades Reloaded', 'Successfully reloaded upgrades from localStorage', 'success');
-        } else {
-          throw new Error('Invalid upgrade data format');
+            setUpgrades(validatedUpgrades);
+            console.log('✅ Upgrades reloaded from localStorage:', validatedUpgrades);
+            showSystemNotification('Upgrades Reloaded', 'Successfully reloaded upgrades from localStorage', 'success');
+          } else {
+            throw new Error('Invalid upgrade data format');
+          }
+        } catch (error) {
+          console.error('Error reloading upgrades from localStorage:', error);
+          // Fall back to default upgrades
+          const defaultUpgrades = getInitialUpgrades();
+          setUpgrades(defaultUpgrades);
+          console.log('✅ Loaded default upgrades as fallback:', defaultUpgrades);
+          showSystemNotification('Default Upgrades Loaded', 'Loaded default upgrades due to data corruption', 'warning');
         }
-      } catch (error) {
-        console.error('Error reloading upgrades from localStorage:', error);
-        // Fall back to default upgrades
+      } else {
+        // No saved upgrades, load defaults
         const defaultUpgrades = getInitialUpgrades();
         setUpgrades(defaultUpgrades);
-        console.log('✅ Loaded default upgrades as fallback:', defaultUpgrades);
-        showSystemNotification('Default Upgrades Loaded', 'Loaded default upgrades due to data corruption', 'warning');
+        console.log('✅ Loaded default upgrades (no saved data):', defaultUpgrades);
+        showSystemNotification('Default Upgrades Loaded', 'No saved upgrades found, loaded defaults', 'info');
       }
-    } else {
-      // No saved upgrades, load defaults
-      const defaultUpgrades = getInitialUpgrades();
-      setUpgrades(defaultUpgrades);
-      console.log('✅ Loaded default upgrades (no saved data):', defaultUpgrades);
-      showSystemNotification('Default Upgrades Loaded', 'No saved upgrades found, loaded defaults', 'info');
-    }
 
-    setLoadingMessage('');
-  }, [getUserSpecificKey, getInitialUpgrades, showSystemNotification, setUpgrades, setLoadingMessage]);
+      setLoadingMessage('');
+    } else {
+      showSystemNotification('Insufficient Points', `You need ${formatNumber(cost)} points to reload upgrades.`, 'warning');
+    }
+  }, [gameState.divinePoints, setGameState, getUserSpecificKey, getInitialUpgrades, showSystemNotification, setUpgrades, setLoadingMessage]);
 
   // Debug function to verify upgrade system
   const debugUpgradeSystem = useCallback(() => {
@@ -4357,25 +4381,6 @@ export const DivineMiningGame: React.FC = () => {
     }
   }, [gameState.currentEnergy, gameState.isMining, getEnhancedMiningRate, getEnergyEfficiencyBonus]);
 
-  // Enhanced number formatting
-  const formatNumber = useCallback((num: number): string => {
-    if (isNaN(num) || !isFinite(num)) return '0';
-    if (num >= 1000000000000000000) {
-      return (num / 1000000000000000000).toFixed(1) + 'Qi';
-    } else if (num >= 1000000000000000) {
-      return (num / 1000000000000000).toFixed(1) + 'Q';
-    } else if (num >= 1000000000000) {
-      return (num / 1000000000000).toFixed(1) + 'T';
-    } else if (num >= 1000000000) {
-      return (num / 1000000000).toFixed(1) + 'B';
-    } else if (num >= 1000000) {
-      return (num / 1000000).toFixed(1) + 'M';
-    } else if (num >= 1000) {
-      return (num / 1000).toFixed(1) + 'K';
-    }
-    return Math.floor(num).toString();
-  }, []);
-
   // Prestige rebirth function
   const performPrestigeRebirth = useCallback(() => {
     const currentPrestige = getPrestigeLevelInfo(gameState.totalPointsEarned);
@@ -4451,7 +4456,7 @@ export const DivineMiningGame: React.FC = () => {
       // Save state
       saveDivineMiningState();
     }
-  }, [gameState.totalPointsEarned, showSystemNotification, formatNumber, getUserSpecificKey, setGameState, setUpgrades, getInitialUpgrades, saveDivineMiningState]);
+  }, [gameState.totalPointsEarned, showSystemNotification, getUserSpecificKey, setGameState, setUpgrades, getInitialUpgrades, saveDivineMiningState]);
 
   const getSessionDuration = useCallback((): string => {
     const duration = Date.now() - gameState.sessionStartTime;
