@@ -494,7 +494,7 @@ export const OnboardingScreen: FC = () => {
         />
       )}
       
-      <div className="max-w-md w-full px-6">
+      <div className="max-w-md w-full px-6 overflow-y-auto max-h-[90vh] py-8 rounded-lg">
         {loading ? (
           <div className="flex flex-col items-center">
             <div className="relative">
