@@ -4964,6 +4964,28 @@ export const DivineMiningGame: React.FC = () => {
               </button>
             </div>
 
+            {/* Manual Refresh Button */}
+            <div className="relative hidden z-10 mt-2">
+              <button
+                onClick={() => window.location.reload(true)}
+                className={`w-full flex items-center justify-center p-1.5 rounded-lg transition-all duration-300 font-mono font-bold border ${
+                  showResetButton
+                    ? 'opacity-100 bg-gradient-to-r from-blue-900/50 to-cyan-800/50 border-blue-500/50 text-blue-300 shadow-[0_0_20px_rgba(59,130,246,0.3)]'
+                    : 'opacity-30 hover:opacity-60 bg-gradient-to-r from-gray-800/30 to-gray-700/30 border-gray-600/30 text-gray-400 hover:text-gray-300'
+                } group text-xs`}
+                title="Force reload game data"
+              >
+                <div className="flex items-center space-x-1">
+                  <div className={`w-1.5 h-1.5 rounded-full transition-colors ${
+                    showResetButton ? 'bg-blue-400 animate-pulse' : 'bg-gray-400'
+                  }`}></div>
+                  <span className="tracking-wider">
+                    🔄 REFRESH DATA
+                  </span>
+                </div>
+              </button>
+            </div>
+
            
             {/* Compact Offline Rewards */}
             {showOfflineRewards && gameState.unclaimedOfflineRewards > 0 && (

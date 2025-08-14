@@ -151,6 +151,16 @@ const UpgradeShopModal: FC<{
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [retryCount, setRetryCount] = useState(0);
+  const { points } = useGameContext();
+
+  useEffect(() => {
+    if (upgradeData && points !== upgradeData.divinePoints) {
+      setUpgradeData((prevData: any) => ({
+        ...prevData,
+        divinePoints: points,
+      }));
+    }
+  }, [points, upgradeData]);
   
   // FAST FILTER STATE - Moved from DivineMiningGame for better performance
   const [upgradeFilter, setUpgradeFilter] = useState<'all' | 'affordable' | 'recommended' | 'hardware' | 'advanced' | 'software' | 'network' | 'infrastructure'>('all');
