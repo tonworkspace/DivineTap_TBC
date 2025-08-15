@@ -3868,7 +3868,8 @@ export const DivineMiningGame: React.FC = () => {
         try {
           const parsed = JSON.parse(savedUpgrades);
           if (Array.isArray(parsed) && parsed.length > 0) {
-            const validatedUpgrades = parsed.map(upgrade => ({
+          const validatedUpgrades = parsed.map(upgrade => {
+            const validated = {
               id: upgrade.id || 'unknown',
               name: upgrade.name || 'Unknown Upgrade',
               level: Math.max(0, Math.min(upgrade.level || 0, upgrade.maxLevel || 50)),
@@ -3885,7 +3886,12 @@ export const DivineMiningGame: React.FC = () => {
               unlockProgress: Math.max(0, Math.min(100, upgrade.unlockProgress || 0)),
               maxLevel: Math.max(1, upgrade.maxLevel || 50),
               unlockReward: upgrade.unlockReward || 'No reward'
-            }));
+            };
+            if (validated.level >= validated.maxLevel) {
+              validated.level = 0;
+            }
+            return validated;
+          });
 
             setUpgrades(validatedUpgrades);
             console.log('✅ Upgrades reloaded from localStorage:', validatedUpgrades);
